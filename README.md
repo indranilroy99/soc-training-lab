@@ -1,110 +1,55 @@
-# DIASS-SEC — Security Operations Platform
+# DIASS-SEC
 
-A browser-based security operations platform for alert triage, SIEM log analysis, incident case management, and threat intelligence enrichment. Built around real-world incident scenarios with accurate Windows Event IDs, MITRE ATT&CK mappings, and full attack chain telemetry.
+Browser-based security operations platform. Alert triage, SIEM log analysis, incident case management, and threat intelligence enrichment — built around real incident scenarios with accurate Windows Event IDs and MITRE ATT&CK mappings.
 
-No build step. No framework. No package manager. Pure HTML, CSS, and JavaScript — Apache serves static files.
-
----
-
-## Platform Modules
-
-| Module | Description |
-|---|---|
-| **Dashboard** | Live attack timeline, severity breakdown, MITRE heatmap, agent health |
-| **Alert Triage** | 18 alerts across 8 incident scenarios — TP/FP classification with MITRE mapping |
-| **SIEM Logs** | 18 raw Windows event logs with key:value search syntax |
-| **Incident Cases** | Case management with task checklists, observable tracking, pivot to threat intel |
-| **Threat Intel** | IOC enrichment with threat scoring — IPs, domains, hashes, URLs, email |
-| **Analyst Board** | Per-analyst activity tracking, triage counts, and accuracy metrics |
-
----
-
-## Incident Scenarios
-
-| # | Scenario | Key Event IDs | MITRE |
-|---|---|---|---|
-| S1 | Port Scan / Recon | 5156 | T1046 |
-| S2 | RDP Brute Force → Account Compromise | 4625, 4624 | T1110.001, T1078 |
-| S3 | Phishing → Macro → PowerShell → C2 | Sysmon 1, 3 | T1059.001, T1071.001 |
-| S4 | Lateral Movement via PsExec + Pass-the-Hash | 7045, 4624 | T1021.002, T1550.002 |
-| S5 | LSASS Credential Dump | Sysmon 10 | T1003.001 |
-| S6 | C2 Beaconing (Cobalt Strike profile) | Sysmon 3, 22 | T1071.001, T1071.004 |
-| S7 | Kerberoasting + DCSync | 4769, 4662 | T1558.003, T1003.006 |
-| S8 | Ransomware + VSS Deletion | Sysmon 11, 4688 | T1486, T1490 |
-| FP | False Positive set (2 scenarios) | 4688, 4720 | — |
-
----
-
-## File Structure
-
-```
-diass-sec/
-├── index.html          # Single-page application shell
-├── css/
-│   └── style.css       # Design system (dark navy, Bloomberg/Linear aesthetic)
-├── js/
-│   └── app.js          # Platform engine: routing, modules, analyst state
-└── data/
-    └── scenarios.js    # Alert data, SIEM logs, IOCs, incident cases
-```
+No build step. No framework. No runtime. Apache serves static files.
 
 ---
 
 ## Requirements
 
-### Server
-
-| Requirement | Version |
-|---|---|
-| Linux (Ubuntu 20.04+ recommended) | any recent LTS |
-| Apache2 | 2.4+ |
-| Git | 2.x |
-
-No Python, Node.js, database, or runtime dependency. Apache serves the static files directly.
-
-> **Non-Ubuntu Linux:** Works on any distro with Apache2. Replace `apt` commands with your package manager:
-> - Debian: `apt` (same as Ubuntu)
-> - RHEL / Rocky / AlmaLinux: `dnf install httpd git` — service name is `httpd` not `apache2`, config path is `/etc/httpd/conf.d/`
-> - Arch: `pacman -S apache git` — service name is `httpd`
-> - openSUSE: `zypper install apache2 git`
-
-### Client
-
-Any modern browser (Chrome 90+, Firefox 88+, Edge 90+, Safari 14+). No install required on the client side.
+- Linux server (Ubuntu 20.04+ recommended)
+- `apache2` and `git` — installed in Step 1 below
+- Any modern browser on the client side (Chrome, Firefox, Edge, Safari)
 
 ---
 
 ## Install
 
-### Option 1 — Automated (recommended)
+### Quick install (recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/indranilroy99/soc-training-lab/main/install.sh | sudo bash
 ```
 
-### Option 2 — Manual (Ubuntu / Debian)
+Done. Access at `http://<your-server-ip>`.
 
-**Step 1 — Install dependencies**
+---
+
+### Manual install (Ubuntu / Debian)
+
+**1. Install dependencies**
 
 ```bash
 sudo apt update && sudo apt install -y apache2 git
 ```
 
-**Step 2 — Enable Apache and verify it's running**
+**2. Start Apache**
 
 ```bash
 sudo systemctl enable apache2
 sudo systemctl start apache2
-sudo systemctl status apache2
 ```
 
-**Step 3 — Clone the repo**
+**3. Clone the repo**
+
+> `/var/www` is root-owned — you must use `sudo` here.
 
 ```bash
 sudo git clone https://github.com/indranilroy99/soc-training-lab.git /var/www/diass-sec
 ```
 
-**Step 4 — Set permissions**
+**4. Set permissions**
 
 ```bash
 sudo chown -R www-data:www-data /var/www/diass-sec
@@ -112,9 +57,9 @@ sudo chown -R root:root /var/www/diass-sec/.git
 sudo chmod -R 755 /var/www/diass-sec
 ```
 
-> Keep `.git` owned by root so `sudo git pull` works later. If you chown `.git` to `www-data`, git will refuse to run there with a "dubious ownership" error.
+> Apache needs to own the app files (`www-data`). `.git` stays owned by root so `sudo git pull` works later without errors.
 
-**Step 5 — Create virtual host**
+**5. Create the Apache site config**
 
 ```bash
 sudo tee /etc/apache2/sites-available/diass-sec.conf > /dev/null << 'EOF'
@@ -129,7 +74,7 @@ sudo tee /etc/apache2/sites-available/diass-sec.conf > /dev/null << 'EOF'
 EOF
 ```
 
-**Step 6 — Enable site and reload Apache**
+**6. Enable the site and reload Apache**
 
 ```bash
 sudo a2ensite diass-sec.conf
@@ -137,33 +82,117 @@ sudo a2dissite 000-default.conf
 sudo systemctl reload apache2
 ```
 
-**Step 7 — Verify**
+**7. Verify it's up**
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" http://localhost
-# Expected: 200
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost
+# 200 = good to go
 ```
 
-Access at `http://<server-ip>` from any browser on the same network.
+Open `http://<your-server-ip>` in a browser.
 
 ---
 
 ## Update
 
+Pull the latest and reload Apache:
+
 ```bash
-cd /var/www/diass-sec && sudo git pull origin main && sudo systemctl reload apache2
+sudo git -C /var/www/diass-sec pull origin main
+sudo systemctl reload apache2
 ```
 
-> Must use `sudo git pull` — `.git` is owned by root to prevent the dubious-ownership error.
+---
+
+## Stop
+
+Stop Apache (platform goes offline, nothing is deleted):
+
+```bash
+sudo systemctl stop apache2
+```
+
+Start it again:
+
+```bash
+sudo systemctl start apache2
+```
+
+Disable Apache from starting on boot:
+
+```bash
+sudo systemctl disable apache2
+```
 
 ---
 
-## Analyst Configuration
+## Uninstall
 
-Analyst identities are defined in `data/scenarios.js` under the `analysts` array. Update `name` fields to match your team roster. The active analyst is set in `js/app.js` under `state.analystId` — change `analyst_01` to the relevant ID.
+Remove the app and site config:
+
+```bash
+sudo rm -rf /var/www/diass-sec
+sudo rm -f /etc/apache2/sites-available/diass-sec.conf
+sudo rm -f /etc/apache2/sites-enabled/diass-sec.conf
+sudo systemctl reload apache2
+```
 
 ---
 
-## IOC Coverage
+## Other Linux Distros
 
-10 indicators pre-loaded: known C2 IPs (Cobalt Strike infrastructure), phishing domains, ransomware hashes, dropper hashes, and C2 URLs — all mapped to real-world threat campaigns against financial sector targets.
+Works on any distro with Apache. Replace the `apt` commands:
+
+| Distro | Install command | Apache service name |
+|---|---|---|
+| Debian | `apt install apache2 git` | `apache2` |
+| RHEL / Rocky / AlmaLinux | `dnf install httpd git` | `httpd` |
+| Arch | `pacman -S apache git` | `httpd` |
+| openSUSE | `zypper install apache2 git` | `apache2` |
+
+On RHEL-based systems the vhost config goes in `/etc/httpd/conf.d/diass-sec.conf` instead of `/etc/apache2/sites-available/`.
+
+---
+
+## File Structure
+
+```
+diass-sec/
+├── index.html          # App shell
+├── install.sh          # Automated install script
+├── css/
+│   └── style.css       # Design system
+├── js/
+│   └── app.js          # Platform engine
+└── data/
+    └── scenarios.js    # Alert data, SIEM logs, IOCs, cases
+```
+
+---
+
+## Modules
+
+| Module | Description |
+|---|---|
+| Dashboard | Attack timeline, severity breakdown, MITRE heatmap |
+| Alert Triage | 18 alerts — TP/FP classification with MITRE mapping |
+| SIEM Logs | 18 raw Windows event logs with search |
+| Incident Cases | Case management, task checklists, observable tracking |
+| Threat Intel | IOC enrichment — IPs, domains, hashes, URLs, email |
+| Analyst Board | Per-analyst triage counts and accuracy metrics |
+
+---
+
+## Scenarios
+
+| ID | Scenario | Event IDs | MITRE |
+|---|---|---|---|
+| S1 | Port Scan / Recon | 5156 | T1046 |
+| S2 | RDP Brute Force → Account Compromise | 4625, 4624 | T1110.001, T1078 |
+| S3 | Phishing → Macro → PowerShell → C2 | Sysmon 1, 3 | T1059.001, T1071.001 |
+| S4 | Lateral Movement via PsExec + Pass-the-Hash | 7045, 4624 | T1021.002, T1550.002 |
+| S5 | LSASS Credential Dump | Sysmon 10 | T1003.001 |
+| S6 | C2 Beaconing (Cobalt Strike profile) | Sysmon 3, 22 | T1071.001, T1071.004 |
+| S7 | Kerberoasting + DCSync | 4769, 4662 | T1558.003, T1003.006 |
+| S8 | Ransomware + VSS Deletion | Sysmon 11, 4688 | T1486, T1490 |
+| FP | False Positive set (2 scenarios) | 4688, 4720 | — |
