@@ -1,6 +1,6 @@
-# NEXUS — Security Operations Training Platform
+# DIASS-SEC — Security Operations Training Platform
 
-**Stack 3 · SOC Specialist Training · vo1dLabs**
+**Stack 3 · SOC Specialist Training**
 
 A browser-based SOC training simulation platform. Trainees work through real incident scenarios across all core SOC disciplines — alert triage, SIEM log analysis, incident case management, and threat intelligence enrichment.
 
@@ -89,4 +89,4 @@ Full 14-day curriculum is in the Slack channel. Platform covers:
 
 ---
 
-*Built for vo1dLabs SOC Training — Stack 3: Niche Cybersecurity Skills*
+*DIASS-SEC SOC Training Platform — Stack 3: Niche Cybersecurity Skills*

@@ -1,10 +1,10 @@
-// NEXUS SOC Training Platform — Scenario Data
+// DIASS-SEC SOC Training Platform — Scenario Data
 // All incidents based on real attack patterns with real Event IDs, MITRE IDs, process names
 
-const NEXUS_DATA = {
+const DIASS_DATA = {
 
   meta: {
-    platform: "NEXUS",
+    platform: "DIASS-SEC",
     version: "2.4.1",
     org: "Meridian Financial Services",
     analyst: "trainee_01",
@@ -543,4 +543,4 @@ const NEXUS_DATA = {
 };
 
 // Export for use across all modules
-if (typeof module !== 'undefined') module.exports = NEXUS_DATA;
+if (typeof module !== 'undefined') module.exports = DIASS_DATA;
