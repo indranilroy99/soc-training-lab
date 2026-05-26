@@ -1,198 +1,220 @@
-# DIAAS-SEC
+# DIAAS-SEC — Security Operations Training Platform
 
-Browser-based security operations platform. Alert triage, SIEM log analysis, incident case management, and threat intelligence enrichment — built around real incident scenarios with accurate Windows Event IDs and MITRE ATT&CK mappings.
+A self-hosted SOC training platform. Analysts log in, work through labs, and earn points. Admins manage users, track progress, and view the leaderboard. No cloud, no Docker, no external dependencies.
 
-No build step. No framework. No runtime. Apache serves static files.
+---
+
+## What's inside
+
+- **6 hands-on labs** — Alert Triage, Phishing Analysis, Lateral Movement, SIEM Hunting, Ransomware IR, APT Threat Hunting
+- **Real auth** — bcrypt-hashed passwords, session tokens, 24h expiry
+- **Analyst dashboard** — lab progress, leaderboard, profile, score tracking
+- **Admin panel** — create/disable/delete users, reset passwords, progress matrix, full leaderboard
+- **SQLite** — zero config, single file database
+- **No Docker, no YAML** — one script installs everything
 
 ---
 
 ## Requirements
 
-- Linux server (Ubuntu 20.04+ recommended)
-- `apache2` and `git` — installed in Step 1 below
-- Any modern browser on the client side (Chrome, Firefox, Edge, Safari)
+| Requirement | Version |
+|------------|---------|
+| Node.js | 18 or higher |
+| npm | comes with Node |
+| git | any recent version |
+| OS | macOS, Ubuntu, Debian, RHEL/CentOS |
 
 ---
 
-## Install
-
-### Quick install (recommended)
+## Install (Mac mini / Linux server)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/indranilroy99/soc-training-lab/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/indranilroy99/soc-training-lab/main/install.sh | bash
 ```
 
-Done. Access at `http://<your-server-ip>`.
+Or clone and run manually:
+
+```bash
+git clone https://github.com/indranilroy99/soc-training-lab ~/diaas-sec
+cd ~/diaas-sec
+npm install
+node database/seed.js
+node server.js
+```
+
+The installer will:
+1. Install Node.js if missing
+2. Clone the repo to `~/diaas-sec`
+3. Install npm dependencies
+4. Seed the database (11 users, 6 labs, 30 questions)
+5. Install a background service (launchd on Mac, systemd on Linux)
 
 ---
 
-### Manual install (Ubuntu / Debian)
+## Default credentials
 
-**1. Install dependencies**
+| Role | Username | Password |
+|------|----------|----------|
+| Admin | `admin` | `Admin@2024` |
+| Analyst | `analyst_01` through `analyst_10` | `Analyst@2024` |
 
-```bash
-sudo apt update && sudo apt install -y apache2 git
-```
-
-**2. Start Apache**
-
-```bash
-sudo systemctl enable apache2
-sudo systemctl start apache2
-```
-
-**3. Clone the repo**
-
-> `/var/www` is root-owned — you must use `sudo` here.
-
-```bash
-sudo git clone https://github.com/indranilroy99/soc-training-lab.git /var/www/diaas-sec
-```
-
-**4. Set permissions**
-
-```bash
-sudo chown -R www-data:www-data /var/www/diaas-sec
-sudo chown -R root:root /var/www/diaas-sec/.git
-sudo chmod -R 755 /var/www/diaas-sec
-```
-
-> Apache needs to own the app files (`www-data`). `.git` stays owned by root so `sudo git pull` works later without errors.
-
-**5. Create the Apache site config**
-
-```bash
-sudo tee /etc/apache2/sites-available/diaas-sec.conf > /dev/null << 'EOF'
-<VirtualHost *:80>
-    DocumentRoot /var/www/diaas-sec
-    <Directory /var/www/diaas-sec>
-        Options -Indexes
-        AllowOverride None
-        Require all granted
-    </Directory>
-</VirtualHost>
-EOF
-```
-
-**6. Enable the site and reload Apache**
-
-```bash
-sudo a2ensite diaas-sec.conf
-sudo a2dissite 000-default.conf
-sudo systemctl reload apache2
-```
-
-**7. Verify it's up**
-
-```bash
-curl -s -o /dev/null -w "%{http_code}\n" http://localhost
-# 200 = good to go
-```
-
-Open `http://<your-server-ip>` in a browser.
+**Change all passwords before sharing with users.** Use the Admin panel → Manage Users → Reset PW.
 
 ---
 
-## Update
+## Access
 
-Pull the latest and reload Apache:
+After install, open a browser and go to:
 
-```bash
-sudo git -C /var/www/diaas-sec pull origin main
-sudo systemctl reload apache2
 ```
+http://<server-ip>:3000          ← login page
+http://<server-ip>:3000/admin    ← admin panel
+http://<server-ip>:3000/analyst  ← analyst view
+```
+
+To find your Mac mini's IP: `System Settings → Wi-Fi → Details` or run `ipconfig getifaddr en0`.
+
+Analysts on the same network open `http://<your-mac-mini-ip>:3000` and log in with the credentials you give them.
 
 ---
 
-## Stop
+## Start / Stop / Update
 
-Stop Apache (platform goes offline, nothing is deleted):
-
+**macOS (launchd)**
 ```bash
-sudo systemctl stop apache2
+# Start
+launchctl load ~/Library/LaunchAgents/com.diaas-sec.plist
+
+# Stop
+launchctl unload ~/Library/LaunchAgents/com.diaas-sec.plist
+
+# Check logs
+tail -f ~/diaas-sec/logs/server.log
 ```
 
-Start it again:
-
+**Linux (systemd)**
 ```bash
-sudo systemctl start apache2
+sudo systemctl start diaas-sec
+sudo systemctl stop diaas-sec
+sudo systemctl status diaas-sec
+journalctl -u diaas-sec -f
 ```
 
-Disable Apache from starting on boot:
-
+**Manual (no service)**
 ```bash
-sudo systemctl disable apache2
+cd ~/diaas-sec
+node server.js
+# Ctrl+C to stop
+```
+
+**Update to latest**
+```bash
+cd ~/diaas-sec
+git pull origin main
+npm install
+# Restart service or node server.js
 ```
 
 ---
 
-## Uninstall
+## Environment variables
 
-Remove the app and site config:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Port to listen on |
 
+To run on a different port:
 ```bash
-sudo rm -rf /var/www/diaas-sec
-sudo rm -f /etc/apache2/sites-available/diaas-sec.conf
-sudo rm -f /etc/apache2/sites-enabled/diaas-sec.conf
-sudo systemctl reload apache2
+PORT=8080 node server.js
 ```
 
 ---
 
-## Other Linux Distros
+## Re-seed the database
 
-Works on any distro with Apache. Replace the `apt` commands:
+If you want to reset all progress and start fresh:
 
-| Distro | Install command | Apache service name |
-|---|---|---|
-| Debian | `apt install apache2 git` | `apache2` |
-| RHEL / Rocky / AlmaLinux | `dnf install httpd git` | `httpd` |
-| Arch | `pacman -S apache git` | `httpd` |
-| openSUSE | `zypper install apache2 git` | `apache2` |
+```bash
+cd ~/diaas-sec
+rm database/diaas.db
+node database/seed.js
+```
 
-On RHEL-based systems the vhost config goes in `/etc/httpd/conf.d/diaas-sec.conf` instead of `/etc/apache2/sites-available/`.
+This recreates all 11 default users, 6 labs, and 30 questions. Any custom users or analyst progress will be wiped.
 
 ---
 
-## File Structure
+## Add users without the admin panel
+
+```bash
+cd ~/diaas-sec
+node -e "
+const db = require('better-sqlite3')('database/diaas.db');
+const bcrypt = require('bcryptjs');
+const hash = bcrypt.hashSync('YourPassword@123', 10);
+db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?,?,?)').run('analyst_11', hash, 'analyst');
+console.log('Done');
+"
+```
+
+---
+
+## File structure
 
 ```
 diaas-sec/
-├── index.html          # App shell
-├── install.sh          # Automated install script
-├── css/
-│   └── style.css       # Design system
-├── js/
-│   └── app.js          # Platform engine
-└── data/
-    └── scenarios.js    # Alert data, SIEM logs, IOCs, cases
+├── server.js              — Node.js backend (no Express)
+├── package.json
+├── database/
+│   ├── schema.sql         — SQLite schema
+│   ├── seed.js            — Seeds users, labs, questions
+│   └── diaas.db           — Database file (created on first seed)
+├── public/
+│   ├── login.html         — Login page
+│   ├── analyst/
+│   │   └── index.html     — Analyst SPA
+│   └── admin/
+│       └── index.html     — Admin SPA
+└── logs/
+    ├── server.log
+    └── error.log
 ```
 
 ---
 
-## Modules
+## Labs
 
-| Module | Description |
-|---|---|
-| Dashboard | Attack timeline, severity breakdown, MITRE heatmap |
-| Alert Triage | 18 alerts — TP/FP classification with MITRE mapping |
-| SIEM Logs | 18 raw Windows event logs with search |
-| Incident Cases | Case management, task checklists, observable tracking |
-| Threat Intel | IOC enrichment — IPs, domains, hashes, URLs, email |
-| Analyst Board | Per-analyst triage counts and accuracy metrics |
+| # | Lab | Category | Difficulty | Points |
+|---|-----|----------|------------|--------|
+| 1 | Alert Triage Fundamentals | Alert Triage | Easy | 100 |
+| 2 | Phishing Email Analysis | Threat Intel | Easy | 100 |
+| 3 | Lateral Movement Detection | Alert Triage | Medium | 150 |
+| 4 | SIEM Log Hunting | SIEM | Medium | 150 |
+| 5 | Ransomware Incident Response | Incident Response | Hard | 200 |
+| 6 | APT Threat Hunting | Threat Hunting | Hard | 200 |
+
+Total available: **900 pts**
 
 ---
 
-## Scenarios
+## Scoring
 
-| ID | Scenario | Event IDs | MITRE |
-|---|---|---|---|
-| S1 | Port Scan / Recon | 5156 | T1046 |
-| S2 | RDP Brute Force → Account Compromise | 4625, 4624 | T1110.001, T1078 |
-| S3 | Phishing → Macro → PowerShell → C2 | Sysmon 1, 3 | T1059.001, T1071.001 |
-| S4 | Lateral Movement via PsExec + Pass-the-Hash | 7045, 4624 | T1021.002, T1550.002 |
-| S5 | LSASS Credential Dump | Sysmon 10 | T1003.001 |
-| S6 | C2 Beaconing (Cobalt Strike profile) | Sysmon 3, 22 | T1071.001, T1071.004 |
-| S7 | Kerberoasting + DCSync | 4769, 4662 | T1558.003, T1003.006 |
-| S8 | Ransomware + VSS Deletion | Sysmon 11, 4688 | T1486, T1490 |
-| FP | False Positive set (2 scenarios) | 4688, 4720 | — |
+- **First correct attempt** — full points
+- **Second correct attempt** — 50% points
+- **Third correct attempt** — 50% points + answer revealed
+- **3 failed attempts** — answer and explanation revealed, 0 pts
+- Text questions use keyword matching (case-insensitive, partial credit)
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Node.js 20, built-in `http` module (no Express) |
+| Database | SQLite via `better-sqlite3` |
+| Auth | bcryptjs password hashing, crypto random session tokens |
+| Frontend | Vanilla HTML/CSS/JS, no frameworks |
+| Service | launchd (macOS) / systemd (Linux) |
+
+All dependencies are free and open source. Zero paid services.

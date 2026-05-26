@@ -1,0 +1,19 @@
+{
+  "name": "diaas-sec",
+  "version": "2.0.0",
+  "description": "DIAAS-SEC Security Operations Training Platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node database/seed.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^9.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,5 @@
+node_modules/
+database/diaas.db
+logs/
+*.log
+.DS_Store

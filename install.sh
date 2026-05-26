@@ -1,197 +1,268 @@
 #!/usr/bin/env bash
-# DIAAS-SEC — Automated Install Script
-# Tested on: Ubuntu 20.04, 22.04, 24.04 / Debian 11, 12
-# For RHEL/Rocky/Arch/openSUSE — see README for manual distro-specific steps
-# Run as root or with sudo: sudo bash install.sh
+# ══════════════════════════════════════════════════════════
+#  DIAAS-SEC Platform — Installer
+#  Supports: macOS (Mac mini), Ubuntu/Debian, RHEL/CentOS
+# ══════════════════════════════════════════════════════════
+set -e
 
-set -euo pipefail
+REPO="https://github.com/indranilroy99/soc-training-lab"
+INSTALL_DIR="$HOME/diaas-sec"
+NODE_MIN=18
+PORT=3000
 
-REPO_URL="https://github.com/indranilroy99/soc-training-lab.git"
-INSTALL_DIR="/var/www/diaas-sec"
-VHOST_CONF="/etc/apache2/sites-available/diaas-sec.conf"
-APP_NAME="DIAAS-SEC"
+# ── Colours ───────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
-# ─────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
-info()    { echo -e "${GREEN}[INFO]${NC}  $*"; }
-warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
-error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+info()    { echo -e "${CYAN}[INFO]${RESET}  $*"; }
+success() { echo -e "${GREEN}[OK]${RESET}    $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
+error()   { echo -e "${RED}[ERROR]${RESET} $*"; exit 1; }
 
-require_root() {
-  [ "$(id -u)" -eq 0 ] || error "Run as root or with sudo."
-}
+# ── Banner ────────────────────────────────────────────────
+echo ""
+echo -e "${BOLD}${CYAN}"
+cat << 'BANNER'
+  ██████╗ ██╗ █████╗  █████╗ ███████╗      ███████╗███████╗ ██████╗
+  ██╔══██╗██║██╔══██╗██╔══██╗██╔════╝      ██╔════╝██╔════╝██╔════╝
+  ██║  ██║██║███████║███████║███████╗█████╗███████╗█████╗  ██║
+  ██║  ██║██║██╔══██║██╔══██║╚════██║╚════╝╚════██║██╔══╝  ██║
+  ██████╔╝██║██║  ██║██║  ██║███████║      ███████║███████╗╚██████╗
+  ╚═════╝ ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝      ╚══════╝╚══════╝ ╚═════╝
+BANNER
+echo -e "${RESET}"
+echo -e "  ${BOLD}Security Operations Training Platform${RESET}"
+echo -e "  Installer v2.0"
+echo ""
 
-detect_distro() {
-  if command -v apt-get &>/dev/null; then
-    DISTRO="debian"
-  elif command -v dnf &>/dev/null; then
-    DISTRO="rhel"
-  elif command -v pacman &>/dev/null; then
-    DISTRO="arch"
-  elif command -v zypper &>/dev/null; then
-    DISTRO="suse"
+# ── Detect OS ─────────────────────────────────────────────
+detect_os() {
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    OS="macos"
+  elif [ -f /etc/debian_version ]; then
+    OS="debian"
+  elif [ -f /etc/redhat-release ]; then
+    OS="rhel"
   else
-    error "Unsupported distro. Install apache2 and git manually, then re-run."
+    OS="unknown"
   fi
-  info "Detected package manager: $DISTRO"
+  info "Detected OS: $OS"
 }
 
-# ─────────────────────────────────────────────
-# Step 1 — Install dependencies
-# ─────────────────────────────────────────────
-install_deps() {
-  info "Installing apache2 and git..."
-  case "$DISTRO" in
+# ── Check / Install Node.js ───────────────────────────────
+check_node() {
+  if command -v node &>/dev/null; then
+    NODE_VER=$(node -e "process.stdout.write(process.versions.node.split('.')[0])")
+    if [ "$NODE_VER" -ge "$NODE_MIN" ]; then
+      success "Node.js $NODE_VER found"
+      return 0
+    else
+      warn "Node.js $NODE_VER is too old (need $NODE_MIN+). Installing newer version..."
+    fi
+  else
+    info "Node.js not found. Installing..."
+  fi
+
+  case "$OS" in
+    macos)
+      if ! command -v brew &>/dev/null; then
+        info "Installing Homebrew first..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      fi
+      brew install node
+      ;;
     debian)
-      apt-get update -qq
-      apt-get install -y apache2 git
-      APACHE_SERVICE="apache2"
-      APACHE_SITES_ENABLED="/etc/apache2/sites-enabled"
+      curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+      sudo apt-get install -y nodejs
       ;;
     rhel)
-      dnf install -y httpd git
-      APACHE_SERVICE="httpd"
-      VHOST_CONF="/etc/httpd/conf.d/diaas-sec.conf"
-      APACHE_SITES_ENABLED=""   # httpd loads all conf.d automatically
+      curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+      sudo yum install -y nodejs
       ;;
-    arch)
-      pacman -Sy --noconfirm apache git
-      APACHE_SERVICE="httpd"
-      VHOST_CONF="/etc/httpd/conf/extra/diaas-sec.conf"
-      APACHE_SITES_ENABLED=""
-      ;;
-    suse)
-      zypper install -y apache2 git
-      APACHE_SERVICE="apache2"
-      APACHE_SITES_ENABLED=""
+    *)
+      error "Cannot auto-install Node.js on this OS. Install Node.js $NODE_MIN+ manually from https://nodejs.org then re-run."
       ;;
   esac
-  info "Dependencies installed."
+  success "Node.js installed: $(node --version)"
 }
 
-# ─────────────────────────────────────────────
-# Step 2 — Clone repo
-# ─────────────────────────────────────────────
-clone_repo() {
-  # Mark directory safe for git operations run as root (avoids "dubious ownership" error)
-  git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
+# ── Check git ─────────────────────────────────────────────
+check_git() {
+  if ! command -v git &>/dev/null; then
+    case "$OS" in
+      macos)   brew install git ;;
+      debian)  sudo apt-get install -y git ;;
+      rhel)    sudo yum install -y git ;;
+      *)       error "git not found. Install it manually." ;;
+    esac
+  fi
+  success "git found: $(git --version)"
+}
 
+# ── Clone or update ───────────────────────────────────────
+setup_repo() {
   if [ -d "$INSTALL_DIR/.git" ]; then
-    warn "$INSTALL_DIR already exists — pulling latest instead of cloning."
+    info "Existing install found at $INSTALL_DIR — pulling latest..."
     git -C "$INSTALL_DIR" pull origin main
   else
-    info "Cloning $APP_NAME to $INSTALL_DIR..."
-    git clone "$REPO_URL" "$INSTALL_DIR"
+    info "Cloning repository to $INSTALL_DIR ..."
+    git clone "$REPO" "$INSTALL_DIR"
   fi
+  success "Repository ready at $INSTALL_DIR"
 }
 
-# ─────────────────────────────────────────────
-# Step 3 — Permissions
-# ─────────────────────────────────────────────
-set_permissions() {
-  info "Setting permissions..."
-  # Determine web server user
-  if id www-data &>/dev/null; then
-    WEB_USER="www-data"
-  elif id apache &>/dev/null; then
-    WEB_USER="apache"
-  elif id http &>/dev/null; then
-    WEB_USER="http"
+# ── Install npm deps ──────────────────────────────────────
+install_deps() {
+  info "Installing Node.js dependencies..."
+  cd "$INSTALL_DIR"
+  npm install --omit=dev --silent
+  success "Dependencies installed (better-sqlite3, bcryptjs)"
+}
+
+# ── Seed database ─────────────────────────────────────────
+seed_db() {
+  cd "$INSTALL_DIR"
+  if [ -f "database/diaas.db" ]; then
+    warn "Database already exists. Skipping seed (run 'node database/seed.js' manually to re-seed)."
   else
-    WEB_USER="nobody"
-    warn "Could not detect web user — falling back to 'nobody'"
-  fi
-
-  # Give web user ownership of app files, but keep .git owned by root
-  # so future `sudo git pull` works without the dubious-ownership error
-  chown -R "$WEB_USER":"$WEB_USER" "$INSTALL_DIR"
-  chown -R root:root "$INSTALL_DIR/.git"
-  chmod -R 755 "$INSTALL_DIR"
-  info "App files owner: $WEB_USER  |  .git owner: root"
-}
-
-# ─────────────────────────────────────────────
-# Step 4 — Virtual host config
-# ─────────────────────────────────────────────
-write_vhost() {
-  info "Writing virtual host config to $VHOST_CONF..."
-  mkdir -p "$(dirname "$VHOST_CONF")"
-  cat > "$VHOST_CONF" << EOF
-<VirtualHost *:80>
-    DocumentRoot $INSTALL_DIR
-    <Directory $INSTALL_DIR>
-        Options -Indexes
-        AllowOverride None
-        Require all granted
-    </Directory>
-    ErrorLog /var/log/${APACHE_SERVICE}/diaas-sec-error.log
-    CustomLog /var/log/${APACHE_SERVICE}/diaas-sec-access.log combined
-</VirtualHost>
-EOF
-
-  # Debian/Ubuntu: enable site, disable default
-  if [ "$DISTRO" = "debian" ]; then
-    a2ensite diaas-sec.conf
-    a2dissite 000-default.conf 2>/dev/null || true
+    info "Seeding database..."
+    node database/seed.js
+    success "Database seeded — 1 admin + 10 analysts + 6 labs"
   fi
 }
 
-# ─────────────────────────────────────────────
-# Step 5 — Enable and start Apache
-# ─────────────────────────────────────────────
-start_apache() {
-  info "Enabling and starting $APACHE_SERVICE..."
-  systemctl enable "$APACHE_SERVICE"
-  systemctl restart "$APACHE_SERVICE"
+# ── macOS launchd service ─────────────────────────────────
+install_macos_service() {
+  PLIST_PATH="$HOME/Library/LaunchAgents/com.diaas-sec.plist"
+  NODE_BIN=$(which node)
+
+  cat > "$PLIST_PATH" << PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.diaas-sec</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${NODE_BIN}</string>
+    <string>${INSTALL_DIR}/server.js</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>${INSTALL_DIR}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PORT</key>
+    <string>${PORT}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${INSTALL_DIR}/logs/server.log</string>
+  <key>StandardErrorPath</key>
+  <string>${INSTALL_DIR}/logs/error.log</string>
+</dict>
+</plist>
+PLIST
+
+  mkdir -p "$INSTALL_DIR/logs"
+  launchctl unload "$PLIST_PATH" 2>/dev/null || true
+  launchctl load "$PLIST_PATH"
+  success "macOS launchd service installed — starts automatically on login"
 }
 
-# ─────────────────────────────────────────────
-# Step 6 — Verify
-# ─────────────────────────────────────────────
-verify() {
-  sleep 1
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost 2>/dev/null || echo "000")
-  if [ "$HTTP_CODE" = "200" ]; then
-    info "Verification passed — HTTP $HTTP_CODE"
+# ── Linux systemd service ─────────────────────────────────
+install_linux_service() {
+  NODE_BIN=$(which node)
+  CURRENT_USER=$(whoami)
+
+  sudo tee /etc/systemd/system/diaas-sec.service > /dev/null << UNIT
+[Unit]
+Description=DIAAS-SEC Training Platform
+After=network.target
+
+[Service]
+Type=simple
+User=${CURRENT_USER}
+WorkingDirectory=${INSTALL_DIR}
+ExecStart=${NODE_BIN} ${INSTALL_DIR}/server.js
+Restart=on-failure
+RestartSec=5
+Environment=PORT=${PORT}
+StandardOutput=append:${INSTALL_DIR}/logs/server.log
+StandardError=append:${INSTALL_DIR}/logs/error.log
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+  mkdir -p "$INSTALL_DIR/logs"
+  sudo systemctl daemon-reload
+  sudo systemctl enable diaas-sec
+  sudo systemctl restart diaas-sec
+  success "systemd service installed and started — auto-starts on boot"
+}
+
+# ── Print local IP ────────────────────────────────────────
+get_local_ip() {
+  if [[ "$OS" == "macos" ]]; then
+    IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "localhost")
   else
-    warn "HTTP $HTTP_CODE returned from localhost. Check Apache logs:"
-    warn "  sudo journalctl -u $APACHE_SERVICE -n 30"
+    IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
   fi
+  echo "$IP"
 }
 
-# ─────────────────────────────────────────────
-# Main
-# ─────────────────────────────────────────────
+# ── Main ──────────────────────────────────────────────────
 main() {
-  echo ""
-  echo "  ██████╗ ██╗  █████╗   █████╗  ███████╗    ███████╗███████╗ ██████╗ "
-  echo "  ██╔══██╗██║ ██╔══██╗ ██╔══██╗ ██╔════╝    ██╔════╝██╔════╝██╔════╝ "
-  echo "  ██║  ██║██║ ███████║ ███████║ ███████╗    ███████╗█████╗  ██║      "
-  echo "  ██║  ██║██║ ██╔══██║ ██╔══██║ ╚════██║    ╚════██║██╔══╝  ██║      "
-  echo "  ██████╔╝██║ ██║  ██║ ██║  ██║ ███████║    ███████║███████╗╚██████╗ "
-  echo "  ╚═════╝ ╚═╝ ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚══════╝    ╚══════╝╚══════╝ ╚═════╝ "
-  echo ""
-  echo "  Security Operations Platform — Install"
-  echo "  ───────────────────────────────────────"
-  echo ""
-
-  require_root
-  detect_distro
+  detect_os
+  check_git
+  check_node
+  setup_repo
   install_deps
-  clone_repo
-  set_permissions
-  write_vhost
-  start_apache
-  verify
+  seed_db
 
-  SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "<server-ip>")
+  # Install service
+  case "$OS" in
+    macos)
+      read -p "$(echo -e "${YELLOW}Install as a background service (auto-start on login)? [Y/n]: ${RESET}")" INSTALL_SVC
+      if [[ "${INSTALL_SVC:-Y}" =~ ^[Yy]$ ]]; then
+        install_macos_service
+      else
+        warn "Skipping service install. Start manually with: cd $INSTALL_DIR && node server.js"
+      fi
+      ;;
+    debian|rhel)
+      read -p "$(echo -e "${YELLOW}Install as a systemd service (auto-start on boot)? [Y/n]: ${RESET}")" INSTALL_SVC
+      if [[ "${INSTALL_SVC:-Y}" =~ ^[Yy]$ ]]; then
+        install_linux_service
+      else
+        warn "Skipping service install. Start manually with: cd $INSTALL_DIR && node server.js"
+      fi
+      ;;
+  esac
+
+  # Done
+  LOCAL_IP=$(get_local_ip)
   echo ""
-  echo -e "${GREEN}  ✓ DIAAS-SEC deployed successfully${NC}"
-  echo "  Access: http://${SERVER_IP}"
-  echo "  Logs:   /var/log/${APACHE_SERVICE}/diaas-sec-error.log"
-  echo "  Update: cd $INSTALL_DIR && sudo git pull origin main && sudo systemctl reload $APACHE_SERVICE"
+  echo -e "${GREEN}${BOLD}══════════════════════════════════════════${RESET}"
+  echo -e "${GREEN}${BOLD}  DIAAS-SEC is running!${RESET}"
+  echo -e "${GREEN}${BOLD}══════════════════════════════════════════${RESET}"
+  echo ""
+  echo -e "  ${BOLD}Platform URL:${RESET}   http://${LOCAL_IP}:${PORT}"
+  echo -e "  ${BOLD}Admin Panel:${RESET}    http://${LOCAL_IP}:${PORT}/admin"
+  echo -e "  ${BOLD}Analyst View:${RESET}   http://${LOCAL_IP}:${PORT}/analyst"
+  echo ""
+  echo -e "  ${BOLD}Default Credentials:${RESET}"
+  echo -e "  Admin   →  username: ${CYAN}admin${RESET}        password: ${CYAN}Admin@2024${RESET}"
+  echo -e "  Analyst →  username: ${CYAN}analyst_01${RESET}   password: ${CYAN}Analyst@2024${RESET}"
+  echo -e "             (analyst_01 through analyst_10 — all same default password)"
+  echo ""
+  echo -e "  ${YELLOW}Change all passwords via the Admin panel before sharing with users.${RESET}"
+  echo ""
+  echo -e "  ${BOLD}Logs:${RESET}  $INSTALL_DIR/logs/server.log"
   echo ""
 }
 

@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIAAS-SEC — Admin</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:         #1a1d2e;
+  --sidebar:    #212433;
+  --card:       #212433;
+  --input-bg:   #2a2d3e;
+  --border:     #2e3148;
+  --green:      #2bcc8b;
+  --green-dim:  rgba(43,204,139,0.12);
+  --orange:     #ff6b35;
+  --orange-dim: rgba(255,107,53,0.12);
+  --red:        #ff4757;
+  --red-dim:    rgba(255,71,87,0.12);
+  --blue:       #4a9eff;
+  --blue-dim:   rgba(74,158,255,0.12);
+  --yellow:     #ffd32a;
+  --text:       #e8eaf0;
+  --muted:      #9da5b4;
+  --dim:        #565970;
+  --font:       system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono:       'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --radius:     8px;
+  --sidebar-w:  240px;
+  --topbar-h:   56px;
+}
+html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text); overflow: hidden; }
+button { font-family: var(--font); cursor: pointer; }
+input, select, textarea { font-family: var(--font); }
+
+#app { display: flex; height: 100vh; }
+
+/* ── SIDEBAR ── */
+#sidebar {
+  width: var(--sidebar-w); min-width: var(--sidebar-w);
+  background: var(--sidebar); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; z-index: 100;
+}
+.sidebar-logo {
+  height: var(--topbar-h); display: flex; align-items: center; gap: 10px;
+  padding: 0 18px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.logo-mark {
+  width: 30px; height: 30px; background: rgba(255,107,53,0.15);
+  border: 1.5px solid rgba(255,107,53,0.4); border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.logo-mark svg { color: var(--orange); }
+.logo-name { font-size: 14px; font-weight: 800; letter-spacing: 1px; }
+.logo-name span { color: var(--orange); }
+.logo-tag {
+  margin-left: auto; font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; color: var(--orange); background: var(--orange-dim);
+  border: 1px solid rgba(255,107,53,0.25); padding: 2px 6px; border-radius: 3px;
+}
+.sidebar-nav { padding: 16px 10px; flex: 1; }
+.nav-section-label {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--dim); padding: 0 8px 8px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 6px; cursor: pointer;
+  color: var(--muted); transition: background 0.12s, color 0.12s;
+  margin-bottom: 2px; user-select: none; border: 1px solid transparent;
+}
+.nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.nav-item.active { background: var(--orange-dim); color: var(--orange); border-color: rgba(255,107,53,0.2); }
+.nav-item svg { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.8; }
+.nav-item.active svg { opacity: 1; }
+.nav-label { font-size: 13px; font-weight: 500; }
+.sidebar-footer { padding: 14px 10px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.admin-chip {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  background: var(--input-bg); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.admin-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--orange); color: #111;
+  font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.admin-info .a-name { font-size: 12.5px; font-weight: 600; }
+.admin-info .a-role { font-size: 10.5px; color: var(--orange); }
+
+/* ── MAIN ── */
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#topbar {
+  height: var(--topbar-h); background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 24px; gap: 14px; flex-shrink: 0;
+}
+.topbar-breadcrumb { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.bc-cur { color: var(--text); font-weight: 600; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.admin-badge {
+  font-size: 11px; font-weight: 700; padding: 3px 10px;
+  background: var(--orange-dim); border: 1px solid rgba(255,107,53,0.25);
+  border-radius: 20px; color: var(--orange);
+}
+#content { flex: 1; overflow-y: auto; overflow-x: hidden; }
+.page { display: none; padding: 24px; animation: fadeIn 0.15s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── PAGE HEADER ── */
+.page-hdr { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
+.page-hdr-left .page-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.page-hdr-left .page-sub { font-size: 13px; color: var(--muted); }
+
+/* ── STATS ── */
+.stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+.stat-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 16px; border-top: 2px solid var(--orange);
+}
+.stat-card.green { border-top-color: var(--green); }
+.stat-card.blue  { border-top-color: var(--blue); }
+.stat-card.red   { border-top-color: var(--red); }
+.stat-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: var(--dim); margin-bottom: 10px; }
+.stat-val { font-size: 30px; font-weight: 800; font-family: var(--mono); color: var(--text); line-height: 1; margin-bottom: 6px; }
+.stat-val.orange { color: var(--orange); }
+.stat-val.green  { color: var(--green); }
+.stat-val.blue   { color: var(--blue); }
+.stat-sub { font-size: 11.5px; color: var(--dim); }
+
+/* ── CARD ── */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.card-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+}
+.card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  border: 1px solid transparent; cursor: pointer;
+  transition: background 0.12s, border-color 0.12s; white-space: nowrap;
+}
+.btn-orange { background: var(--orange); color: #111; border-color: var(--orange); }
+.btn-orange:hover { background: #e85f2b; }
+.btn-green  { background: var(--green);  color: #111; border-color: var(--green); }
+.btn-green:hover  { background: #25b87d; }
+.btn-outline { background: transparent; color: var(--muted); border-color: var(--border); }
+.btn-outline:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.btn-red    { background: var(--red-dim); color: var(--red); border-color: rgba(255,71,87,0.3); }
+.btn-red:hover    { background: rgba(255,71,87,0.2); }
+.btn-sm { padding: 5px 10px; font-size: 11.5px; }
+.btn-xs { padding: 3px 8px; font-size: 10.5px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+/* ── TABLE ── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.6px; color: var(--dim);
+  background: var(--input-bg); border-bottom: 2px solid var(--border); white-space: nowrap;
+}
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: rgba(255,255,255,0.025); }
+tbody td { padding: 11px 14px; font-size: 12.5px; color: var(--muted); vertical-align: middle; }
+td.td-main { color: var(--text); font-weight: 500; }
+td.td-mono { font-family: var(--mono); font-size: 11.5px; }
+
+/* ── STATUS CHIPS ── */
+.chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 3px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+.chip-green  { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(43,204,139,0.25); }
+.chip-orange { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(255,107,53,0.25); }
+.chip-red    { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(255,71,87,0.25); }
+.chip-blue   { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(74,158,255,0.25); }
+.chip-dim    { background: rgba(255,255,255,0.06); color: var(--dim); border: 1px solid var(--border); }
+
+/* ── SEARCH BAR ── */
+.search-wrap { position: relative; }
+.search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--dim); pointer-events: none; }
+.search-input {
+  background: var(--input-bg); border: 1.5px solid var(--border);
+  border-radius: 6px; padding: 7px 12px 7px 32px; font-size: 13px;
+  color: var(--text); outline: none; transition: border-color 0.15s; width: 240px;
+}
+.search-input:focus { border-color: var(--orange); }
+.search-input::placeholder { color: var(--dim); }
+
+/* ── FORM ── */
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--dim); margin-bottom: 6px; }
+.form-input, .form-select {
+  width: 100%; background: var(--input-bg); border: 1.5px solid var(--border);
+  border-radius: 6px; padding: 9px 12px; font-size: 13px; color: var(--text);
+  outline: none; transition: border-color 0.15s;
+}
+.form-input:focus, .form-select:focus { border-color: var(--orange); }
+.form-input::placeholder { color: var(--dim); }
+.form-hint { font-size: 11px; color: var(--dim); margin-top: 4px; }
+
+/* ── MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+  z-index: 1000; display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.15s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 60px); overflow: hidden; display: flex; flex-direction: column;
+  transform: translateY(10px); transition: transform 0.15s;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal-header { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); gap: 10px; flex-shrink: 0; }
+.modal-title { font-size: 15px; font-weight: 700; flex: 1; }
+.modal-close { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 5px; cursor: pointer; color: var(--muted); background: none; border: none; transition: background 0.1s, color 0.1s; }
+.modal-close:hover { background: var(--red-dim); color: var(--red); }
+.modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+.modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0; }
+
+/* ── PROGRESS MATRIX ── */
+.matrix-wrap { overflow-x: auto; }
+.matrix-cell {
+  width: 70px; min-width: 70px; text-align: center;
+  padding: 6px 4px; font-size: 10px; font-weight: 600;
+  border-radius: 3px; cursor: default;
+}
+.mc-done     { background: var(--green-dim);  color: var(--green); }
+.mc-progress { background: var(--orange-dim); color: var(--orange); }
+.mc-none     { background: rgba(255,255,255,0.04); color: var(--dim); }
+
+/* ── LEADERBOARD ── */
+.lb-table { width: 100%; border-collapse: collapse; }
+.lb-table thead th { padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--dim); background: var(--input-bg); border-bottom: 2px solid var(--border); }
+.lb-table tbody tr { border-bottom: 1px solid var(--border); }
+.lb-table tbody tr:hover { background: rgba(255,255,255,0.025); }
+.lb-table tbody td { padding: 11px 14px; font-size: 13px; color: var(--muted); }
+.lb-rank { font-family: var(--mono); font-weight: 700; font-size: 14px; }
+.lb-rank.r1 { color: #ffd32a; } .lb-rank.r2 { color: #b0bec5; } .lb-rank.r3 { color: #cd7f32; }
+
+/* ── TOAST ── */
+#toasts { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column-reverse; gap: 8px; pointer-events: none; }
+.toast { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--text); min-width: 260px; max-width: 360px; animation: slideIn 0.2s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.3); pointer-events: all; }
+.toast.success { border-left: 3px solid var(--green); }
+.toast.error   { border-left: 3px solid var(--red); }
+.toast.info    { border-left: 3px solid var(--blue); }
+@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ── MISC ── */
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--orange); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-state { display: flex; align-items: center; justify-content: center; padding: 48px; gap: 12px; color: var(--muted); font-size: 13px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px; text-align: center; color: var(--dim); }
+.empty-title { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.confirm-text { font-size: 13.5px; color: var(--muted); line-height: 1.65; }
+.confirm-text strong { color: var(--text); }
+.info-banner { padding: 10px 14px; border-radius: 6px; font-size: 12.5px; border-left: 3px solid; margin-bottom: 14px; }
+.info-banner.warn { background: var(--orange-dim); border-color: var(--orange); color: var(--muted); }
+.info-banner.info { background: var(--blue-dim);   border-color: var(--blue);   color: var(--muted); }
+
+@media (max-width: 1100px) { .stats-row { grid-template-columns: repeat(2,1fr); } }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <div class="logo-name">DIAAS<span>-SEC</span></div>
+      <div class="logo-tag">Admin</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Admin Controls</div>
+      <div class="nav-item active" data-page="overview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span class="nav-label">Overview</span>
+      </div>
+      <div class="nav-item" data-page="users">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="nav-label">Manage Users</span>
+      </div>
+      <div class="nav-item" data-page="progress">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span class="nav-label">Progress Matrix</span>
+      </div>
+      <div class="nav-item" data-page="leaderboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6L3 12l5 6M16 6l5 6-5 6"/></svg>
+        <span class="nav-label">Leaderboard</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-chip">
+        <div class="admin-avatar" id="sidebar-avatar">A</div>
+        <div class="admin-info">
+          <div class="a-name" id="sidebar-username">Admin</div>
+          <div class="a-role">Administrator</div>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;justify-content:center" onclick="App.logout()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div id="main">
+    <header id="topbar">
+      <div class="topbar-breadcrumb">
+        <span>DIAAS-SEC</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        <span class="bc-cur" id="bc-cur">Overview</span>
+      </div>
+      <div class="topbar-right">
+        <span class="admin-badge">Admin Panel</span>
+        <button class="btn btn-outline btn-sm" onclick="App.refreshAll()">↺ Refresh</button>
+      </div>
+    </header>
+
+    <div id="content">
+
+      <!-- OVERVIEW -->
+      <div class="page active" id="page-overview">
+        <div class="page-hdr">
+          <div class="page-hdr-left">
+            <h1 class="page-title">Platform Overview</h1>
+            <p class="page-sub">Live statistics across all analysts and labs.</p>
+          </div>
+        </div>
+        <div class="stats-row" id="overview-stats">
+          <div class="stat-card"><div class="stat-label">Total Analysts</div><div class="stat-val orange" id="st-users">–</div><div class="stat-sub">registered</div></div>
+          <div class="stat-card green"><div class="stat-label">Active Analysts</div><div class="stat-val green" id="st-active">–</div><div class="stat-sub">enabled accounts</div></div>
+          <div class="stat-card blue"><div class="stat-label">Labs Completed</div><div class="stat-val blue" id="st-labs">–</div><div class="stat-sub">across all analysts</div></div>
+          <div class="stat-card red"><div class="stat-label">Avg Score</div><div class="stat-val" id="st-score">–</div><div class="stat-sub">pts per analyst</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">Top Performers</span></div>
+            <div style="overflow-x:auto" id="overview-top"><div class="loading-state"><div class="spinner"></div>Loading...</div></div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">Lab Completion Rates</span></div>
+            <div style="padding:16px" id="overview-labs"><div class="loading-state"><div class="spinner"></div>Loading...</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- USERS -->
+      <div class="page" id="page-users">
+        <div class="page-hdr">
+          <div class="page-hdr-left">
+            <h1 class="page-title">Manage Users</h1>
+            <p class="page-sub">Create, enable, disable, and reset analyst accounts.</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="search-wrap">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="search-input" type="text" id="user-search" placeholder="Search users..." oninput="Pages.filterUsers()">
+            </div>
+            <button class="btn btn-orange" onclick="Modals.createUser()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add User
+            </button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tbl-wrap" id="users-table-wrap">
+            <div class="loading-state"><div class="spinner"></div>Loading users...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROGRESS MATRIX -->
+      <div class="page" id="page-progress">
+        <div class="page-hdr">
+          <div class="page-hdr-left">
+            <h1 class="page-title">Progress Matrix</h1>
+            <p class="page-sub">Every analyst's completion status across all labs.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hdr">
+            <span class="card-title">Analyst × Lab Matrix</span>
+            <div style="display:flex;gap:10px;align-items:center;font-size:11px;color:var(--dim)">
+              <span style="display:flex;align-items:center;gap:4px"><span class="chip chip-green" style="padding:1px 6px">Done</span> Completed</span>
+              <span style="display:flex;align-items:center;gap:4px"><span class="chip chip-orange" style="padding:1px 6px">WIP</span> In Progress</span>
+              <span style="display:flex;align-items:center;gap:4px"><span class="chip chip-dim" style="padding:1px 6px">–</span> Not Started</span>
+            </div>
+          </div>
+          <div class="matrix-wrap" id="matrix-wrap">
+            <div class="loading-state"><div class="spinner"></div>Loading matrix...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEADERBOARD -->
+      <div class="page" id="page-leaderboard">
+        <div class="page-hdr">
+          <div class="page-hdr-left">
+            <h1 class="page-title">Leaderboard</h1>
+            <p class="page-sub">Complete rankings across all analysts.</p>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="Pages.loadLeaderboard()">↺ Refresh</button>
+        </div>
+        <div class="card">
+          <div style="overflow-x:auto" id="lb-wrap">
+            <div class="loading-state"><div class="spinner"></div>Loading...</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- CREATE USER MODAL -->
+<div class="modal-overlay" id="modal-create-user">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Add New User</span>
+      <button class="modal-close" onclick="Modals.close('modal-create-user')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner info">Credentials will be provided manually to the user. Passwords are stored hashed and cannot be recovered — use reset if forgotten.</div>
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" class="form-input" id="new-username" placeholder="e.g. analyst_11">
+        <div class="form-hint">Lowercase, letters and underscores only. Cannot be changed later.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="text" class="form-input" id="new-password" placeholder="e.g. TempPass@2024">
+        <div class="form-hint">Share this with the user. They can change it after login.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-select" id="new-role">
+          <option value="analyst">Analyst</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="Modals.close('modal-create-user')">Cancel</button>
+      <button class="btn btn-orange" id="btn-create-user" onclick="Pages.createUser()">Create User</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESET PASSWORD MODAL -->
+<div class="modal-overlay" id="modal-reset-pw">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Reset Password</span>
+      <button class="modal-close" onclick="Modals.close('modal-reset-pw')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner warn">This will immediately invalidate the user's current session and force a re-login with the new password.</div>
+      <p class="confirm-text" style="margin-bottom:16px">Reset password for: <strong id="reset-pw-username">–</strong></p>
+      <div class="form-group">
+        <label class="form-label">New Password</label>
+        <input type="text" class="form-input" id="reset-pw-value" placeholder="New temporary password">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="Modals.close('modal-reset-pw')">Cancel</button>
+      <button class="btn btn-orange" id="btn-reset-pw" onclick="Pages.confirmResetPw()">Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE MODAL -->
+<div class="modal-overlay" id="modal-confirm-delete">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Delete User</span>
+      <button class="modal-close" onclick="Modals.close('modal-confirm-delete')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="confirm-text">Permanently delete <strong id="del-username">–</strong>? This removes all their progress and answers. <strong style="color:var(--red)">This cannot be undone.</strong></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="Modals.close('modal-confirm-delete')">Cancel</button>
+      <button class="btn btn-red" id="btn-confirm-delete" onclick="Pages.confirmDelete()">Delete Permanently</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+'use strict';
+
+// ── API ─────────────────────────────────────────────────
+const API = {
+  token()   { return localStorage.getItem('diaas_token') || ''; },
+  user()    { try { return JSON.parse(localStorage.getItem('diaas_user') || 'null'); } catch { return null; } },
+  headers() { return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.token() }; },
+  async get(path) {
+    const r = await fetch(path, { headers: this.headers() });
+    if (r.status === 401) { App.logout(); throw new Error('Unauthorized'); }
+    return r.json();
+  },
+  async post(path, body) {
+    const r = await fetch(path, { method: 'POST', headers: this.headers(), body: JSON.stringify(body) });
+    if (r.status === 401) { App.logout(); throw new Error('Unauthorized'); }
+    return { ok: r.ok, status: r.status, data: await r.json() };
+  },
+  async put(path, body) {
+    const r = await fetch(path, { method: 'PUT', headers: this.headers(), body: JSON.stringify(body) });
+    if (r.status === 401) { App.logout(); throw new Error('Unauthorized'); }
+    return { ok: r.ok, status: r.status, data: await r.json() };
+  },
+  async del(path) {
+    const r = await fetch(path, { method: 'DELETE', headers: this.headers() });
+    if (r.status === 401) { App.logout(); throw new Error('Unauthorized'); }
+    return { ok: r.ok, status: r.status, data: await r.json() };
+  }
+};
+
+function toast(msg, type = 'info', duration = 3500) {
+  const icons = { success: '✓', error: '✕', info: 'ℹ' };
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.innerHTML = `<span>${icons[type]||'ℹ'}</span><span>${msg}</span>`;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity 0.3s'; setTimeout(()=>t.remove(),300); }, duration);
+}
+
+// ── MODALS ──────────────────────────────────────────────
+const Modals = {
+  open(id)  { const el = document.getElementById(id); if (el) el.classList.add('open'); },
+  close(id) { const el = document.getElementById(id); if (el) el.classList.remove('open'); },
+  createUser() {
+    document.getElementById('new-username').value = '';
+    document.getElementById('new-password').value = '';
+    document.getElementById('new-role').value = 'analyst';
+    Modals.open('modal-create-user');
+    setTimeout(() => document.getElementById('new-username').focus(), 100);
+  }
+};
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+});
+
+// ── APP ─────────────────────────────────────────────────
+const App = {
+  usersData: [],
+  _deleteTarget: null,
+  _resetPwTarget: null,
+
+  async init() {
+    const token = API.token();
+    const user  = API.user();
+    if (!token || !user) { window.location.href = '/'; return; }
+    if (user.role !== 'admin') { window.location.href = '/analyst'; return; }
+    document.getElementById('sidebar-username').textContent = user.username;
+    document.getElementById('sidebar-avatar').textContent   = user.username.slice(0,2).toUpperCase();
+    document.querySelectorAll('.nav-item[data-page]').forEach(el => {
+      el.addEventListener('click', () => App.navigate(el.dataset.page));
+    });
+    App.navigate('overview');
+  },
+
+  navigate(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const pageEl = document.getElementById('page-' + page);
+    const navEl  = document.querySelector(`.nav-item[data-page="${page}"]`);
+    if (pageEl) pageEl.classList.add('active');
+    if (navEl)  navEl.classList.add('active');
+    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', leaderboard:'Leaderboard' };
+    document.getElementById('bc-cur').textContent = labels[page] || page;
+    if (page === 'overview')    Pages.loadOverview();
+    if (page === 'users')       Pages.loadUsers();
+    if (page === 'progress')    Pages.loadProgress();
+    if (page === 'leaderboard') Pages.loadLeaderboard();
+  },
+
+  refreshAll() {
+    const cur = document.querySelector('.nav-item.active')?.dataset.page || 'overview';
+    App.navigate(cur);
+    toast('Refreshed', 'info', 1500);
+  },
+
+  logout() {
+    API.post('/api/auth/logout', {}).catch(()=>{});
+    localStorage.removeItem('diaas_token');
+    localStorage.removeItem('diaas_user');
+    window.location.href = '/';
+  }
+};
+
+// ── PAGES ───────────────────────────────────────────────
+const Pages = {
+  _usersRaw: [],
+  _filterQ: '',
+
+  async loadOverview() {
+    try {
+      const [stats, board, progress] = await Promise.all([
+        API.get('/api/admin/stats'),
+        API.get('/api/leaderboard'),
+        API.get('/api/admin/progress')
+      ]);
+      document.getElementById('st-users').textContent  = stats.total_users;
+      document.getElementById('st-active').textContent = stats.active_users;
+      document.getElementById('st-labs').textContent   = stats.labs_completed;
+      document.getElementById('st-score').textContent  = stats.avg_score;
+
+      // Top performers table
+      const topEl = document.getElementById('overview-top');
+      const top5 = board.slice(0, 5);
+      const rankIcons = ['🥇','🥈','🥉'];
+      topEl.innerHTML = `<table class="lb-table">
+        <thead><tr><th>Rank</th><th>Analyst</th><th>Score</th><th>Labs Done</th></tr></thead>
+        <tbody>${top5.map(r => `<tr>
+          <td class="lb-rank ${r.rank<=3?'r'+r.rank:''}">${rankIcons[r.rank-1]||'#'+r.rank}</td>
+          <td style="color:var(--text);font-weight:500">${r.username}</td>
+          <td style="font-family:var(--mono);color:var(--green);font-weight:700">${r.score}</td>
+          <td>${r.labs_done}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+
+      // Lab completion rates
+      const labsEl = document.getElementById('overview-labs');
+      if (progress.labs && progress.users) {
+        labsEl.innerHTML = progress.labs.map(lab => {
+          const done = progress.users.filter(u => u.labs[lab.slug]?.status === 'completed').length;
+          const total = progress.users.length;
+          const pct = total > 0 ? Math.round(done/total*100) : 0;
+          return `<div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+              <span style="color:var(--text)">${lab.title}</span>
+              <span style="color:var(--dim);font-family:var(--mono)">${done}/${total}</span>
+            </div>
+            <div style="height:6px;background:var(--input-bg);border-radius:2px;overflow:hidden">
+              <div style="height:100%;background:${pct===100?'var(--green)':pct>0?'var(--orange)':'var(--dim)'};width:${pct}%;border-radius:2px;transition:width 0.5s"></div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    } catch(e) { console.error(e); toast('Failed to load overview', 'error'); }
+  },
+
+  async loadUsers() {
+    document.getElementById('users-table-wrap').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading users...</div>';
+    try {
+      const users = await API.get('/api/admin/users');
+      Pages._usersRaw = users;
+      Pages.renderUsersTable(users);
+    } catch(e) { toast('Failed to load users', 'error'); }
+  },
+
+  filterUsers() {
+    const q = document.getElementById('user-search').value.toLowerCase();
+    const filtered = Pages._usersRaw.filter(u =>
+      u.username.toLowerCase().includes(q) || u.role.toLowerCase().includes(q)
+    );
+    Pages.renderUsersTable(filtered);
+  },
+
+  renderUsersTable(users) {
+    const wrap = document.getElementById('users-table-wrap');
+    if (users.length === 0) {
+      wrap.innerHTML = '<div class="empty-state"><div class="empty-title">No users found</div></div>';
+      return;
+    }
+    wrap.innerHTML = `<table>
+      <thead><tr>
+        <th>Username</th><th>Role</th><th>Status</th><th>Score</th>
+        <th>Labs Done</th><th>Last Active</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${users.map(u => {
+        const lastActive = u.last_session
+          ? new Date(u.last_session).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
+          : 'Never';
+        return `<tr>
+          <td class="td-main">${u.username}</td>
+          <td><span class="chip ${u.role==='admin'?'chip-orange':'chip-blue'}">${u.role}</span></td>
+          <td><span class="chip ${u.active?'chip-green':'chip-red'}">${u.active?'Active':'Disabled'}</span></td>
+          <td class="td-mono" style="color:var(--green)">${u.score}</td>
+          <td>${u.labs_done}</td>
+          <td style="color:var(--dim);font-size:11.5px">${lastActive}</td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="btn btn-outline btn-xs" onclick="Pages.toggleUser(${u.id}, ${u.active})">${u.active?'Disable':'Enable'}</button>
+              <button class="btn btn-outline btn-xs" onclick="Pages.resetPw(${u.id}, '${u.username}')">Reset PW</button>
+              <button class="btn btn-red btn-xs" onclick="Pages.deleteUser(${u.id}, '${u.username}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  },
+
+  async createUser() {
+    const username = document.getElementById('new-username').value.trim();
+    const password = document.getElementById('new-password').value.trim();
+    const role     = document.getElementById('new-role').value;
+    if (!username || !password) { toast('Username and password required', 'error'); return; }
+    const btn = document.getElementById('btn-create-user');
+    btn.disabled = true; btn.textContent = 'Creating...';
+    const res = await API.post('/api/admin/users', { username, password, role });
+    btn.disabled = false; btn.textContent = 'Create User';
+    if (res.ok) {
+      toast(`User "${username}" created successfully`, 'success');
+      Modals.close('modal-create-user');
+      Pages.loadUsers();
+    } else {
+      toast(res.data.error || 'Failed to create user', 'error');
+    }
+  },
+
+  async toggleUser(userId, currentActive) {
+    const res = await API.put(`/api/admin/users/${userId}`, { active: !currentActive });
+    if (res.ok) { toast(currentActive ? 'User disabled' : 'User enabled', 'success'); Pages.loadUsers(); }
+    else toast('Failed to update user', 'error');
+  },
+
+  resetPw(userId, username) {
+    App._resetPwTarget = userId;
+    document.getElementById('reset-pw-username').textContent = username;
+    document.getElementById('reset-pw-value').value = '';
+    Modals.open('modal-reset-pw');
+    setTimeout(() => document.getElementById('reset-pw-value').focus(), 100);
+  },
+
+  async confirmResetPw() {
+    const pw = document.getElementById('reset-pw-value').value.trim();
+    if (!pw) { toast('Enter a new password', 'error'); return; }
+    const btn = document.getElementById('btn-reset-pw');
+    btn.disabled = true; btn.textContent = 'Resetting...';
+    const res = await API.put(`/api/admin/users/${App._resetPwTarget}`, { password: pw });
+    btn.disabled = false; btn.textContent = 'Reset Password';
+    if (res.ok) { toast('Password reset successfully', 'success'); Modals.close('modal-reset-pw'); }
+    else toast(res.data.error || 'Failed to reset password', 'error');
+  },
+
+  deleteUser(userId, username) {
+    App._deleteTarget = userId;
+    document.getElementById('del-username').textContent = username;
+    Modals.open('modal-confirm-delete');
+  },
+
+  async confirmDelete() {
+    const btn = document.getElementById('btn-confirm-delete');
+    btn.disabled = true; btn.textContent = 'Deleting...';
+    const res = await API.del(`/api/admin/users/${App._deleteTarget}`);
+    btn.disabled = false; btn.textContent = 'Delete Permanently';
+    if (res.ok) {
+      toast('User deleted', 'success');
+      Modals.close('modal-confirm-delete');
+      Pages.loadUsers();
+    } else {
+      toast(res.data.error || 'Failed to delete user', 'error');
+    }
+  },
+
+  async loadProgress() {
+    document.getElementById('matrix-wrap').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading matrix...</div>';
+    try {
+      const data = await API.get('/api/admin/progress');
+      if (!data.users || data.users.length === 0) {
+        document.getElementById('matrix-wrap').innerHTML = '<div class="empty-state"><div class="empty-title">No data yet</div></div>';
+        return;
+      }
+      const labs = data.labs;
+      const rows = data.users;
+      document.getElementById('matrix-wrap').innerHTML = `
+        <table>
+          <thead><tr>
+            <th>Analyst</th>
+            ${labs.map(l => `<th style="min-width:100px">${l.title.split(' ').slice(0,2).join(' ')}…</th>`).join('')}
+            <th>Total Score</th>
+          </tr></thead>
+          <tbody>${rows.map(r => `<tr>
+            <td class="td-main">${r.username}</td>
+            ${labs.map(l => {
+              const p = r.labs[l.slug];
+              const cls = p.status==='completed'?'mc-done':p.status==='in_progress'?'mc-progress':'mc-none';
+              const label = p.status==='completed'?`✓ ${p.score}pts`:p.status==='in_progress'?`WIP ${p.score}pts`:'–';
+              return `<td><div class="matrix-cell ${cls}">${label}</div></td>`;
+            }).join('')}
+            <td class="td-mono" style="color:var(--green);font-weight:700">${r.total_score}</td>
+          </tr>`).join('')}</tbody>
+        </table>`;
+    } catch(e) { console.error(e); toast('Failed to load progress', 'error'); }
+  },
+
+  async loadLeaderboard() {
+    document.getElementById('lb-wrap').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading...</div>';
+    try {
+      const board = await API.get('/api/leaderboard');
+      const rankIcons = ['🥇','🥈','🥉'];
+      document.getElementById('lb-wrap').innerHTML = `<table class="lb-table">
+        <thead><tr>
+          <th>Rank</th><th>Analyst</th><th>Score</th><th>Labs Done</th>
+          <th>Correct Answers</th><th>Accuracy</th>
+        </tr></thead>
+        <tbody>${board.map(r => `<tr>
+          <td class="lb-rank ${r.rank<=3?'r'+r.rank:''}">${rankIcons[r.rank-1]||'#'+r.rank}</td>
+          <td style="color:var(--text);font-weight:500">${r.username}</td>
+          <td style="font-family:var(--mono);color:var(--green);font-weight:700">${r.score}</td>
+          <td>${r.labs_done}</td>
+          <td style="font-family:var(--mono)">${r.correct_answers}</td>
+          <td>${r.accuracy}%</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    } catch(e) { document.getElementById('lb-wrap').innerHTML = '<div class="empty-state"><div class="empty-title">Failed to load</div></div>'; }
+  }
+};
+
+window.App    = App;
+window.Pages  = Pages;
+window.Modals = Modals;
+document.addEventListener('DOMContentLoaded', App.init);
+</script>
+</body>
+</html>
