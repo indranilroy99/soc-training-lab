@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DIASS-SEC — Automated Install Script
+# DIAAS-SEC — Automated Install Script
 # Tested on: Ubuntu 20.04, 22.04, 24.04 / Debian 11, 12
 # For RHEL/Rocky/Arch/openSUSE — see README for manual distro-specific steps
 # Run as root or with sudo: sudo bash install.sh
@@ -7,9 +7,9 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/indranilroy99/soc-training-lab.git"
-INSTALL_DIR="/var/www/diass-sec"
-VHOST_CONF="/etc/apache2/sites-available/diass-sec.conf"
-APP_NAME="DIASS-SEC"
+INSTALL_DIR="/var/www/diaas-sec"
+VHOST_CONF="/etc/apache2/sites-available/diaas-sec.conf"
+APP_NAME="DIAAS-SEC"
 
 # ─────────────────────────────────────────────
 # Helpers
@@ -53,13 +53,13 @@ install_deps() {
     rhel)
       dnf install -y httpd git
       APACHE_SERVICE="httpd"
-      VHOST_CONF="/etc/httpd/conf.d/diass-sec.conf"
+      VHOST_CONF="/etc/httpd/conf.d/diaas-sec.conf"
       APACHE_SITES_ENABLED=""   # httpd loads all conf.d automatically
       ;;
     arch)
       pacman -Sy --noconfirm apache git
       APACHE_SERVICE="httpd"
-      VHOST_CONF="/etc/httpd/conf/extra/diass-sec.conf"
+      VHOST_CONF="/etc/httpd/conf/extra/diaas-sec.conf"
       APACHE_SITES_ENABLED=""
       ;;
     suse)
@@ -126,14 +126,14 @@ write_vhost() {
         AllowOverride None
         Require all granted
     </Directory>
-    ErrorLog /var/log/${APACHE_SERVICE}/diass-sec-error.log
-    CustomLog /var/log/${APACHE_SERVICE}/diass-sec-access.log combined
+    ErrorLog /var/log/${APACHE_SERVICE}/diaas-sec-error.log
+    CustomLog /var/log/${APACHE_SERVICE}/diaas-sec-access.log combined
 </VirtualHost>
 EOF
 
   # Debian/Ubuntu: enable site, disable default
   if [ "$DISTRO" = "debian" ]; then
-    a2ensite diass-sec.conf
+    a2ensite diaas-sec.conf
     a2dissite 000-default.conf 2>/dev/null || true
   fi
 }
@@ -188,9 +188,9 @@ main() {
 
   SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "<server-ip>")
   echo ""
-  echo -e "${GREEN}  ✓ DIASS-SEC deployed successfully${NC}"
+  echo -e "${GREEN}  ✓ DIAAS-SEC deployed successfully${NC}"
   echo "  Access: http://${SERVER_IP}"
-  echo "  Logs:   /var/log/${APACHE_SERVICE}/diass-sec-error.log"
+  echo "  Logs:   /var/log/${APACHE_SERVICE}/diaas-sec-error.log"
   echo "  Update: cd $INSTALL_DIR && sudo git pull origin main && sudo systemctl reload $APACHE_SERVICE"
   echo ""
 }

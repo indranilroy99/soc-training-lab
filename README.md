@@ -1,4 +1,4 @@
-# DIASS-SEC
+# DIAAS-SEC
 
 Browser-based security operations platform. Alert triage, SIEM log analysis, incident case management, and threat intelligence enrichment — built around real incident scenarios with accurate Windows Event IDs and MITRE ATT&CK mappings.
 
@@ -46,15 +46,15 @@ sudo systemctl start apache2
 > `/var/www` is root-owned — you must use `sudo` here.
 
 ```bash
-sudo git clone https://github.com/indranilroy99/soc-training-lab.git /var/www/diass-sec
+sudo git clone https://github.com/indranilroy99/soc-training-lab.git /var/www/diaas-sec
 ```
 
 **4. Set permissions**
 
 ```bash
-sudo chown -R www-data:www-data /var/www/diass-sec
-sudo chown -R root:root /var/www/diass-sec/.git
-sudo chmod -R 755 /var/www/diass-sec
+sudo chown -R www-data:www-data /var/www/diaas-sec
+sudo chown -R root:root /var/www/diaas-sec/.git
+sudo chmod -R 755 /var/www/diaas-sec
 ```
 
 > Apache needs to own the app files (`www-data`). `.git` stays owned by root so `sudo git pull` works later without errors.
@@ -62,10 +62,10 @@ sudo chmod -R 755 /var/www/diass-sec
 **5. Create the Apache site config**
 
 ```bash
-sudo tee /etc/apache2/sites-available/diass-sec.conf > /dev/null << 'EOF'
+sudo tee /etc/apache2/sites-available/diaas-sec.conf > /dev/null << 'EOF'
 <VirtualHost *:80>
-    DocumentRoot /var/www/diass-sec
-    <Directory /var/www/diass-sec>
+    DocumentRoot /var/www/diaas-sec
+    <Directory /var/www/diaas-sec>
         Options -Indexes
         AllowOverride None
         Require all granted
@@ -77,7 +77,7 @@ EOF
 **6. Enable the site and reload Apache**
 
 ```bash
-sudo a2ensite diass-sec.conf
+sudo a2ensite diaas-sec.conf
 sudo a2dissite 000-default.conf
 sudo systemctl reload apache2
 ```
@@ -98,7 +98,7 @@ Open `http://<your-server-ip>` in a browser.
 Pull the latest and reload Apache:
 
 ```bash
-sudo git -C /var/www/diass-sec pull origin main
+sudo git -C /var/www/diaas-sec pull origin main
 sudo systemctl reload apache2
 ```
 
@@ -131,9 +131,9 @@ sudo systemctl disable apache2
 Remove the app and site config:
 
 ```bash
-sudo rm -rf /var/www/diass-sec
-sudo rm -f /etc/apache2/sites-available/diass-sec.conf
-sudo rm -f /etc/apache2/sites-enabled/diass-sec.conf
+sudo rm -rf /var/www/diaas-sec
+sudo rm -f /etc/apache2/sites-available/diaas-sec.conf
+sudo rm -f /etc/apache2/sites-enabled/diaas-sec.conf
 sudo systemctl reload apache2
 ```
 
@@ -150,14 +150,14 @@ Works on any distro with Apache. Replace the `apt` commands:
 | Arch | `pacman -S apache git` | `httpd` |
 | openSUSE | `zypper install apache2 git` | `apache2` |
 
-On RHEL-based systems the vhost config goes in `/etc/httpd/conf.d/diass-sec.conf` instead of `/etc/apache2/sites-available/`.
+On RHEL-based systems the vhost config goes in `/etc/httpd/conf.d/diaas-sec.conf` instead of `/etc/apache2/sites-available/`.
 
 ---
 
 ## File Structure
 
 ```
-diass-sec/
+diaas-sec/
 ├── index.html          # App shell
 ├── install.sh          # Automated install script
 ├── css/

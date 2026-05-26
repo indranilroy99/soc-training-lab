@@ -1,4 +1,4 @@
-// DIASS-SEC — Platform Engine
+// DIAAS-SEC — Platform Engine
 // Handles routing, state, scoring, toasts, clock, sidebar
 
 const App = (function() {
@@ -48,14 +48,14 @@ const App = (function() {
     document.querySelectorAll('.my-score').forEach(el => el.textContent = state.score);
     toast('+' + pts + ' pts — ' + label, 'success');
     // Update board
-    const me = DIASS_DATA.analysts.find(a => a.id === state.analystId);
+    const me = DIAAS_DATA.analysts.find(a => a.id === state.analystId);
     if (me) me.score = state.score;
     _sortLeaderboard();
   }
 
   function _sortLeaderboard() {
-    DIASS_DATA.analysts.sort((a,b) => b.score - a.score);
-    DIASS_DATA.analysts.forEach((a,i) => a.rank = i+1);
+    DIAAS_DATA.analysts.sort((a,b) => b.score - a.score);
+    DIAAS_DATA.analysts.forEach((a,i) => a.rank = i+1);
   }
 
   // ---- TOAST ----
@@ -126,7 +126,7 @@ const App = (function() {
     let i = 0;
     const ticker = document.getElementById('live-ticker');
     if (!ticker) return;
-    const items = DIASS_DATA.alerts.filter(a => a.severity === 'critical' || a.severity === 'high');
+    const items = DIAAS_DATA.alerts.filter(a => a.severity === 'critical' || a.severity === 'high');
     state.liveAlertInterval = setInterval(() => {
       if (items.length === 0) return;
       const alert = items[i % items.length];
@@ -137,9 +137,9 @@ const App = (function() {
 
   // ---- LIVE ALERT COUNT IN NAV ----
   function updateNavBadges() {
-    const unreviewedCount = DIASS_DATA.alerts.filter(a => !state.solvedAlerts.has(a.id)).length;
+    const unreviewedCount = DIAAS_DATA.alerts.filter(a => !state.solvedAlerts.has(a.id)).length;
     document.querySelectorAll('.badge-alerts').forEach(el => el.textContent = unreviewedCount);
-    const openCases = DIASS_DATA.cases.filter(c => c.status === 'open').length;
+    const openCases = DIAAS_DATA.cases.filter(c => c.status === 'open').length;
     document.querySelectorAll('.badge-cases').forEach(el => el.textContent = openCases);
   }
 
@@ -151,7 +151,7 @@ const App = (function() {
   }
   function dotHtml(sev) { return '<span class="live-dot ' + sev + '"></span>'; }
   function mitreHtml(id) {
-    const t = DIASS_DATA.mitre_techniques[id];
+    const t = DIAAS_DATA.mitre_techniques[id];
     const name = t ? t.name : id;
     return '<span class="mitre-tag" data-tip="' + name + '">' + id + '</span>';
   }
@@ -197,12 +197,12 @@ const Dashboard = (function() {
   }
 
   function renderStats() {
-    const total    = DIASS_DATA.alerts.length;
-    const critical = DIASS_DATA.alerts.filter(a=>a.severity==='critical').length;
-    const high     = DIASS_DATA.alerts.filter(a=>a.severity==='high').length;
-    const openCases = DIASS_DATA.cases.filter(c=>c.status==='open').length;
+    const total    = DIAAS_DATA.alerts.length;
+    const critical = DIAAS_DATA.alerts.filter(a=>a.severity==='critical').length;
+    const high     = DIAAS_DATA.alerts.filter(a=>a.severity==='high').length;
+    const openCases = DIAAS_DATA.cases.filter(c=>c.status==='open').length;
     const solved    = App.state.solvedAlerts.size;
-    const tp        = DIASS_DATA.alerts.filter(a=>App.state.solvedAlerts.has(a.id) && a.answer==='TP').length;
+    const tp        = DIAAS_DATA.alerts.filter(a=>App.state.solvedAlerts.has(a.id) && a.answer==='TP').length;
 
     _set('stat-total',    total);
     _set('stat-critical', critical);
@@ -216,7 +216,7 @@ const Dashboard = (function() {
     const el = document.getElementById('chart-severity');
     if (!el) return;
     const counts = { critical:0, high:0, medium:0, low:0 };
-    DIASS_DATA.alerts.forEach(a => { if (counts[a.severity]!==undefined) counts[a.severity]++; });
+    DIAAS_DATA.alerts.forEach(a => { if (counts[a.severity]!==undefined) counts[a.severity]++; });
     const max = Math.max(...Object.values(counts), 1);
     const colors = { critical:'var(--critical)', high:'var(--high)', medium:'var(--medium)', low:'var(--low)' };
     el.innerHTML = Object.entries(counts).map(([sev,count]) => `
@@ -231,11 +231,11 @@ const Dashboard = (function() {
     const el = document.getElementById('chart-mitre');
     if (!el) return;
     const counts = {};
-    DIASS_DATA.alerts.forEach(a => { counts[a.mitre] = (counts[a.mitre]||0)+1; });
+    DIAAS_DATA.alerts.forEach(a => { counts[a.mitre] = (counts[a.mitre]||0)+1; });
     const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);
     const max = sorted[0] ? sorted[0][1] : 1;
     el.innerHTML = sorted.map(([tid,count]) => {
-      const t = DIASS_DATA.mitre_techniques[tid];
+      const t = DIAAS_DATA.mitre_techniques[tid];
       const name = t ? t.name : tid;
       return `<div class="bar-row">
         <span class="bar-label" data-tip="${tid}">${name}</span>
@@ -248,7 +248,7 @@ const Dashboard = (function() {
   function renderRecentAlerts() {
     const el = document.getElementById('recent-alerts-body');
     if (!el) return;
-    const recent = DIASS_DATA.alerts.slice(0,8);
+    const recent = DIAAS_DATA.alerts.slice(0,8);
     el.innerHTML = recent.map(a => {
       const solved = App.state.solvedAlerts.has(a.id);
       const statusHtml = solved
@@ -337,7 +337,7 @@ const Alerts = (function() {
   let selected = null;
 
   function init() {
-    filtered = [...DIASS_DATA.alerts];
+    filtered = [...DIAAS_DATA.alerts];
     renderTable();
     bindFilters();
   }
@@ -382,7 +382,7 @@ const Alerts = (function() {
     const q     = (document.getElementById('alert-search')?.value || '').toLowerCase();
     const sev   = document.getElementById('alert-sev-filter')?.value || 'all';
     const status = document.getElementById('alert-status-filter')?.value || 'all';
-    filtered = DIASS_DATA.alerts.filter(a => {
+    filtered = DIAAS_DATA.alerts.filter(a => {
       if (sev !== 'all' && a.severity !== sev) return false;
       if (status === 'open' && App.state.solvedAlerts.has(a.id)) return false;
       if (status === 'triaged' && !App.state.solvedAlerts.has(a.id)) return false;
@@ -396,7 +396,7 @@ const Alerts = (function() {
   }
 
   function openDetail(id) {
-    const alert = DIASS_DATA.alerts.find(a => a.id === id);
+    const alert = DIAAS_DATA.alerts.find(a => a.id === id);
     if (!alert) return;
     selected = alert;
     const modal = document.getElementById('modal-alert-detail');
@@ -413,7 +413,7 @@ const Alerts = (function() {
     modal.querySelector('#detail-process').textContent = alert.process;
     modal.querySelector('#detail-ts').textContent = App.fmtTs(alert.timestamp);
     modal.querySelector('#detail-mitre').innerHTML = App.mitreHtml(alert.mitre);
-    const t = DIASS_DATA.mitre_techniques[alert.mitre];
+    const t = DIAAS_DATA.mitre_techniques[alert.mitre];
     modal.querySelector('#detail-tactic').textContent = t ? t.tactic : 'Unknown';
     modal.querySelector('#detail-desc').textContent = alert.description;
     modal.querySelector('#detail-raw-log').textContent = alert.raw_log;
@@ -490,7 +490,7 @@ const SIEM = (function() {
   let currentLog = null;
 
   function init() {
-    results = [...DIASS_DATA.siem_logs];
+    results = [...DIAAS_DATA.siem_logs];
     renderResults();
     bindSearch();
   }
@@ -542,7 +542,7 @@ const SIEM = (function() {
   function runQuery(q) {
     q = (q || '').trim().toLowerCase();
     const hostF = (document.getElementById('siem-host-filter')?.value || 'all').toLowerCase();
-    results = DIASS_DATA.siem_logs.filter(log => {
+    results = DIAAS_DATA.siem_logs.filter(log => {
       if (hostF !== 'all' && log.host.toLowerCase() !== hostF) return false;
       if (!q) return true;
       // Support key:value syntax
@@ -564,7 +564,7 @@ const SIEM = (function() {
   }
 
   function showLog(id) {
-    const log = DIASS_DATA.siem_logs.find(l => l.id === id);
+    const log = DIAAS_DATA.siem_logs.find(l => l.id === id);
     if (!log) return;
     currentLog = log;
     const panel = document.getElementById('siem-detail-panel');
@@ -612,7 +612,7 @@ const Cases = (function() {
   function renderList() {
     const el = document.getElementById('cases-list');
     if (!el) return;
-    el.innerHTML = DIASS_DATA.cases.map(c => {
+    el.innerHTML = DIAAS_DATA.cases.map(c => {
       const done = c.tasks.filter(t=>t.status==='closed').length;
       const pct  = c.tasks.length ? Math.round(done/c.tasks.length*100) : 0;
       return `<div class="card mb-3 cursor-pointer" onclick="Cases.openCase('${c.id}')" style="cursor:pointer">
@@ -652,7 +652,7 @@ const Cases = (function() {
   }
 
   function openCase(id) {
-    const c = DIASS_DATA.cases.find(x=>x.id===id);
+    const c = DIAAS_DATA.cases.find(x=>x.id===id);
     if (!c) return;
     selectedCase = c;
     const modal = document.getElementById('modal-case-detail');
@@ -702,7 +702,7 @@ const Cases = (function() {
   }
 
   function toggleTask(caseId, taskId) {
-    const c = DIASS_DATA.cases.find(x=>x.id===caseId);
+    const c = DIAAS_DATA.cases.find(x=>x.id===caseId);
     if (!c) return;
     const t = c.tasks.find(x=>x.id===taskId);
     if (!t) return;
@@ -738,7 +738,7 @@ const Intel = (function() {
   function renderIocTable() {
     const el = document.getElementById('intel-tbody');
     if (!el) return;
-    el.innerHTML = DIASS_DATA.iocs.map(ioc => {
+    el.innerHTML = DIAAS_DATA.iocs.map(ioc => {
       const pct = ioc.score;
       const barColor = pct >= 80 ? 'var(--critical)' : pct >= 50 ? 'var(--high)' : pct >= 20 ? 'var(--medium)' : 'var(--success)';
       return `<tr onclick="Intel.lookupIoc('${ioc.value}')">
@@ -761,14 +761,14 @@ const Intel = (function() {
   }
 
   function lookupIoc(value) {
-    const ioc = DIASS_DATA.iocs.find(i => i.value === value);
+    const ioc = DIAAS_DATA.iocs.find(i => i.value === value);
     if (!ioc) { App.toast('IOC not found in threat database', 'warning'); return; }
     const modal = document.getElementById('modal-ioc-detail');
     if (!modal) return;
     const pct = ioc.score;
     const barColor = pct >= 80 ? 'var(--critical)' : pct >= 50 ? 'var(--high)' : pct >= 20 ? 'var(--medium)' : 'var(--success)';
     const verdict = ioc.malicious
-      ? `<div class="banner banner-critical" style="margin-top:0">⚠ MALICIOUS — DIASS-SEC Threat Score: ${pct}/100</div>`
+      ? `<div class="banner banner-critical" style="margin-top:0">⚠ MALICIOUS — DIAAS-SEC Threat Score: ${pct}/100</div>`
       : `<div class="banner banner-success" style="margin-top:0">✓ CLEAN — No detections</div>`;
     modal.querySelector('#ioc-modal-body').innerHTML = `
       ${verdict}
@@ -802,12 +802,12 @@ const Leaderboard = (function() {
   function init() {
     // Seed demo scores so the board isn't all zeros
     const demo = [312, 285, 274, 248, 231, 198, 175, 142, 118, 0];
-    DIASS_DATA.analysts.forEach((a,i) => {
+    DIAAS_DATA.analysts.forEach((a,i) => {
       if (a.id === App.state.analystId) a.score = App.state.score;
       else if (a.score === 0) a.score = demo[i] || 0;
     });
-    DIASS_DATA.analysts.sort((a,b)=>b.score-a.score);
-    DIASS_DATA.analysts.forEach((a,i)=>a.rank=i+1);
+    DIAAS_DATA.analysts.sort((a,b)=>b.score-a.score);
+    DIAAS_DATA.analysts.forEach((a,i)=>a.rank=i+1);
     renderBoard();
     renderMyStats();
   }
@@ -816,7 +816,7 @@ const Leaderboard = (function() {
     const el = document.getElementById('leaderboard-tbody');
     if (!el) return;
     const badges = ['👑','🥈','🥉'];
-    el.innerHTML = DIASS_DATA.analysts.map((a,i) => {
+    el.innerHTML = DIAAS_DATA.analysts.map((a,i) => {
       const isMe = a.id === App.state.analystId;
       const solved = isMe ? App.state.solvedAlerts.size : Math.floor(a.score/20);
       const acc = solved > 0 ? Math.round((solved/(solved+1))*100)+'%' : 'N/A';
@@ -844,9 +844,9 @@ const Leaderboard = (function() {
   function renderMyStats() {
     const el = document.getElementById('my-stats-body');
     if (!el) return;
-    const tp = DIASS_DATA.alerts.filter(a=>App.state.solvedAlerts.has(a.id)&&a.answer==='TP').length;
-    const fp = DIASS_DATA.alerts.filter(a=>App.state.solvedAlerts.has(a.id)&&a.answer==='FP').length;
-    const tasks = DIASS_DATA.cases.flatMap(c=>c.tasks).filter(t=>t.status==='closed').length;
+    const tp = DIAAS_DATA.alerts.filter(a=>App.state.solvedAlerts.has(a.id)&&a.answer==='TP').length;
+    const fp = DIAAS_DATA.alerts.filter(a=>App.state.solvedAlerts.has(a.id)&&a.answer==='FP').length;
+    const tasks = DIAAS_DATA.cases.flatMap(c=>c.tasks).filter(t=>t.status==='closed').length;
     const iocs  = 0; // enrichments tracked via score
     el.innerHTML = `
       <div class="stat-card success">
@@ -866,8 +866,8 @@ const Leaderboard = (function() {
       </div>
       <div class="stat-card accent">
         <div class="stat-label">Team Rank</div>
-        <div class="stat-value">${(DIASS_DATA.analysts.find(a=>a.id===App.state.analystId)?.rank) || '—'}</div>
-        <div class="stat-delta">of ${DIASS_DATA.analysts.length} analysts</div>
+        <div class="stat-value">${(DIAAS_DATA.analysts.find(a=>a.id===App.state.analystId)?.rank) || '—'}</div>
+        <div class="stat-delta">of ${DIAAS_DATA.analysts.length} analysts</div>
       </div>`;
   }
 

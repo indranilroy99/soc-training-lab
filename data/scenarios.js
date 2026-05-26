@@ -1,10 +1,10 @@
-// DIASS-SEC — Scenario Data
+// DIAAS-SEC — Scenario Data
 // All incidents based on real attack patterns with real Event IDs, MITRE IDs, process names
 
-const DIASS_DATA = {
+const DIAAS_DATA = {
 
   meta: {
-    platform: "DIASS-SEC",
+    platform: "DIAAS-SEC",
     version: "2.4.1",
     org: "Meridian Financial Services",
     analyst: "analyst_01",
@@ -543,4 +543,4 @@ const DIASS_DATA = {
 };
 
 // Export for use across all modules
-if (typeof module !== 'undefined') module.exports = DIASS_DATA;
+if (typeof module !== 'undefined') module.exports = DIAAS_DATA;
