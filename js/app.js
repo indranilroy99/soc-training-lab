@@ -875,4 +875,14 @@ const Leaderboard = (function() {
 })();
 
 // ---- BOOT ----
+// Explicitly expose all modules to window so onclick="" attributes in HTML
+// can call them reliably across all browsers and strict-mode environments
+window.App         = App;
+window.Dashboard   = Dashboard;
+window.Alerts      = Alerts;
+window.SIEM        = SIEM;
+window.Cases       = Cases;
+window.Intel       = Intel;
+window.Leaderboard = Leaderboard;
+
 document.addEventListener('DOMContentLoaded', App.init);
