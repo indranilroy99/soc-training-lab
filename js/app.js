@@ -1,4 +1,4 @@
-// DIASS-SEC SOC Training Platform — Core App Engine
+// DIASS-SEC — Platform Engine
 // Handles routing, state, scoring, toasts, clock, sidebar
 
 const App = (function() {
@@ -7,7 +7,7 @@ const App = (function() {
   // ---- STATE ----
   const state = {
     currentPage: 'dashboard',
-    analystId: 'trainee_01',
+    analystId: 'analyst_01',
     score: 0,
     solvedAlerts: new Set(),
     openedCases: new Set(),
@@ -47,7 +47,7 @@ const App = (function() {
     state.score += pts;
     document.querySelectorAll('.my-score').forEach(el => el.textContent = state.score);
     toast('+' + pts + ' pts — ' + label, 'success');
-    // Bump leaderboard
+    // Update board
     const me = DIASS_DATA.analysts.find(a => a.id === state.analystId);
     if (me) me.score = state.score;
     _sortLeaderboard();
@@ -762,7 +762,7 @@ const Intel = (function() {
 
   function lookupIoc(value) {
     const ioc = DIASS_DATA.iocs.find(i => i.value === value);
-    if (!ioc) { App.toast('IOC not found in DIASS-SEC threat database', 'warning'); return; }
+    if (!ioc) { App.toast('IOC not found in threat database', 'warning'); return; }
     const modal = document.getElementById('modal-ioc-detail');
     if (!modal) return;
     const pct = ioc.score;
@@ -796,7 +796,7 @@ const Intel = (function() {
 })();
 
 // ============================================================
-//  LEADERBOARD MODULE
+//  ANALYST BOARD MODULE
 // ============================================================
 const Leaderboard = (function() {
   function init() {
@@ -852,7 +852,7 @@ const Leaderboard = (function() {
       <div class="stat-card success">
         <div class="stat-label">Total Score</div>
         <div class="stat-value my-score">${App.state.score}</div>
-        <div class="stat-delta">pts earned this session</div>
+        <div class="stat-delta">pts this shift</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Alerts Triaged</div>
@@ -865,7 +865,7 @@ const Leaderboard = (function() {
         <div class="stat-delta">10 pts each</div>
       </div>
       <div class="stat-card accent">
-        <div class="stat-label">Class Rank</div>
+        <div class="stat-label">Team Rank</div>
         <div class="stat-value">${(DIASS_DATA.analysts.find(a=>a.id===App.state.analystId)?.rank) || '—'}</div>
         <div class="stat-delta">of ${DIASS_DATA.analysts.length} analysts</div>
       </div>`;

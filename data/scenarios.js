@@ -1,4 +1,4 @@
-// DIASS-SEC SOC Training Platform — Scenario Data
+// DIASS-SEC — Scenario Data
 // All incidents based on real attack patterns with real Event IDs, MITRE IDs, process names
 
 const DIASS_DATA = {
@@ -7,22 +7,22 @@ const DIASS_DATA = {
     platform: "DIASS-SEC",
     version: "2.4.1",
     org: "Meridian Financial Services",
-    analyst: "trainee_01",
+    analyst: "analyst_01",
     shift: "Day Shift 08:00 – 16:00 IST",
     updated: "2025-01-15T08:00:00Z"
   },
 
   analysts: [
-    { id: "trainee_01", name: "Aryan Shah",       score: 0,   rank: 1, badge: "Analyst",   solved: [] },
-    { id: "trainee_02", name: "Priya Nair",       score: 0,   rank: 2, badge: "Analyst",   solved: [] },
-    { id: "trainee_03", name: "Rohan Mehta",      score: 0,   rank: 3, badge: "Analyst",   solved: [] },
-    { id: "trainee_04", name: "Sneha Iyer",       score: 0,   rank: 4, badge: "Analyst",   solved: [] },
-    { id: "trainee_05", name: "Vikram Das",       score: 0,   rank: 5, badge: "Analyst",   solved: [] },
-    { id: "trainee_06", name: "Meera Pillai",     score: 0,   rank: 6, badge: "Analyst",   solved: [] },
-    { id: "trainee_07", name: "Ankit Verma",      score: 0,   rank: 7, badge: "Analyst",   solved: [] },
-    { id: "trainee_08", name: "Divya Krishnan",   score: 0,   rank: 8, badge: "Analyst",   solved: [] },
-    { id: "trainee_09", name: "Saurabh Joshi",    score: 0,   rank: 9, badge: "Analyst",   solved: [] },
-    { id: "trainee_10", name: "Kavya Reddy",      score: 0,   rank: 10, badge: "Analyst",  solved: [] }
+    { id: "analyst_01", name: "J. Carter",        score: 0,   rank: 1,  badge: "L1 Analyst", solved: [] },
+    { id: "analyst_02", name: "M. Okafor",        score: 0,   rank: 2,  badge: "L1 Analyst", solved: [] },
+    { id: "analyst_03", name: "S. Reeves",        score: 0,   rank: 3,  badge: "L1 Analyst", solved: [] },
+    { id: "analyst_04", name: "A. Petrov",        score: 0,   rank: 4,  badge: "L1 Analyst", solved: [] },
+    { id: "analyst_05", name: "L. Fontaine",      score: 0,   rank: 5,  badge: "L1 Analyst", solved: [] },
+    { id: "analyst_06", name: "D. Nakamura",      score: 0,   rank: 6,  badge: "L1 Analyst", solved: [] },
+    { id: "analyst_07", name: "R. Vasquez",       score: 0,   rank: 7,  badge: "L1 Analyst", solved: [] },
+    { id: "analyst_08", name: "T. Brennan",       score: 0,   rank: 8,  badge: "L1 Analyst", solved: [] },
+    { id: "analyst_09", name: "K. Adeyemi",       score: 0,   rank: 9,  badge: "L1 Analyst", solved: [] },
+    { id: "analyst_10", name: "P. Sinclair",      score: 0,   rank: 10, badge: "L1 Analyst", solved: [] }
   ],
 
   mitre_techniques: {
@@ -413,7 +413,7 @@ const DIASS_DATA = {
       explanation: "CRITICAL TP. VSS deletion is pre-ransomware standard procedure. Paired with mass file rename, this is confirmed active ransomware. Backup destruction = no recovery without offline backups."
     },
 
-    // === FALSE POSITIVES (for training TP/FP discrimination) ===
+    // === FALSE POSITIVES ===
     {
       id: "ALT-2025-0017",
       scenario_id: "FP",
