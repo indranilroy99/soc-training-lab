@@ -1,5 +1,7 @@
 node_modules/
 database/diaas.db
+database/diaas.db-shm
+database/diaas.db-wal
 logs/
 *.log
 .DS_Store
