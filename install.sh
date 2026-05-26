@@ -75,6 +75,9 @@ install_deps() {
 # Step 2 — Clone repo
 # ─────────────────────────────────────────────
 clone_repo() {
+  # Mark directory safe for git operations run as root (avoids "dubious ownership" error)
+  git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
+
   if [ -d "$INSTALL_DIR/.git" ]; then
     warn "$INSTALL_DIR already exists — pulling latest instead of cloning."
     git -C "$INSTALL_DIR" pull origin main
@@ -89,7 +92,7 @@ clone_repo() {
 # ─────────────────────────────────────────────
 set_permissions() {
   info "Setting permissions..."
-  # Determine web user
+  # Determine web server user
   if id www-data &>/dev/null; then
     WEB_USER="www-data"
   elif id apache &>/dev/null; then
@@ -100,9 +103,13 @@ set_permissions() {
     WEB_USER="nobody"
     warn "Could not detect web user — falling back to 'nobody'"
   fi
+
+  # Give web user ownership of app files, but keep .git owned by root
+  # so future `sudo git pull` works without the dubious-ownership error
   chown -R "$WEB_USER":"$WEB_USER" "$INSTALL_DIR"
+  chown -R root:root "$INSTALL_DIR/.git"
   chmod -R 755 "$INSTALL_DIR"
-  info "Owner: $WEB_USER"
+  info "App files owner: $WEB_USER  |  .git owner: root"
 }
 
 # ─────────────────────────────────────────────

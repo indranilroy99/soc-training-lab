@@ -108,8 +108,11 @@ sudo git clone https://github.com/indranilroy99/soc-training-lab.git /var/www/di
 
 ```bash
 sudo chown -R www-data:www-data /var/www/diass-sec
+sudo chown -R root:root /var/www/diass-sec/.git
 sudo chmod -R 755 /var/www/diass-sec
 ```
+
+> Keep `.git` owned by root so `sudo git pull` works later. If you chown `.git` to `www-data`, git will refuse to run there with a "dubious ownership" error.
 
 **Step 5 — Create virtual host**
 
@@ -150,6 +153,8 @@ Access at `http://<server-ip>` from any browser on the same network.
 ```bash
 cd /var/www/diass-sec && sudo git pull origin main && sudo systemctl reload apache2
 ```
+
+> Must use `sudo git pull` — `.git` is owned by root to prevent the dubious-ownership error.
 
 ---
 
