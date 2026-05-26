@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS — Security Operations Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='4' fill='%233b82f6'/><text y='17' x='4' font-size='14' font-weight='700' fill='white' font-family='sans-serif'>N</text></svg>">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <nav id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">NX</div>
+      <span class="logo-text">NEXUS</span>
+      <span class="logo-version">v2.4.1</span>
+    </div>
+
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M7 2L3 5l4 3"/>
+      </svg>
+    </button>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Operations</div>
+
+      <a class="nav-item active" data-page="dashboard">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
+          <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
+        </svg>
+        <span class="nav-label">Dashboard</span>
+      </a>
+
+      <a class="nav-item" data-page="alerts">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M8 1l1.5 3.5H13l-2.8 2 1 3.5L8 8l-3.2 2 1-3.5L3 4.5h3.5z"/>
+        </svg>
+        <span class="nav-label">Alert Triage</span>
+        <span class="nav-badge badge-alerts">18</span>
+      </a>
+
+      <a class="nav-item" data-page="siem">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="1" y="3" width="14" height="2" rx="0.5"/><rect x="1" y="7" width="10" height="2" rx="0.5"/>
+          <rect x="1" y="11" width="12" height="2" rx="0.5"/>
+        </svg>
+        <span class="nav-label">SIEM Logs</span>
+      </a>
+
+      <a class="nav-item" data-page="cases">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="1" y="2" width="14" height="12" rx="1.5"/>
+          <path d="M5 6h6M5 9h4"/>
+        </svg>
+        <span class="nav-label">Incident Cases</span>
+        <span class="nav-badge badge-cases" style="background:var(--high)">2</span>
+      </a>
+
+      <a class="nav-item" data-page="intel">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="8" cy="8" r="7"/><circle cx="8" cy="8" r="3"/>
+          <path d="M8 1v4M8 11v4M1 8h4M11 8h4"/>
+        </svg>
+        <span class="nav-label">Threat Intel</span>
+      </a>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Training</div>
+      <a class="nav-item" data-page="leaderboard">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="1" y="9" width="4" height="6" rx="0.5"/>
+          <rect x="6" y="5" width="4" height="10" rx="0.5"/>
+          <rect x="11" y="1" width="4" height="14" rx="0.5"/>
+        </svg>
+        <span class="nav-label">Leaderboard</span>
+      </a>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="analyst-chip">
+        <div class="analyst-avatar">AS</div>
+        <div>
+          <div class="analyst-name">Aryan Shah</div>
+          <div class="analyst-role">L1 SOC Analyst</div>
+        </div>
+        <span class="analyst-score-badge my-score">0</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===================== MAIN ===================== -->
+  <div id="main">
+
+    <!-- TOPBAR -->
+    <header id="topbar">
+      <div class="topbar-breadcrumb">
+        <span>NEXUS</span>
+        <span class="topbar-sep">/</span>
+        <span class="current" id="breadcrumb-current">Dashboard</span>
+      </div>
+
+      <!-- Live alert ticker -->
+      <div style="flex:1;overflow:hidden;margin:0 16px;display:flex;align-items:center;gap:8px;max-width:480px">
+        <span class="live-dot critical"></span>
+        <span id="live-ticker" style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      </div>
+
+      <div class="topbar-right">
+        <div class="topbar-status">
+          <span class="status-dot"></span>
+          <span>All Systems Operational</span>
+        </div>
+        <div class="topbar-clock" id="topbar-clock">--:--:-- IST</div>
+        <button class="topbar-btn alert-indicator" onclick="App.navigate('alerts')" data-tip="Alert Queue">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 1a5 5 0 0 1 5 5v3l1.5 2.5h-13L3 9V6a5 5 0 0 1 5-5z"/><path d="M6 13a2 2 0 0 0 4 0"/>
+          </svg>
+          <span class="alert-dot"></span>
+        </button>
+        <button class="topbar-btn" data-tip="Settings">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="8" cy="8" r="2"/>
+            <path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.5 3.5l1 1M11.5 11.5l1 1M3.5 12.5l1-1M11.5 4.5l1-1"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===================== CONTENT ===================== -->
+    <div id="content">
+
+      <!-- ============ PAGE: DASHBOARD ============ -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Security Operations Dashboard</h1>
+            <p class="page-subtitle">Meridian Financial Services — Incident date: 2025-01-15 &nbsp;·&nbsp; Real-time telemetry simulation</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-secondary" onclick="Dashboard.refresh()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8a6 6 0 1 0 1-3"/><path d="M2 3v4h4"/></svg>
+              Refresh
+            </button>
+            <button class="btn btn-primary" onclick="App.navigate('alerts')">Triage Alerts →</button>
+          </div>
+        </div>
+
+        <!-- Stat Row -->
+        <div class="stats-grid stats-grid-4 mb-4">
+          <div class="stat-card critical">
+            <div class="stat-label">Critical Alerts</div>
+            <div class="stat-value" id="stat-critical">—</div>
+            <div class="stat-delta delta-up">↑ Immediate attention</div>
+          </div>
+          <div class="stat-card high">
+            <div class="stat-label">High Alerts</div>
+            <div class="stat-value" id="stat-high">—</div>
+            <div class="stat-delta">In queue</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Alerts (24h)</div>
+            <div class="stat-value" id="stat-total">—</div>
+            <div class="stat-delta">Across all agents</div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-label">Triaged by You</div>
+            <div class="stat-value" id="stat-solved">—</div>
+            <div class="stat-delta"><span id="stat-tp">—</span> confirmed TP</div>
+          </div>
+        </div>
+
+        <!-- Row 1 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+          <!-- Attack Timeline -->
+          <div class="card" style="grid-column:1/2">
+            <div class="card-header">
+              <span class="card-title">Attack Timeline — Today's Incident</span>
+              <span class="chip chip-critical">ACTIVE INCIDENT</span>
+            </div>
+            <div class="card-body" style="max-height:380px;overflow-y:auto">
+              <div class="timeline" id="attack-timeline"></div>
+            </div>
+          </div>
+
+          <!-- Right column -->
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <!-- Severity breakdown -->
+            <div class="card">
+              <div class="card-header"><span class="card-title">Alert Severity Breakdown</span></div>
+              <div class="card-body">
+                <div class="bar-chart" id="chart-severity"></div>
+              </div>
+            </div>
+            <!-- MITRE heatmap -->
+            <div class="card">
+              <div class="card-header"><span class="card-title">Top MITRE Techniques</span></div>
+              <div class="card-body">
+                <div class="bar-chart" id="chart-mitre"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2 -->
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
+
+          <!-- Recent alerts table -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Recent Alerts</span>
+              <button class="btn btn-sm btn-secondary" onclick="App.navigate('alerts')">View All</button>
+            </div>
+            <div class="card-body-tight">
+              <div class="table-wrap">
+                <table>
+                  <thead><tr>
+                    <th>ID</th><th>Rule</th><th>Severity</th>
+                    <th>Agent</th><th>MITRE</th><th>When</th><th>Status</th>
+                  </tr></thead>
+                  <tbody id="recent-alerts-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Agent status -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Agent Health</span>
+              <span class="chip chip-success">8 ONLINE</span>
+            </div>
+            <div class="card-body" id="agent-status-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: ALERT TRIAGE ============ -->
+      <div class="page" id="page-alerts">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Alert Triage Queue</h1>
+            <p class="page-subtitle">Classify each alert as True Positive or False Positive. Map to MITRE. Earn points for correct answers.</p>
+          </div>
+          <div class="page-actions">
+            <span class="chip chip-neutral" style="font-size:11px;padding:4px 10px">Score: <strong class="my-score text-accent">0</strong> pts</span>
+          </div>
+        </div>
+
+        <div class="banner banner-info">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><path d="M8 7v5M8 5h.01"/></svg>
+          <div><strong>How to score:</strong> Correct TP/FP verdict = full points. Correct MITRE mapping = +30% bonus. Click any alert to open the triage panel.</div>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="card mb-3">
+          <div class="filter-bar">
+            <div class="search-input-wrap">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="6.5" r="5"/><path d="m11 11 3 3"/></svg>
+              <input class="search-input" id="alert-search" placeholder="Search rule name, agent, IP...">
+            </div>
+            <select class="filter-select" id="alert-sev-filter">
+              <option value="all">All Severities</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <select class="filter-select" id="alert-status-filter">
+              <option value="all">All Status</option>
+              <option value="open">Open</option>
+              <option value="triaged">Triaged</option>
+            </select>
+          </div>
+          <div class="card-body-tight">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th style="width:20px"></th>
+                  <th>Alert ID</th>
+                  <th>Rule</th>
+                  <th>Severity</th>
+                  <th>Agent</th>
+                  <th>Source IP</th>
+                  <th>MITRE</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                </tr></thead>
+                <tbody id="alerts-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: SIEM LOGS ============ -->
+      <div class="page" id="page-siem">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">SIEM Log Search</h1>
+            <p class="page-subtitle">Query raw event logs. Use <code style="font-family:var(--font-mono);font-size:11px;background:var(--bg-raised);padding:1px 5px;border-radius:2px">event_id:4625</code> or <code style="font-family:var(--font-mono);font-size:11px;background:var(--bg-raised);padding:1px 5px;border-radius:2px">host:WIN-DC01</code> syntax. Press Enter to run.</p>
+          </div>
+        </div>
+
+        <!-- Query Bar -->
+        <div class="card mb-3">
+          <div class="card-header" style="gap:8px;flex-wrap:wrap">
+            <span class="card-title">Query</span>
+            <div class="flex gap-2 flex-wrap">
+              <button class="btn btn-xs btn-ghost siem-quick-query" data-query="event_id:4625">Brute Force</button>
+              <button class="btn btn-xs btn-ghost siem-quick-query" data-query="lsass">LSASS Access</button>
+              <button class="btn btn-xs btn-ghost siem-quick-query" data-query="tag:lateral-movement">Lateral Move</button>
+              <button class="btn btn-xs btn-ghost siem-quick-query" data-query="tag:ransomware">Ransomware</button>
+              <button class="btn btn-xs btn-ghost siem-quick-query" data-query="host:WIN-DC01">DC Events</button>
+              <button class="btn btn-xs btn-ghost siem-quick-query" data-query="powershell">PowerShell</button>
+              <button class="btn btn-xs btn-ghost siem-quick-query" data-query="">All Events</button>
+            </div>
+            <div class="flex gap-2 ml-auto" style="margin-left:auto">
+              <select class="filter-select" id="siem-host-filter">
+                <option value="all">All Hosts</option>
+                <option value="WIN-DC01">WIN-DC01</option>
+                <option value="WIN-FIN01">WIN-FIN01</option>
+                <option value="WIN-APP01">WIN-APP01</option>
+                <option value="WIN-HR01">WIN-HR01</option>
+                <option value="WIN-RDP01">WIN-RDP01</option>
+                <option value="WIN-FILE01">WIN-FILE01</option>
+              </select>
+              <select class="filter-select" id="siem-time-filter">
+                <option value="shift">This shift (today)</option>
+                <option value="24h">Last 24h</option>
+                <option value="7d">Last 7d</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body" style="padding:12px 16px">
+            <div style="display:flex;gap:8px">
+              <input class="form-input" id="siem-search" placeholder="Search logs... e.g. event_id:4624   tag:c2   lsass   host:WIN-APP01" style="font-family:var(--font-mono);font-size:12px">
+              <button class="btn btn-primary" id="siem-run">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2l10 6-10 6V2z" fill="currentColor" stroke="none"/></svg>
+                Run
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 320px;gap:16px">
+          <!-- Results -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Results</span>
+              <span class="text-sm text-muted" id="siem-count">0 events</span>
+            </div>
+            <div class="card-body-tight">
+              <div class="table-wrap" style="max-height:calc(100vh - 340px);overflow-y:auto">
+                <table>
+                  <thead><tr>
+                    <th>Timestamp</th><th>Host</th><th>Source</th>
+                    <th>Event ID</th><th>Level</th><th>Message</th><th>Tags</th>
+                  </tr></thead>
+                  <tbody id="siem-results-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detail panel -->
+          <div class="card" id="siem-detail-panel" style="display:none;max-height:calc(100vh - 220px);overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: CASES ============ -->
+      <div class="page" id="page-cases">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Incident Cases</h1>
+            <p class="page-subtitle">Manage active investigations. Add observables. Complete tasks to earn points.</p>
+          </div>
+          <div class="page-actions">
+            <span class="chip chip-critical">2 OPEN</span>
+          </div>
+        </div>
+        <div id="cases-list"></div>
+      </div>
+
+      <!-- ============ PAGE: THREAT INTEL ============ -->
+      <div class="page" id="page-intel">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Threat Intelligence</h1>
+            <p class="page-subtitle">Enrich IOCs against the NEXUS threat database. Every lookup earns +5 pts.</p>
+          </div>
+        </div>
+
+        <!-- Lookup bar -->
+        <div class="card mb-3">
+          <div class="card-header"><span class="card-title">IOC Lookup</span></div>
+          <div class="card-body" style="padding:12px 16px">
+            <div style="display:flex;gap:8px">
+              <input class="form-input" id="intel-search" placeholder="Enter IP, domain, hash, URL, or email...">
+              <button class="btn btn-primary" onclick="Intel.runLookup()">Enrich</button>
+            </div>
+            <div class="mt-2 flex gap-2 flex-wrap">
+              <span class="text-xs text-muted">Quick lookup:</span>
+              <button class="btn btn-xs btn-ghost" onclick="Intel.lookupIoc('185.220.101.15')">185.220.101.15</button>
+              <button class="btn btn-xs btn-ghost" onclick="Intel.lookupIoc('203.0.113.42')">203.0.113.42</button>
+              <button class="btn btn-xs btn-ghost" onclick="Intel.lookupIoc('update.meridian-security-patch.com')">C2 Domain</button>
+              <button class="btn btn-xs btn-ghost" onclick="Intel.lookupIoc('e3b0c44298fc1c149afbf4c8996fb924')">Ransomware Hash</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- IOC Table -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Known Malicious Indicators</span>
+            <span class="chip chip-neutral">10 IOCs</span>
+          </div>
+          <div class="card-body-tight">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Type</th><th>Indicator</th><th style="width:140px">Threat Score</th>
+                  <th>Engines</th><th>Verdict</th><th>Description</th><th>Tags</th>
+                </tr></thead>
+                <tbody id="intel-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: LEADERBOARD ============ -->
+      <div class="page" id="page-leaderboard">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Class Leaderboard</h1>
+            <p class="page-subtitle">Batch — Stack 3 Training · SOC Specialist Cohort · Meridian Financial Sim</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-secondary" onclick="Leaderboard.init()">Refresh</button>
+          </div>
+        </div>
+
+        <!-- My stats row -->
+        <div class="stats-grid stats-grid-4 mb-4" id="my-stats-body"></div>
+
+        <!-- Leaderboard table -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Rankings</span>
+            <span class="text-sm text-muted">Live · Updates after each triage</span>
+          </div>
+          <div class="card-body-tight">
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th style="width:50px">Rank</th>
+                  <th>Analyst</th>
+                  <th>Score</th>
+                  <th>Alerts Solved</th>
+                  <th>Accuracy</th>
+                  <th>Tier</th>
+                </tr></thead>
+                <tbody id="leaderboard-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scoring guide -->
+        <div class="card mt-3">
+          <div class="card-header"><span class="card-title">Scoring Guide</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+              <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border:1px solid var(--border)">
+                <div class="text-xs text-muted mb-2">CORRECT TRIAGE</div>
+                <div style="font-size:13px;color:var(--text-primary)">Alert verdict (TP/FP) — <strong class="text-success">+10 to +35 pts</strong> depending on severity</div>
+              </div>
+              <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border:1px solid var(--border)">
+                <div class="text-xs text-muted mb-2">MITRE MAPPING</div>
+                <div style="font-size:13px;color:var(--text-primary)">Correct MITRE T-code — <strong class="text-accent">+30% bonus</strong> on top of verdict score</div>
+              </div>
+              <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border:1px solid var(--border)">
+                <div class="text-xs text-muted mb-2">CASE TASKS</div>
+                <div style="font-size:13px;color:var(--text-primary)">Each task completed — <strong class="text-medium">+10 pts</strong>. Adding observables — <strong class="text-medium">+5 pts</strong></div>
+              </div>
+              <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border:1px solid var(--border)">
+                <div class="text-xs text-muted mb-2">IOC ENRICHMENT</div>
+                <div style="font-size:13px;color:var(--text-primary)">Each IOC lookup — <strong class="text-info">+5 pts</strong> (max 10 enrichments per session)</div>
+              </div>
+              <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border:1px solid var(--border)">
+                <div class="text-xs text-muted mb-2">SPEED BONUS</div>
+                <div style="font-size:13px;color:var(--text-primary)">Critical alert triaged within 5 min — <strong class="text-critical">+15 pts</strong> bonus</div>
+              </div>
+              <div style="padding:12px;background:var(--bg-surface);border-radius:var(--border)">
+                <div class="text-xs text-muted mb-2">CAPSTONE</div>
+                <div style="font-size:13px;color:var(--text-primary)">Operation Blackout — <strong style="color:#f59e0b">up to 300 pts</strong> total</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ===================== MODALS ===================== -->
+
+<!-- Alert Detail / Triage Modal -->
+<div class="modal-overlay" id="modal-alert-detail">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div>
+        <span class="text-mono text-muted text-sm" id="detail-id"></span>
+        <div class="modal-title mt-1" id="detail-rule" style="font-size:15px"></div>
+      </div>
+      <div id="detail-sev" style="margin-right:8px"></div>
+      <button class="modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab(this,'tab-details')">Alert Details</div>
+        <div class="tab" onclick="switchTab(this,'tab-triage')">Triage</div>
+        <div class="tab" onclick="switchTab(this,'tab-raw')">Raw Log</div>
+      </div>
+
+      <!-- Tab: Details -->
+      <div class="tab-panel active" id="tab-details">
+        <div class="detail-grid mb-3">
+          <div class="detail-row"><span class="detail-key">Timestamp</span><span class="detail-val" id="detail-ts"></span></div>
+          <div class="detail-row"><span class="detail-key">Agent</span><span class="detail-val" id="detail-agent"></span></div>
+          <div class="detail-row"><span class="detail-key">Source IP</span><span class="detail-val" id="detail-src-ip"></span></div>
+          <div class="detail-row"><span class="detail-key">Destination IP</span><span class="detail-val" id="detail-dest-ip"></span></div>
+          <div class="detail-row"><span class="detail-key">Dest Port</span><span class="detail-val" id="detail-dest-port"></span></div>
+          <div class="detail-row"><span class="detail-key">Event ID</span><span class="detail-val" id="detail-event-id"></span></div>
+          <div class="detail-row"><span class="detail-key">Process</span><span class="detail-val" id="detail-process"></span></div>
+          <div class="detail-row"><span class="detail-key">Tactic</span><span class="detail-val" id="detail-tactic"></span></div>
+        </div>
+        <div class="detail-row mb-3" style="background:var(--bg-surface);padding:10px;border-radius:var(--radius);border:1px solid var(--border)">
+          <span class="detail-key">MITRE Technique</span>
+          <div id="detail-mitre" style="margin-top:4px"></div>
+        </div>
+        <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border:1px solid var(--border)">
+          <div class="form-label">Description</div>
+          <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.6" id="detail-desc"></p>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button class="btn btn-secondary btn-sm" onclick="Intel.lookupIoc(document.getElementById('detail-src-ip').textContent)">
+            Enrich Source IP in TI
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('siem');setTimeout(()=>{document.getElementById('siem-search').value=document.getElementById('detail-agent').textContent;SIEM.runQuery(document.getElementById('detail-agent').textContent)},300)">
+            Hunt in SIEM
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab: Triage -->
+      <div class="tab-panel" id="tab-triage">
+        <div class="banner banner-info mb-3">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><path d="M8 7v5M8 5h.01"/></svg>
+          <div>This alert is worth <strong id="detail-points"></strong> points. +30% bonus for correct MITRE mapping.</div>
+        </div>
+        <form id="triage-form">
+          <div class="form-group">
+            <label class="form-label">Verdict *</label>
+            <div class="radio-group">
+              <label class="radio-option" onclick="this.closest('.radio-group').querySelectorAll('.radio-option').forEach(x=>x.classList.remove('selected'));this.classList.add('selected')">
+                <input type="radio" name="verdict" value="TP"> <span class="radio-label">True Positive — this is a real attack</span>
+                <span class="radio-sub chip chip-critical">TP</span>
+              </label>
+              <label class="radio-option" onclick="this.closest('.radio-group').querySelectorAll('.radio-option').forEach(x=>x.classList.remove('selected'));this.classList.add('selected')">
+                <input type="radio" name="verdict" value="FP"> <span class="radio-label">False Positive — this is benign activity</span>
+                <span class="radio-sub chip chip-success">FP</span>
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">MITRE ATT&CK Technique (for +bonus pts)</label>
+            <select class="form-select" id="triage-mitre">
+              <option value="">— Select technique —</option>
+              <option value="T1046">T1046 — Network Service Discovery</option>
+              <option value="T1110.001">T1110.001 — Password Spraying</option>
+              <option value="T1078">T1078 — Valid Accounts</option>
+              <option value="T1566.001">T1566.001 — Spear Phishing Attachment</option>
+              <option value="T1059.001">T1059.001 — PowerShell</option>
+              <option value="T1071.001">T1071.001 — Web Protocols (C2)</option>
+              <option value="T1071.004">T1071.004 — DNS C2</option>
+              <option value="T1021.002">T1021.002 — SMB/Windows Admin Shares</option>
+              <option value="T1550.002">T1550.002 — Pass the Hash</option>
+              <option value="T1003.001">T1003.001 — LSASS Memory</option>
+              <option value="T1562.001">T1562.001 — Disable or Modify Tools</option>
+              <option value="T1558.003">T1558.003 — Kerberoasting</option>
+              <option value="T1003.006">T1003.006 — DCSync</option>
+              <option value="T1486">T1486 — Data Encrypted for Impact</option>
+              <option value="T1490">T1490 — Inhibit System Recovery</option>
+              <option value="T1136.001">T1136.001 — Create Local Account</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Investigation Notes (optional)</label>
+            <textarea class="form-textarea" id="triage-notes" placeholder="What did you look at? What confirms or refutes this alert?"></textarea>
+          </div>
+        </form>
+        <div id="triage-feedback" class="feedback-panel"></div>
+      </div>
+
+      <!-- Tab: Raw Log -->
+      <div class="tab-panel" id="tab-raw">
+        <div class="form-label mb-2">Raw Log Entry</div>
+        <div class="log-block" id="detail-raw-log"></div>
+        <div class="mt-3">
+          <p class="text-sm text-muted">This is the exact log line from the agent. In a real SOC this would be the raw syslog or Windows Event XML. Use this to validate the alert before triaging.</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost modal-close">Cancel</button>
+      <button class="btn btn-primary" id="btn-submit-triage" onclick="Alerts.submitTriage()">Submit Triage</button>
+    </div>
+  </div>
+</div>
+
+<!-- IOC Detail Modal -->
+<div class="modal-overlay" id="modal-ioc-detail">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title" id="ioc-modal-title">IOC Lookup</span>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="modal-body" id="ioc-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Case Detail Modal -->
+<div class="modal-overlay" id="modal-case-detail">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span class="text-mono text-sm text-muted" id="case-modal-id"></span>
+          <span id="case-modal-sev"></span>
+          <span class="chip chip-neutral" id="case-modal-status"></span>
+        </div>
+        <div class="modal-title" id="case-modal-title"></div>
+      </div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab(this,'case-tab-overview')">Overview</div>
+        <div class="tab" onclick="switchTab(this,'case-tab-tasks')">Tasks</div>
+        <div class="tab" onclick="switchTab(this,'case-tab-observables')">Observables</div>
+      </div>
+
+      <div class="tab-panel active" id="case-tab-overview">
+        <div class="detail-grid mb-3">
+          <div class="detail-row"><span class="detail-key">Created</span><span class="detail-val" id="case-modal-created"></span></div>
+          <div class="detail-row"><span class="detail-key">MITRE Coverage</span><div id="case-modal-mitre" style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px"></div></div>
+        </div>
+        <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border:1px solid var(--border)">
+          <div class="form-label mb-2">Case Description</div>
+          <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.6" id="case-modal-desc"></p>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="case-tab-tasks">
+        <p class="text-sm text-muted mb-3">Check tasks as you complete them. Each task earns +10 pts.</p>
+        <div id="case-tasks-list"></div>
+      </div>
+
+      <div class="tab-panel" id="case-tab-observables">
+        <p class="text-sm text-muted mb-3">Click any observable to enrich it in Threat Intel. Add new observables with +5 pts each.</p>
+        <div id="case-observables" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px"></div>
+        <div class="divider"></div>
+        <div class="form-label mb-2">Add Observable</div>
+        <div style="display:flex;gap:8px">
+          <select class="form-select" id="obs-type" style="width:100px">
+            <option value="ip">IP</option>
+            <option value="domain">Domain</option>
+            <option value="hash">Hash</option>
+            <option value="url">URL</option>
+            <option value="email">Email</option>
+          </select>
+          <input class="form-input" id="obs-val" placeholder="Enter indicator value...">
+          <button class="btn btn-primary" onclick="Cases.addObservable()">Add</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost modal-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- Scripts -->
+<script src="data/scenarios.js"></script>
+<script src="js/app.js"></script>
+<script>
+// Tab switcher — shared across modals
+function switchTab(tabEl, panelId) {
+  const container = tabEl.closest('.tabs');
+  const pageScope = tabEl.closest('.modal-body') || tabEl.closest('.page');
+  if (!container || !pageScope) return;
+  container.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  pageScope.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  tabEl.classList.add('active');
+  const panel = document.getElementById(panelId);
+  if (panel) panel.classList.add('active');
+}
+</script>
+</body>
+</html>
