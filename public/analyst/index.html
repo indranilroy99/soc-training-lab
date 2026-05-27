@@ -655,7 +655,7 @@ input, textarea, select { font-family: var(--font); }
                   <label class="form-label">Confirm New Password</label>
                   <input type="password" class="form-input" id="pw-confirm" placeholder="Confirm new password">
                 </div>
-                <button class="btn btn-green" onclick="Pages.changePassword()">Update Password</button>
+                <button class="btn btn-green" id="btn-change-pw" onclick="Pages.changePassword()">Update Password</button>
                 <div id="pw-msg" style="display:none;margin-top:10px;font-size:12.5px;padding:8px 12px;border-radius:5px"></div>
               </div>
             </div>
@@ -756,6 +756,11 @@ const App = {
     // Nav click handlers
     document.querySelectorAll('.nav-item[data-page]').forEach(el => {
       el.addEventListener('click', () => App.navigate(el.dataset.page));
+    });
+
+    // Filter tab handlers
+    document.querySelectorAll('.filter-tab').forEach(btn => {
+      btn.addEventListener('click', () => Pages.renderLabsGrid(btn.dataset.cat));
     });
 
     await App.loadMe();
@@ -996,8 +1001,8 @@ const Pages = {
     if (q.answer_type === 'choice' && q.options) {
       const opts = JSON.parse(typeof q.options === 'string' ? q.options : JSON.stringify(q.options));
       inputHtml = `<div class="q-choices" id="q-choices-${q.id}">
-        ${opts.map(opt => `<label class="q-choice ${done ? 'correct' : ''}" ${done ? '' : ''}>
-          <input type="radio" name="q-${q.id}" value="${opt}" style="pointer-events:none"> ${opt}
+        ${opts.map(opt => `<label class="q-choice ${done ? 'correct' : ''}">
+          <input type="radio" name="q-${q.id}" value="${opt}" ${done ? 'disabled' : ''}> ${opt}
         </label>`).join('')}
       </div>`;
     } else {
@@ -1151,38 +1156,32 @@ const Pages = {
   },
 
   async changePassword() {
-    const cur  = document.getElementById('pw-current').value;
-    const pw1  = document.getElementById('pw-new').value;
-    const pw2  = document.getElementById('pw-confirm').value;
+    const cur   = document.getElementById('pw-current').value;
+    const pw1   = document.getElementById('pw-new').value;
+    const pw2   = document.getElementById('pw-confirm').value;
     const msgEl = document.getElementById('pw-msg');
+    const btn   = document.getElementById('btn-change-pw');
     function showMsg(msg, ok) {
-      msgEl.style.display = 'block';
-      msgEl.style.background  = ok ? 'rgba(43,204,139,0.1)' : 'rgba(255,71,87,0.1)';
-      msgEl.style.border      = `1px solid ${ok ? 'rgba(43,204,139,0.3)' : 'rgba(255,71,87,0.3)'}`;
-      msgEl.style.color       = ok ? 'var(--green)' : 'var(--red)';
-      msgEl.textContent = msg;
+      msgEl.style.display    = 'block';
+      msgEl.style.background = ok ? 'rgba(43,204,139,0.1)' : 'rgba(255,71,87,0.1)';
+      msgEl.style.border     = `1px solid ${ok ? 'rgba(43,204,139,0.3)' : 'rgba(255,71,87,0.3)'}`;
+      msgEl.style.color      = ok ? 'var(--green)' : 'var(--red)';
+      msgEl.textContent      = msg;
     }
-    if (!cur || !pw1 || !pw2) { showMsg('All fields required', false); return; }
-    if (pw1 !== pw2) { showMsg('Passwords do not match', false); return; }
-    if (pw1.length < 8) { showMsg('Password must be at least 8 characters', false); return; }
-    // Verify current by re-logging in
-    const user = API.user();
-    const loginRes = await API.post('/api/auth/login', { username: user.username, password: cur });
-    if (!loginRes.ok) { showMsg('Current password is incorrect', false); return; }
-    const putRes = await API.put('/api/admin/users/' + user.id, { password: pw1 });
-    if (putRes.ok) {
-      showMsg('Password updated. Please log in again.', true);
+    if (!cur || !pw1 || !pw2) { showMsg('All fields required.', false); return; }
+    if (pw1 !== pw2)          { showMsg('New passwords do not match.', false); return; }
+    if (pw1.length < 8)       { showMsg('Password must be at least 8 characters.', false); return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const res = await API.post('/api/user/password', { current_password: cur, new_password: pw1 });
+    if (btn) { btn.disabled = false; btn.textContent = 'Update Password'; }
+    if (res.ok) {
+      showMsg('Password updated. Logging you out…', true);
       setTimeout(() => App.logout(), 1500);
     } else {
-      showMsg('Failed to update password', false);
+      showMsg(res.data.error || 'Failed to update password.', false);
     }
   }
 };
-
-// ── FILTER TABS ────────────────────────────────────────
-document.querySelectorAll('.filter-tab').forEach(btn => {
-  btn.addEventListener('click', () => Pages.renderLabsGrid(btn.dataset.cat));
-});
 
 // ── BOOT ───────────────────────────────────────────────
 window.App   = App;

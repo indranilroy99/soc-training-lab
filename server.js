@@ -333,6 +333,26 @@ async function router(req, res) {
     });
   }
 
+  // ── POST /api/user/password (self-service, any authenticated user) ──
+  if (method === 'POST' && url === '/api/user/password') {
+    const user = requireAuth(req, res); if (!user) return;
+    const { current_password, new_password } = await parseBody(req);
+    if (!current_password || !new_password) {
+      return jsonRes(res, 400, { error: 'current_password and new_password required' });
+    }
+    if (new_password.length < 8) {
+      return jsonRes(res, 400, { error: 'Password must be at least 8 characters' });
+    }
+    const row = db.prepare(`SELECT password_hash FROM users WHERE id=?`).get(user.id);
+    if (!bcrypt.compareSync(current_password, row.password_hash)) {
+      return jsonRes(res, 401, { error: 'Current password is incorrect' });
+    }
+    const hash = bcrypt.hashSync(new_password, 10);
+    db.prepare(`UPDATE users SET password_hash=? WHERE id=?`).run(hash, user.id);
+    db.prepare(`DELETE FROM sessions WHERE user_id=?`).run(user.id);
+    return jsonRes(res, 200, { ok: true });
+  }
+
   // ── GET /api/leaderboard ──────────────────────────────
   if (method === 'GET' && url === '/api/leaderboard') {
     const user = requireAuth(req, res); if (!user) return;
