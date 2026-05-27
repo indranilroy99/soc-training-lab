@@ -165,27 +165,62 @@ input, textarea, select { font-family: var(--font); }
 .filter-tab.active { color: var(--text); border-bottom-color: var(--blue); }
 
 /* ── LAB VIEW ── */
-#lab-view { display: none; padding: 24px; animation: fadeIn 0.12s ease; overflow-y: auto; flex: 1; }
-#lab-view.active { display: block; }
-.lab-view-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
-.lab-info-panel { position: sticky; top: 0; }
-.lab-info-card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+#lab-view { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+#lab-view.active { display: flex; }
+
+/* Back bar at top of lab view */
+.lab-view-topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 24px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; background: var(--bg);
+}
+
+/* Two-column layout: left panel fixed, right panel scrollable */
+.lab-view-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left info panel — fixed, non-scrolling */
+.lab-info-panel {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  height: 100%;
+  background: var(--bg);
+}
+.lab-info-card { background: transparent; overflow: hidden; }
 .lab-info-top { padding: 18px 20px; border-bottom: 1px solid var(--border); }
-.lab-info-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 8px; line-height: 1.3; }
-.lab-info-desc { font-size: 12.5px; color: var(--muted); line-height: 1.65; }
+.lab-info-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 8px; line-height: 1.3; }
+.lab-info-desc { font-size: 12px; color: var(--muted); line-height: 1.65; }
 .lab-info-meta { padding: 12px 20px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--border); }
 .lab-meta-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
 .lab-meta-key { color: var(--dim); }
 .lab-meta-val { color: var(--text); font-weight: 500; }
 .q-progress-row { padding: 14px 20px; }
 .q-dots { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
-.q-dot { width: 26px; height: 26px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; background: var(--input-bg); border: 1px solid var(--border); color: var(--dim); transition: all 0.12s; }
-.q-dot.done { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); }
-.q-dot.active { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); }
+/* Progress dots — clickable, with done/active/current states */
+.q-dot {
+  width: 26px; height: 26px; border-radius: 3px; display: flex; align-items: center;
+  justify-content: center; font-size: 10px; font-weight: 500;
+  background: #1E2128; border: 1px solid var(--border); color: #6B7280;
+  transition: all 0.12s; cursor: pointer;
+}
+.q-dot:hover { border-color: var(--blue); color: var(--text); }
+.q-dot.done { background: #22C55E; border-color: #22C55E; color: #fff; }
+.q-dot.current { border: 1px solid var(--blue); color: #fff; background: var(--card2); }
+
+/* Right questions panel — independently scrollable */
+.questions-scroll-panel {
+  overflow-y: auto;
+  height: 100%;
+  padding: 24px;
+}
 
 /* ── QUESTIONS ── */
 .questions-panel { display: flex; flex-direction: column; gap: 12px; }
-.q-card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; transition: border-color 0.12s; }
+.q-card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; transition: border-color 0.12s; scroll-margin-top: 16px; }
 .q-card.done { border-left: 2px solid var(--blue); }
 .q-card.locked { opacity: 0.4; pointer-events: none; }
 .q-card-header { padding: 14px 16px 0; }
@@ -202,7 +237,7 @@ input, textarea, select { font-family: var(--font); }
 .q-text-input { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 4px; padding: 9px 12px; font-size: 13px; color: var(--text); outline: none; transition: border-color 0.12s; margin-bottom: 10px; }
 .q-text-input:focus { border-color: var(--blue); }
 .q-text-input::placeholder { color: var(--dim); }
-.q-actions { display: flex; align-items: center; gap: 10px; }
+.q-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .q-attempts { font-size: 11px; color: var(--dim); }
 .q-hint-btn { background: none; border: none; color: var(--dim); font-size: 11px; cursor: pointer; padding: 0; text-decoration: underline; }
 .q-hint-btn:hover { color: var(--muted); }
@@ -216,6 +251,16 @@ input, textarea, select { font-family: var(--font); }
 .q-feedback.wrong .fb-title   { color: var(--red); font-weight: 600; margin-bottom: 4px; font-size: 13px; }
 .q-feedback.revealed { background: var(--blue-muted); border-color: var(--blue); color: var(--muted); }
 .q-feedback.revealed .fb-title { color: var(--blue); font-weight: 600; margin-bottom: 4px; font-size: 13px; }
+
+/* ── PREV / NEXT BUTTONS ── */
+.q-nav-btns { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.q-nav-btn {
+  height: 32px; padding: 0 14px; font-size: 13px; font-weight: 500; font-family: var(--font);
+  background: #1E2128; border: 1px solid #3B7BF6; color: #94A3B8;
+  border-radius: 4px; cursor: pointer; transition: background 0.1s, color 0.1s;
+}
+.q-nav-btn:hover:not(:disabled) { background: #3B82F6; color: #fff; border-color: #3B82F6; }
+.q-nav-btn:disabled { background: #2A2D35; border-color: transparent; color: #4B5563; cursor: default; }
 
 /* ── LEADERBOARD ── */
 .lb-table { width: 100%; border-collapse: collapse; }
@@ -673,7 +718,8 @@ input, textarea, select { font-family: var(--font); }
 
     <!-- LAB VIEW (outside pages) -->
     <div id="lab-view">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <!-- Back bar — fixed at top -->
+      <div class="lab-view-topbar">
         <button class="btn btn-outline btn-sm" onclick="App.navigate('labs')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
           Back to Labs
@@ -684,8 +730,9 @@ input, textarea, select { font-family: var(--font); }
           <span class="bc-cur" id="lab-breadcrumb">Lab</span>
         </div>
       </div>
-      <div id="lab-completion-banner"></div>
+      <!-- Two-column layout -->
       <div class="lab-view-layout">
+        <!-- Left: fixed info panel -->
         <div class="lab-info-panel">
           <div class="lab-info-card">
             <div class="lab-info-top">
@@ -695,13 +742,17 @@ input, textarea, select { font-family: var(--font); }
             </div>
             <div class="lab-info-meta" id="lab-meta"></div>
             <div class="q-progress-row">
-              <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--dim)">Question Progress</div>
+              <div style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--dim)">Question Progress</div>
               <div class="q-dots" id="q-dots"></div>
             </div>
           </div>
         </div>
-        <div class="questions-panel" id="questions-panel">
-          <div class="loading-state"><div class="spinner"></div>Loading questions...</div>
+        <!-- Right: independently scrollable questions -->
+        <div class="questions-scroll-panel" id="questions-scroll-panel">
+          <div id="lab-completion-banner"></div>
+          <div class="questions-panel" id="questions-panel">
+            <div class="loading-state"><div class="spinner"></div>Loading questions...</div>
+          </div>
         </div>
       </div>
     </div>
@@ -995,9 +1046,9 @@ const Pages = {
       <div class="lab-meta-row"><span class="lab-meta-key">Questions</span><span class="lab-meta-val">${lab.questions.length}</span></div>
       <div class="lab-meta-row"><span class="lab-meta-key">Status</span><span class="lab-meta-val">${totalDone}/${lab.questions.length} answered</span></div>`;
 
-    // Q dots
+    // Q dots — clickable
     document.getElementById('q-dots').innerHTML = lab.questions.map((q, i) =>
-      `<div class="q-dot ${q.completed ? 'done' : ''}" id="qdot-${q.id}">${i+1}</div>`
+      `<div class="q-dot ${q.completed ? 'done' : ''}" id="qdot-${q.id}" onclick="Pages.scrollToQuestion(${i})">${i+1}</div>`
     ).join('');
 
     // Completion banner
@@ -1027,7 +1078,7 @@ const Pages = {
         <button class="btn btn-outline btn-sm" style="flex-shrink:0" onclick="App.navigate('soc')">Go to SOC Dashboard</button>
       </div>
       ${lab.questions.map((q, i) => {
-        return Pages._renderQuestion(q, i, lab.slug, true);
+        return Pages._renderQuestion(q, i, lab.slug, true, lab.questions.length);
       }).join('')}`;
 
       // Attach choice handlers for already-completed questions only
@@ -1043,7 +1094,7 @@ const Pages = {
     const panel = document.getElementById('questions-panel');
     panel.innerHTML = lab.questions.map((q, i) => {
       const isLocked = i > 0 && !lab.questions[i-1].completed && !q.completed;
-      return Pages._renderQuestion(q, i, lab.slug, isLocked);
+      return Pages._renderQuestion(q, i, lab.slug, isLocked, lab.questions.length);
     }).join('');
 
     // Attach event handlers
@@ -1058,10 +1109,54 @@ const Pages = {
         });
       }
     });
+
+    // IntersectionObserver — highlight current question dot in left panel
+    Pages._labQuestionsData = lab.questions;
+    Pages._initQObserver();
   },
 
-  _renderQuestion(q, idx, slug, locked) {
+  _labQuestionsData: [],
+  _qObserver: null,
+
+  _initQObserver() {
+    if (Pages._qObserver) Pages._qObserver.disconnect();
+    const scrollPanel = document.getElementById('questions-scroll-panel');
+    if (!scrollPanel) return;
+    Pages._qObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const card = entry.target;
+          const idx  = parseInt(card.dataset.qidx, 10);
+          const qid  = parseInt(card.dataset.qid, 10);
+          // Update current dot
+          document.querySelectorAll('.q-dot').forEach(d => d.classList.remove('current'));
+          const dot = document.getElementById('qdot-' + qid);
+          if (dot && !dot.classList.contains('done')) dot.classList.add('current');
+        }
+      });
+    }, { root: scrollPanel, threshold: 0.4 });
+    document.querySelectorAll('.q-card[data-qidx]').forEach(card => {
+      Pages._qObserver.observe(card);
+    });
+  },
+
+  scrollToQuestion(idx) {
+    const cards = document.querySelectorAll('.q-card[data-qidx]');
+    const target = Array.from(cards).find(c => parseInt(c.dataset.qidx, 10) === idx);
+    if (!target) return;
+    const scrollPanel = document.getElementById('questions-scroll-panel');
+    if (scrollPanel) {
+      const cardTop = target.offsetTop - scrollPanel.offsetTop;
+      scrollPanel.scrollTo({ top: cardTop - 16, behavior: 'smooth' });
+    } else {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  },
+
+  _renderQuestion(q, idx, slug, locked, totalQ) {
     const done = q.completed;
+    const isFirst = idx === 0;
+    const isLast  = idx === totalQ - 1;
     let inputHtml = '';
     if (q.answer_type === 'choice' && q.options) {
       const opts = JSON.parse(typeof q.options === 'string' ? q.options : JSON.stringify(q.options));
@@ -1074,7 +1169,7 @@ const Pages = {
       inputHtml = `<input type="text" class="q-text-input" id="q-input-${q.id}" placeholder="Type your answer here..." ${done ? 'disabled' : ''}>`;
     }
     const attemptsLeft = Math.max(0, 3 - q.attempts);
-    return `<div class="q-card ${done ? 'done' : ''} ${locked ? 'locked' : ''}" id="q-card-${q.id}">
+    return `<div class="q-card ${done ? 'done' : ''} ${locked ? 'locked' : ''}" id="q-card-${q.id}" id="question-${idx+1}" data-qidx="${idx}" data-qid="${q.id}">
       <div class="q-card-header">
         <div class="q-num">Question ${idx+1}</div>
         <div class="q-text">${q.question}</div>
@@ -1093,6 +1188,10 @@ const Pages = {
           }
         </div>
         <div class="q-feedback" id="q-fb-${q.id}"></div>
+        <div class="q-nav-btns">
+          <button class="q-nav-btn" onclick="Pages.scrollToQuestion(${idx-1})" ${isFirst ? 'disabled' : ''}>← Previous</button>
+          <button class="q-nav-btn" onclick="Pages.scrollToQuestion(${idx+1})" ${isLast ? 'disabled' : ''}>Next →</button>
+        </div>
       </div>
     </div>`;
   },
@@ -1149,6 +1248,15 @@ const Pages = {
         document.getElementById('sidebar-score').textContent = d.total_score;
         // Unlock next question
         Pages._unlockNext(questionId);
+        // Auto-advance to next question after 1200ms
+        const currentCard = document.getElementById('q-card-' + questionId);
+        if (currentCard) {
+          const currentIdx = parseInt(currentCard.dataset.qidx, 10);
+          const allCards = document.querySelectorAll('.q-card[data-qidx]');
+          if (!isNaN(currentIdx) && currentIdx + 1 < allCards.length) {
+            setTimeout(() => Pages.scrollToQuestion(currentIdx + 1), 1200);
+          }
+        }
         // Check lab completion
         if (d.lab_status === 'completed') {
           setTimeout(() => {
