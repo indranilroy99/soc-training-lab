@@ -264,6 +264,34 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
 .info-banner.warn { background: var(--orange-dim); border-color: var(--orange); color: var(--muted); }
 .info-banner.info { background: var(--blue-dim);   border-color: var(--blue);   color: var(--muted); }
 
+/* ── LABS MANAGER ── */
+.lab-row-expanded { background: var(--blue-muted) !important; }
+.q-row { display:flex; align-items:flex-start; gap:12px; padding:13px 16px; border-bottom:1px solid var(--border); }
+.q-row:last-child { border-bottom:none; }
+.q-num { width:26px; height:26px; border-radius:3px; background:var(--border); color:var(--muted); font-size:11px; font-weight:600; font-family:var(--mono); display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px; }
+.q-body { flex:1;min-width:0; }
+.q-text { font-size:13px; color:var(--text); line-height:1.5; margin-bottom:6px; }
+.q-meta { display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--dim); }
+.q-meta span { display:flex;align-items:center;gap:4px; }
+.q-actions { display:flex;gap:6px;flex-shrink:0;margin-top:2px; }
+.diff-chip { display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:500;font-family:var(--mono); }
+.diff-easy   { color:#22C55E; } .diff-medium { color:var(--blue); }
+.diff-hard   { color:var(--orange); } .diff-expert { color:var(--red); }
+.vis-toggle { display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none; }
+.vis-toggle input { display:none; }
+.vis-track { width:32px;height:17px;background:var(--border);border-radius:10px;position:relative;transition:background 0.15s; }
+.vis-thumb { position:absolute;top:2px;left:2px;width:13px;height:13px;background:#fff;border-radius:50%;transition:left 0.15s;opacity:0.5; }
+.vis-toggle input:checked ~ .vis-track { background:var(--blue); }
+.vis-toggle input:checked ~ .vis-track .vis-thumb { left:17px;opacity:1; }
+.options-builder { display:flex;flex-direction:column;gap:6px; }
+.option-row { display:flex;align-items:center;gap:8px; }
+.option-row input[type=text] { flex:1; }
+.option-row .btn-xs { flex-shrink:0; }
+.modal-wide { width:min(680px,calc(100vw - 32px)); }
+.form-textarea { width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;font-size:13px;color:var(--text);outline:none;transition:border-color 0.15s;resize:vertical;min-height:64px;font-family:var(--font); }
+.form-textarea:focus { border-color:var(--blue); }
+.form-row-2 { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
+
 @media (max-width: 1100px) { .stats-row { grid-template-columns: repeat(2,1fr); } }
 </style>
 </head>
@@ -287,6 +315,10 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
       <div class="nav-item" data-page="progress">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         <span class="nav-label">Progress Matrix</span>
+      </div>
+      <div class="nav-item" data-page="labs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <span class="nav-label">Labs & Questions</span>
       </div>
       <div class="nav-item" data-page="leaderboard">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6L3 12l5 6M16 6l5 6-5 6"/></svg>
@@ -412,9 +444,54 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
         </div>
       </div>
 
-    </div>
-  </div>
-</div>
+      <!-- LABS & QUESTIONS -->
+      <div class="page" id="page-labs">
+        <div class="page-hdr">
+          <div class="page-hdr-left">
+            <h1 class="page-title">Labs &amp; Questions</h1>
+            <p class="page-sub">Create and manage training labs and their questions.</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="search-wrap">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="search-input" type="text" id="labs-search" placeholder="Search labs..." oninput="LabPages.filterLabs()">
+            </div>
+            <button class="btn btn-primary" onclick="LabModals.openCreateLab()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Lab
+            </button>
+          </div>
+        </div>
+
+        <div class="card" id="labs-card">
+          <div class="tbl-wrap" id="labs-table-wrap">
+            <div class="loading-state"><div class="spinner"></div>Loading labs...</div>
+          </div>
+        </div>
+
+        <div id="questions-panel" style="display:none;margin-top:16px">
+          <div class="card">
+            <div class="card-hdr" style="gap:10px">
+              <span class="card-title" id="qpanel-title">Questions</span>
+              <span id="qpanel-count" style="font-size:11px;color:var(--dim);margin-left:4px"></span>
+              <div style="margin-left:auto;display:flex;gap:8px">
+                <button class="btn btn-primary btn-sm" onclick="LabPages.openAddQuestion()">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Add Question
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="LabPages.closeQPanel()">✕ Close</button>
+              </div>
+            </div>
+            <div id="questions-list">
+              <div class="loading-state"><div class="spinner"></div>Loading questions...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /#content -->
+  </div><!-- /#main -->
+</div><!-- /#app -->
 
 <!-- CREATE USER MODAL -->
 <div class="modal-overlay" id="modal-create-user">
@@ -485,6 +562,164 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="Modals.close('modal-confirm-delete')">Cancel</button>
       <button class="btn btn-red" id="btn-confirm-delete" onclick="Pages.confirmDelete()">Delete Permanently</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE/EDIT LAB MODAL -->
+<div class="modal-overlay" id="modal-lab-form">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <span class="modal-title" id="lab-form-title">Create New Lab</span>
+      <button class="modal-close" onclick="LabModals.close('modal-lab-form')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="lf-id">
+      <div class="form-group">
+        <label class="form-label">Lab Title <span style="color:var(--red)">*</span></label>
+        <input type="text" class="form-input" id="lf-title" placeholder="e.g. Phishing Investigation">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" id="lf-description" placeholder="What analysts will learn in this lab..." rows="3"></textarea>
+      </div>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <input type="text" class="form-input" id="lf-category" placeholder="e.g. Email Security">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Difficulty</label>
+          <select class="form-select" id="lf-difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+            <option value="expert">Expert</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label class="form-label">Total Points</label>
+          <input type="number" class="form-input" id="lf-points" value="100" min="10" max="9999">
+          <div class="form-hint">Max points for completing this lab.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Visibility</label>
+          <select class="form-select" id="lf-visible">
+            <option value="1">Visible to analysts</option>
+            <option value="0">Hidden (draft)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="LabModals.close('modal-lab-form')">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-lab" onclick="LabPages.saveLab()">Create Lab</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT QUESTION MODAL -->
+<div class="modal-overlay" id="modal-question-form">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <span class="modal-title" id="qform-title">Add Question</span>
+      <button class="modal-close" onclick="LabModals.close('modal-question-form')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="qf-id">
+      <div class="form-group">
+        <label class="form-label">Question <span style="color:var(--red)">*</span></label>
+        <textarea class="form-textarea" id="qf-question" placeholder="Enter the question text..." rows="3"></textarea>
+      </div>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label class="form-label">Answer Type</label>
+          <select class="form-select" id="qf-type" onchange="LabModals.onTypeChange()">
+            <option value="choice">Multiple Choice</option>
+            <option value="text">Free Text</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Difficulty</label>
+          <select class="form-select" id="qf-difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+            <option value="expert">Expert</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Options builder (shown for choice type) -->
+      <div id="qf-options-section" class="form-group">
+        <label class="form-label">Answer Options <span style="color:var(--dim)">(add 2–6 options)</span></label>
+        <div class="options-builder" id="options-builder"></div>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="LabModals.addOption()">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Option
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Correct Answer <span style="color:var(--red)">*</span></label>
+        <input type="text" class="form-input" id="qf-answer" placeholder="For choice: exact option text. For text: key answer phrase.">
+        <div class="form-hint" id="qf-answer-hint">Must match one of the options exactly (case-insensitive).</div>
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-group">
+          <label class="form-label">Points</label>
+          <input type="number" class="form-input" id="qf-points" value="20" min="5" max="999">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Hint <span style="color:var(--dim)">(optional)</span></label>
+          <input type="text" class="form-input" id="qf-hint" placeholder="Shown after 1st wrong attempt">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Explanation <span style="color:var(--dim)">(shown after completion)</span></label>
+        <textarea class="form-textarea" id="qf-explanation" placeholder="Why is this the correct answer?" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="LabModals.close('modal-question-form')">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-question" onclick="LabPages.saveQuestion()">Add Question</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE LAB CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-delete-lab">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Delete Lab</span>
+      <button class="modal-close" onclick="LabModals.close('modal-delete-lab')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="confirm-text">Permanently delete <strong id="del-lab-name">–</strong>?<br>This removes all questions and all analyst progress for this lab. <strong style="color:var(--red)">Cannot be undone.</strong></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="LabModals.close('modal-delete-lab')">Cancel</button>
+      <button class="btn btn-red" id="btn-confirm-delete-lab" onclick="LabPages.confirmDeleteLab()">Delete Lab</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE QUESTION CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-delete-question">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Delete Question</span>
+      <button class="modal-close" onclick="LabModals.close('modal-delete-question')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="confirm-text">Delete this question? All analyst answers for it will also be removed. <strong style="color:var(--red)">Cannot be undone.</strong></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="LabModals.close('modal-delete-question')">Cancel</button>
+      <button class="btn btn-red" id="btn-confirm-delete-q" onclick="LabPages.confirmDeleteQuestion()">Delete Question</button>
     </div>
   </div>
 </div>
@@ -573,12 +808,13 @@ const App = {
     const navEl  = document.querySelector(`.nav-item[data-page="${page}"]`);
     if (pageEl) pageEl.classList.add('active');
     if (navEl)  navEl.classList.add('active');
-    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', leaderboard:'Leaderboard' };
+    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', leaderboard:'Leaderboard', labs:'Labs & Questions' };
     document.getElementById('bc-cur').textContent = labels[page] || page;
     if (page === 'overview')    Pages.loadOverview();
     if (page === 'users')       Pages.loadUsers();
     if (page === 'progress')    Pages.loadProgress();
     if (page === 'leaderboard') Pages.loadLeaderboard();
+    if (page === 'labs')        LabPages.load();
   },
 
   refreshAll() {
@@ -814,6 +1050,429 @@ const Pages = {
     } catch(e) { document.getElementById('lb-wrap').innerHTML = '<div class="empty-state"><div class="empty-title">Failed to load</div></div>'; }
   }
 };
+
+// ── LAB MODALS ──────────────────────────────────────────
+const LabModals = {
+  open(id)  { const el = document.getElementById(id); if (el) el.classList.add('open'); },
+  close(id) { const el = document.getElementById(id); if (el) el.classList.remove('open'); },
+
+  openCreateLab() {
+    document.getElementById('lab-form-title').textContent = 'Create New Lab';
+    document.getElementById('btn-save-lab').textContent  = 'Create Lab';
+    document.getElementById('lf-id').value          = '';
+    document.getElementById('lf-title').value        = '';
+    document.getElementById('lf-description').value  = '';
+    document.getElementById('lf-category').value     = '';
+    document.getElementById('lf-difficulty').value   = 'medium';
+    document.getElementById('lf-points').value       = '100';
+    document.getElementById('lf-visible').value      = '1';
+    this.open('modal-lab-form');
+    setTimeout(() => document.getElementById('lf-title').focus(), 100);
+  },
+
+  openEditLab(lab) {
+    document.getElementById('lab-form-title').textContent = 'Edit Lab';
+    document.getElementById('btn-save-lab').textContent  = 'Save Changes';
+    document.getElementById('lf-id').value          = lab.id;
+    document.getElementById('lf-title').value        = lab.title;
+    document.getElementById('lf-description').value  = lab.description || '';
+    document.getElementById('lf-category').value     = lab.category || '';
+    document.getElementById('lf-difficulty').value   = lab.difficulty || 'medium';
+    document.getElementById('lf-points').value       = lab.points;
+    document.getElementById('lf-visible').value      = lab.is_visible ? '1' : '0';
+    this.open('modal-lab-form');
+    setTimeout(() => document.getElementById('lf-title').focus(), 100);
+  },
+
+  onTypeChange() {
+    const type = document.getElementById('qf-type').value;
+    document.getElementById('qf-options-section').style.display = type === 'choice' ? '' : 'none';
+    document.getElementById('qf-answer-hint').textContent = type === 'choice'
+      ? 'Must match one of the options exactly (case-insensitive).'
+      : 'Key phrases the answer must contain.';
+  },
+
+  _options: [],
+
+  initOptions(opts) {
+    this._options = opts && opts.length ? [...opts] : ['', ''];
+    this._renderOptions();
+  },
+
+  addOption() {
+    if (this._options.length >= 6) { toast('Maximum 6 options', 'error'); return; }
+    this._options.push('');
+    this._renderOptions();
+    // focus the new field
+    const rows = document.querySelectorAll('#options-builder .option-input');
+    if (rows.length) rows[rows.length - 1].focus();
+  },
+
+  removeOption(idx) {
+    if (this._options.length <= 2) { toast('Minimum 2 options required', 'error'); return; }
+    this._options.splice(idx, 1);
+    this._renderOptions();
+  },
+
+  _renderOptions() {
+    const builder = document.getElementById('options-builder');
+    builder.innerHTML = this._options.map((opt, i) => `
+      <div class="option-row">
+        <input type="text" class="form-input option-input" value="${opt.replace(/"/g,'&quot;')}"
+          placeholder="Option ${i + 1}"
+          oninput="LabModals._options[${i}] = this.value">
+        <button type="button" class="btn btn-red btn-xs" onclick="LabModals.removeOption(${i})">✕</button>
+      </div>
+    `).join('');
+  },
+
+  getOptions() {
+    // re-read from DOM to catch any last keystrokes
+    document.querySelectorAll('#options-builder .option-input').forEach((el, i) => {
+      this._options[i] = el.value;
+    });
+    return this._options.map(o => o.trim()).filter(o => o.length > 0);
+  },
+
+  openAddQuestion() {
+    document.getElementById('qform-title').textContent        = 'Add Question';
+    document.getElementById('btn-save-question').textContent  = 'Add Question';
+    document.getElementById('qf-id').value         = '';
+    document.getElementById('qf-question').value   = '';
+    document.getElementById('qf-type').value       = 'choice';
+    document.getElementById('qf-difficulty').value = 'medium';
+    document.getElementById('qf-answer').value     = '';
+    document.getElementById('qf-points').value     = '20';
+    document.getElementById('qf-hint').value       = '';
+    document.getElementById('qf-explanation').value= '';
+    this.initOptions(['', '']);
+    this.onTypeChange();
+    this.open('modal-question-form');
+    setTimeout(() => document.getElementById('qf-question').focus(), 100);
+  },
+
+  openEditQuestion(q) {
+    document.getElementById('qform-title').textContent        = 'Edit Question';
+    document.getElementById('btn-save-question').textContent  = 'Save Changes';
+    document.getElementById('qf-id').value         = q.id;
+    document.getElementById('qf-question').value   = q.question;
+    document.getElementById('qf-type').value       = q.answer_type || 'choice';
+    document.getElementById('qf-difficulty').value = q.difficulty || 'medium';
+    document.getElementById('qf-answer').value     = q.correct_answer;
+    document.getElementById('qf-points').value     = q.points;
+    document.getElementById('qf-hint').value       = q.hint || '';
+    document.getElementById('qf-explanation').value= q.explanation || '';
+    this.initOptions(q.options && q.options.length ? q.options : ['', '']);
+    this.onTypeChange();
+    this.open('modal-question-form');
+    setTimeout(() => document.getElementById('qf-question').focus(), 100);
+  }
+};
+
+// Close new modals on overlay click
+['modal-lab-form','modal-question-form','modal-delete-lab','modal-delete-question'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ── LAB PAGES ───────────────────────────────────────────
+const LabPages = {
+  _labsRaw:        [],
+  _activeLab:      null,
+  _deleteLabTarget: null,
+  _deleteQTarget:   null,
+
+  async load() {
+    document.getElementById('labs-table-wrap').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading labs...</div>';
+    document.getElementById('questions-panel').style.display = 'none';
+    this._activeLab = null;
+    try {
+      const labs = await API.get('/api/admin/labs');
+      this._labsRaw = labs;
+      this.renderLabsTable(labs);
+    } catch(e) { toast('Failed to load labs', 'error'); }
+  },
+
+  filterLabs() {
+    const q = document.getElementById('labs-search').value.toLowerCase();
+    this.renderLabsTable(q
+      ? this._labsRaw.filter(l => l.title.toLowerCase().includes(q) || (l.category||'').toLowerCase().includes(q))
+      : this._labsRaw
+    );
+  },
+
+  renderLabsTable(labs) {
+    const wrap = document.getElementById('labs-table-wrap');
+    if (!labs.length) {
+      wrap.innerHTML = '<div class="empty-state"><div class="empty-title">No labs yet</div><div style="font-size:12px;margin-top:6px">Click "New Lab" to create the first one.</div></div>';
+      return;
+    }
+    const diffColor = { easy:'#22C55E', medium:'var(--blue)', hard:'var(--orange)', expert:'var(--red)' };
+    wrap.innerHTML = `<table>
+      <thead><tr>
+        <th>#</th><th>Title</th><th>Category</th><th>Difficulty</th>
+        <th>Questions</th><th>Completions</th><th>Points</th><th>Visible</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${labs.map((l, i) => {
+        const dc = diffColor[l.difficulty] || 'var(--dim)';
+        const rowCls = this._activeLab?.id === l.id ? 'class="lab-row-expanded"' : '';
+        return `<tr id="lab-row-${l.id}" ${rowCls}>
+          <td class="td-mono" style="color:var(--dim)">${i + 1}</td>
+          <td class="td-main">${esc(l.title)}</td>
+          <td style="color:var(--muted);font-size:12px">${esc(l.category||'–')}</td>
+          <td><span style="font-size:11px;font-weight:500;font-family:var(--mono);color:${dc}">${l.difficulty||'–'}</span></td>
+          <td class="td-mono">${l.question_count}</td>
+          <td class="td-mono">${l.completions}</td>
+          <td class="td-mono" style="color:var(--blue)">${l.points}</td>
+          <td>
+            <label class="vis-toggle" title="${l.is_visible ? 'Visible' : 'Hidden (draft)'}">
+              <input type="checkbox" ${l.is_visible ? 'checked' : ''} onchange="LabPages.toggleVisible(${l.id}, this.checked)">
+              <span class="vis-track"><span class="vis-thumb"></span></span>
+            </label>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline btn-xs" onclick="LabPages.viewQuestions(${l.id})">Questions</button>
+              <button class="btn btn-outline btn-xs" onclick="LabPages.editLab(${l.id})">Edit</button>
+              <button class="btn btn-red btn-xs" onclick="LabPages.deleteLab(${l.id}, '${esc(l.title)}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  },
+
+  async viewQuestions(labId) {
+    const lab = this._labsRaw.find(l => l.id === labId);
+    if (!lab) return;
+    // highlight row
+    document.querySelectorAll('#labs-table-wrap tbody tr').forEach(r => r.classList.remove('lab-row-expanded'));
+    const row = document.getElementById('lab-row-' + labId);
+    if (row) row.classList.add('lab-row-expanded');
+    this._activeLab = lab;
+    document.getElementById('qpanel-title').textContent = lab.title + ' — Questions';
+    document.getElementById('qpanel-count').textContent = '';
+    const panel = document.getElementById('questions-panel');
+    panel.style.display = '';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    document.getElementById('questions-list').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading...</div>';
+    await this._loadQuestions(labId);
+  },
+
+  async _loadQuestions(labId) {
+    try {
+      const qs = await API.get('/api/admin/labs/' + labId + '/questions');
+      document.getElementById('qpanel-count').textContent = `${qs.length} question${qs.length !== 1 ? 's' : ''}`;
+      this._renderQuestions(qs);
+    } catch(e) { toast('Failed to load questions', 'error'); }
+  },
+
+  _renderQuestions(qs) {
+    const wrap = document.getElementById('questions-list');
+    if (!qs.length) {
+      wrap.innerHTML = '<div class="empty-state"><div class="empty-title">No questions yet</div><div style="font-size:12px;margin-top:6px">Click "Add Question" to create the first one.</div></div>';
+      return;
+    }
+    const diffColor = { easy:'diff-easy', medium:'diff-medium', hard:'diff-hard', expert:'diff-expert' };
+    wrap.innerHTML = qs.map((q, i) => {
+      const typeLabel = q.answer_type === 'choice' ? 'Multiple Choice' : 'Free Text';
+      const opts = q.options && q.options.length ? q.options : [];
+      const optsHtml = opts.length
+        ? `<span style="display:flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>${opts.length} options</span>`
+        : '';
+      return `<div class="q-row">
+        <div class="q-num">${i + 1}</div>
+        <div class="q-body">
+          <div class="q-text">${esc(q.question)}</div>
+          <div class="q-meta">
+            <span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>${typeLabel}</span>
+            ${optsHtml}
+            <span class="diff-chip ${diffColor[q.difficulty]||'diff-medium'}">${q.difficulty||'medium'}</span>
+            <span style="color:var(--blue)">${q.points} pts</span>
+            <span style="color:#22C55E;font-family:var(--mono);font-size:10.5px">✓ ${esc(q.correct_answer)}</span>
+            ${q.hint ? `<span style="color:var(--dim)">Hint: ${esc(q.hint)}</span>` : ''}
+          </div>
+        </div>
+        <div class="q-actions">
+          <button class="btn btn-outline btn-xs" onclick='LabPages.editQuestion(${JSON.stringify(q).replace(/'/g,"&#39;")})'>Edit</button>
+          <button class="btn btn-red btn-xs" onclick="LabPages.deleteQuestion(${q.id})">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  },
+
+  closeQPanel() {
+    document.getElementById('questions-panel').style.display = 'none';
+    document.querySelectorAll('#labs-table-wrap tbody tr').forEach(r => r.classList.remove('lab-row-expanded'));
+    this._activeLab = null;
+  },
+
+  editLab(labId) {
+    const lab = this._labsRaw.find(l => l.id === labId);
+    if (lab) LabModals.openEditLab(lab);
+  },
+
+  async saveLab() {
+    const title       = document.getElementById('lf-title').value.trim();
+    const description = document.getElementById('lf-description').value.trim();
+    const category    = document.getElementById('lf-category').value.trim();
+    const difficulty  = document.getElementById('lf-difficulty').value;
+    const points      = parseInt(document.getElementById('lf-points').value) || 100;
+    const is_visible  = document.getElementById('lf-visible').value === '1';
+    const id          = document.getElementById('lf-id').value;
+
+    if (!title) { toast('Title is required', 'error'); document.getElementById('lf-title').focus(); return; }
+
+    const btn = document.getElementById('btn-save-lab');
+    btn.disabled = true; btn.textContent = 'Saving...';
+
+    let res;
+    if (id) {
+      res = await API.put('/api/admin/labs/' + id, { title, description, category, difficulty, points, is_visible });
+    } else {
+      res = await API.post('/api/admin/labs', { title, description, category, difficulty, points, is_visible });
+    }
+
+    btn.disabled = false; btn.textContent = id ? 'Save Changes' : 'Create Lab';
+
+    if (res.ok) {
+      toast(id ? 'Lab updated' : 'Lab created', 'success');
+      LabModals.close('modal-lab-form');
+      await this.load();
+    } else {
+      toast(res.data.error || 'Failed to save lab', 'error');
+    }
+  },
+
+  async toggleVisible(labId, visible) {
+    const res = await API.put('/api/admin/labs/' + labId, { is_visible: visible });
+    if (res.ok) {
+      toast(visible ? 'Lab is now visible' : 'Lab hidden (draft)', visible ? 'success' : 'info');
+      const lab = this._labsRaw.find(l => l.id === labId);
+      if (lab) lab.is_visible = visible ? 1 : 0;
+    } else {
+      toast('Failed to update visibility', 'error');
+      await this.load();
+    }
+  },
+
+  deleteLab(labId, name) {
+    this._deleteLabTarget = labId;
+    document.getElementById('del-lab-name').textContent = name;
+    LabModals.open('modal-delete-lab');
+  },
+
+  async confirmDeleteLab() {
+    const btn = document.getElementById('btn-confirm-delete-lab');
+    btn.disabled = true; btn.textContent = 'Deleting...';
+    const res = await API.del('/api/admin/labs/' + this._deleteLabTarget);
+    btn.disabled = false; btn.textContent = 'Delete Lab';
+    if (res.ok) {
+      toast('Lab deleted', 'success');
+      LabModals.close('modal-delete-lab');
+      this.closeQPanel();
+      await this.load();
+    } else {
+      toast(res.data.error || 'Failed to delete lab', 'error');
+    }
+  },
+
+  openAddQuestion() {
+    if (!this._activeLab) { toast('Select a lab first', 'error'); return; }
+    LabModals.openAddQuestion();
+  },
+
+  editQuestion(q) {
+    LabModals.openEditQuestion(q);
+  },
+
+  async saveQuestion() {
+    const id         = document.getElementById('qf-id').value;
+    const question   = document.getElementById('qf-question').value.trim();
+    const type       = document.getElementById('qf-type').value;
+    const difficulty = document.getElementById('qf-difficulty').value;
+    const answer     = document.getElementById('qf-answer').value.trim();
+    const points     = parseInt(document.getElementById('qf-points').value) || 20;
+    const hint       = document.getElementById('qf-hint').value.trim();
+    const explanation= document.getElementById('qf-explanation').value.trim();
+
+    if (!question) { toast('Question text is required', 'error'); document.getElementById('qf-question').focus(); return; }
+    if (!answer)   { toast('Correct answer is required', 'error'); document.getElementById('qf-answer').focus(); return; }
+
+    let options = [];
+    if (type === 'choice') {
+      options = LabModals.getOptions();
+      if (options.length < 2) { toast('Add at least 2 options', 'error'); return; }
+      const answerLower = answer.toLowerCase();
+      if (!options.some(o => o.toLowerCase() === answerLower)) {
+        toast('Correct answer must match one of the options exactly', 'error');
+        document.getElementById('qf-answer').focus(); return;
+      }
+    }
+
+    const btn = document.getElementById('btn-save-question');
+    btn.disabled = true; btn.textContent = 'Saving...';
+
+    const payload = { question, answer_type: type, options, correct_answer: answer, hint, explanation, points, difficulty };
+    let res;
+    if (id) {
+      res = await API.put('/api/admin/questions/' + id, payload);
+    } else {
+      res = await API.post('/api/admin/labs/' + this._activeLab.id + '/questions', payload);
+    }
+
+    btn.disabled = false; btn.textContent = id ? 'Save Changes' : 'Add Question';
+
+    if (res.ok) {
+      toast(id ? 'Question updated' : 'Question added', 'success');
+      LabModals.close('modal-question-form');
+      await this._loadQuestions(this._activeLab.id);
+      // refresh question_count in table
+      const labRow = this._labsRaw.find(l => l.id === this._activeLab.id);
+      if (labRow) { if (!id) labRow.question_count = (labRow.question_count || 0) + 1; }
+      const qs = await API.get('/api/admin/labs/' + this._activeLab.id + '/questions');
+      document.getElementById('qpanel-count').textContent = `${qs.length} question${qs.length !== 1 ? 's' : ''}`;
+      // re-render table row count only if loaded
+      const cell = document.querySelector(`#lab-row-${this._activeLab.id} td:nth-child(5)`);
+      if (cell) cell.textContent = qs.length;
+    } else {
+      toast(res.data.error || 'Failed to save question', 'error');
+    }
+  },
+
+  deleteQuestion(qId) {
+    this._deleteQTarget = qId;
+    LabModals.open('modal-delete-question');
+  },
+
+  async confirmDeleteQuestion() {
+    const btn = document.getElementById('btn-confirm-delete-q');
+    btn.disabled = true; btn.textContent = 'Deleting...';
+    const res = await API.del('/api/admin/questions/' + this._deleteQTarget);
+    btn.disabled = false; btn.textContent = 'Delete Question';
+    if (res.ok) {
+      toast('Question deleted', 'success');
+      LabModals.close('modal-delete-question');
+      if (this._activeLab) {
+        const qs = await API.get('/api/admin/labs/' + this._activeLab.id + '/questions');
+        this._renderQuestions(qs);
+        document.getElementById('qpanel-count').textContent = `${qs.length} question${qs.length !== 1 ? 's' : ''}`;
+        const cell = document.querySelector(`#lab-row-${this._activeLab.id} td:nth-child(5)`);
+        if (cell) cell.textContent = qs.length;
+      }
+    } else {
+      toast(res.data.error || 'Failed to delete question', 'error');
+    }
+  }
+};
+
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+window.LabPages  = LabPages;
+window.LabModals = LabModals;
 
 window.App    = App;
 window.Pages  = Pages;

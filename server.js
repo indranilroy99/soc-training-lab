@@ -22,6 +22,14 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+// ── Migrations (idempotent) ───────────────────────────────
+try {
+  db.prepare(`ALTER TABLE labs ADD COLUMN is_visible INTEGER DEFAULT 1`).run();
+  console.log('[migrate] Added labs.is_visible column');
+} catch(e) {
+  // Column already exists — ignore
+}
+
 // ── MIME types ────────────────────────────────────────────
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -113,7 +121,7 @@ function getUserRank(userId) {
 }
 
 function getLabsWithProgress(userId) {
-  const labs = db.prepare(`SELECT * FROM labs ORDER BY order_index`).all();
+  const labs = db.prepare(`SELECT * FROM labs WHERE is_visible=1 OR is_visible IS NULL ORDER BY order_index`).all();
   return labs.map(lab => {
     const prog = db.prepare(
       `SELECT status, score, started_at, completed_at FROM user_progress WHERE user_id=? AND lab_id=?`
@@ -535,6 +543,153 @@ async function router(req, res) {
     return jsonRes(res, 200, { users: matrix, labs });
   }
 
+  // ── GET /api/admin/labs ───────────────────────────────
+  if (method === 'GET' && url === '/api/admin/labs') {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const labs = db.prepare(
+      `SELECT l.*,
+         (SELECT COUNT(*) FROM questions q WHERE q.lab_id = l.id) as question_count,
+         (SELECT COUNT(*) FROM user_progress p WHERE p.lab_id = l.id AND p.status='completed') as completions
+       FROM labs l ORDER BY l.order_index`
+    ).all().map(l => ({ ...l, alert_refs: l.alert_refs ? JSON.parse(l.alert_refs) : [] }));
+    return jsonRes(res, 200, labs);
+  }
+
+  // ── POST /api/admin/labs ──────────────────────────────
+  if (method === 'POST' && url === '/api/admin/labs') {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const body = await parseBody(req);
+    const { title, description, difficulty, category, points, alert_refs, is_visible } = body;
+    if (!title) return jsonRes(res, 400, { error: 'title is required' });
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '-' + Date.now().toString(36);
+    const maxOrder = db.prepare(`SELECT COALESCE(MAX(order_index),0) as m FROM labs`).get().m;
+    const info = db.prepare(
+      `INSERT INTO labs (slug, title, description, difficulty, category, points, alert_refs, order_index, is_visible)
+       VALUES (?,?,?,?,?,?,?,?,?)`
+    ).run(
+      slug,
+      title.trim(),
+      (description || '').trim(),
+      difficulty || 'medium',
+      (category || '').trim(),
+      parseInt(points) || 100,
+      JSON.stringify(Array.isArray(alert_refs) ? alert_refs : []),
+      maxOrder + 1,
+      is_visible === false || is_visible === 0 ? 0 : 1
+    );
+    return jsonRes(res, 201, { id: info.lastInsertRowid, slug });
+  }
+
+  // ── PUT /api/admin/labs/:id ───────────────────────────
+  const labAdminPutMatch = url.match(/^\/api\/admin\/labs\/(\d+)$/);
+  if (method === 'PUT' && labAdminPutMatch) {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const labId = parseInt(labAdminPutMatch[1]);
+    const lab = db.prepare(`SELECT id FROM labs WHERE id=?`).get(labId);
+    if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
+    const body = await parseBody(req);
+    const fields = [];
+    const vals   = [];
+    if (body.title       !== undefined) { fields.push('title=?');       vals.push(body.title.trim()); }
+    if (body.description !== undefined) { fields.push('description=?'); vals.push(body.description.trim()); }
+    if (body.difficulty  !== undefined) { fields.push('difficulty=?');  vals.push(body.difficulty); }
+    if (body.category    !== undefined) { fields.push('category=?');    vals.push(body.category.trim()); }
+    if (body.points      !== undefined) { fields.push('points=?');      vals.push(parseInt(body.points) || 100); }
+    if (body.alert_refs  !== undefined) { fields.push('alert_refs=?');  vals.push(JSON.stringify(Array.isArray(body.alert_refs) ? body.alert_refs : [])); }
+    if (body.is_visible  !== undefined) { fields.push('is_visible=?');  vals.push(body.is_visible ? 1 : 0); }
+    if (body.order_index !== undefined) { fields.push('order_index=?'); vals.push(parseInt(body.order_index)); }
+    if (fields.length === 0) return jsonRes(res, 400, { error: 'Nothing to update' });
+    vals.push(labId);
+    db.prepare(`UPDATE labs SET ${fields.join(', ')} WHERE id=?`).run(...vals);
+    return jsonRes(res, 200, { ok: true });
+  }
+
+  // ── DELETE /api/admin/labs/:id ────────────────────────
+  const labAdminDelMatch = url.match(/^\/api\/admin\/labs\/(\d+)$/);
+  if (method === 'DELETE' && labAdminDelMatch) {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const labId = parseInt(labAdminDelMatch[1]);
+    const lab = db.prepare(`SELECT id FROM labs WHERE id=?`).get(labId);
+    if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
+    db.prepare(`DELETE FROM labs WHERE id=?`).run(labId);
+    return jsonRes(res, 200, { ok: true });
+  }
+
+  // ── GET /api/admin/labs/:id/questions ─────────────────
+  const labQGetMatch = url.match(/^\/api\/admin\/labs\/(\d+)\/questions$/);
+  if (method === 'GET' && labQGetMatch) {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const labId = parseInt(labQGetMatch[1]);
+    const questions = db.prepare(`SELECT * FROM questions WHERE lab_id=? ORDER BY order_index`).all(labId).map(q => ({
+      ...q,
+      options: q.options ? JSON.parse(q.options) : []
+    }));
+    return jsonRes(res, 200, questions);
+  }
+
+  // ── POST /api/admin/labs/:id/questions ────────────────
+  const labQPostMatch = url.match(/^\/api\/admin\/labs\/(\d+)\/questions$/);
+  if (method === 'POST' && labQPostMatch) {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const labId = parseInt(labQPostMatch[1]);
+    const lab = db.prepare(`SELECT id FROM labs WHERE id=?`).get(labId);
+    if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
+    const body = await parseBody(req);
+    const { question, answer_type, options, correct_answer, hint, explanation, points, difficulty } = body;
+    if (!question || !correct_answer) return jsonRes(res, 400, { error: 'question and correct_answer are required' });
+    const maxOrder = db.prepare(`SELECT COALESCE(MAX(order_index),0) as m FROM questions WHERE lab_id=?`).get(labId).m;
+    const info = db.prepare(
+      `INSERT INTO questions (lab_id, question, answer_type, options, correct_answer, hint, explanation, points, difficulty, order_index)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`
+    ).run(
+      labId,
+      question.trim(),
+      answer_type || 'choice',
+      options ? JSON.stringify(Array.isArray(options) ? options : []) : null,
+      correct_answer.trim(),
+      (hint || '').trim(),
+      (explanation || '').trim(),
+      parseInt(points) || 20,
+      difficulty || 'medium',
+      maxOrder + 1
+    );
+    return jsonRes(res, 201, { id: info.lastInsertRowid });
+  }
+
+  // ── PUT /api/admin/questions/:id ──────────────────────
+  const qPutMatch = url.match(/^\/api\/admin\/questions\/(\d+)$/);
+  if (method === 'PUT' && qPutMatch) {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const qId = parseInt(qPutMatch[1]);
+    const q = db.prepare(`SELECT id FROM questions WHERE id=?`).get(qId);
+    if (!q) return jsonRes(res, 404, { error: 'Question not found' });
+    const body = await parseBody(req);
+    const fields = [];
+    const vals   = [];
+    if (body.question       !== undefined) { fields.push('question=?');       vals.push(body.question.trim()); }
+    if (body.answer_type    !== undefined) { fields.push('answer_type=?');    vals.push(body.answer_type); }
+    if (body.options        !== undefined) { fields.push('options=?');        vals.push(body.options ? JSON.stringify(Array.isArray(body.options) ? body.options : []) : null); }
+    if (body.correct_answer !== undefined) { fields.push('correct_answer=?'); vals.push(body.correct_answer.trim()); }
+    if (body.hint           !== undefined) { fields.push('hint=?');           vals.push(body.hint.trim()); }
+    if (body.explanation    !== undefined) { fields.push('explanation=?');    vals.push(body.explanation.trim()); }
+    if (body.points         !== undefined) { fields.push('points=?');         vals.push(parseInt(body.points) || 20); }
+    if (body.difficulty     !== undefined) { fields.push('difficulty=?');     vals.push(body.difficulty); }
+    if (body.order_index    !== undefined) { fields.push('order_index=?');    vals.push(parseInt(body.order_index)); }
+    if (fields.length === 0) return jsonRes(res, 400, { error: 'Nothing to update' });
+    vals.push(qId);
+    db.prepare(`UPDATE questions SET ${fields.join(', ')} WHERE id=?`).run(...vals);
+    return jsonRes(res, 200, { ok: true });
+  }
+
+  // ── DELETE /api/admin/questions/:id ───────────────────
+  const qDelMatch = url.match(/^\/api\/admin\/questions\/(\d+)$/);
+  if (method === 'DELETE' && qDelMatch) {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const qId = parseInt(qDelMatch[1]);
+    db.prepare(`DELETE FROM questions WHERE id=?`).run(qId);
+    return jsonRes(res, 200, { ok: true });
+  }
+
   // ── Static files & HTML routes ────────────────────────
   if (method === 'GET') {
     if (url === '/' || url === '/login' || url === '/login.html') {
@@ -550,6 +705,38 @@ async function router(req, res) {
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
       return serveFile(res, filePath);
     }
+  }
+
+  // ── POST /api/alerts/:id/escalate ────────────────────
+  const escalateMatch = url.match(/^\/api\/alerts\/([A-Z0-9-]+)\/escalate$/);
+  if (method === 'POST' && escalateMatch) {
+    const user = requireAuth(req, res); if (!user) return;
+    const alertId = escalateMatch[1];
+    const alert = db.prepare(`SELECT id FROM soc_alerts WHERE id=?`).get(alertId);
+    if (!alert) return jsonRes(res, 404, { error: 'Alert not found' });
+    const { level, justification } = await parseBody(req);
+    const validLevel = ['L2', 'L3'].includes(level) ? level : 'L2';
+    const info = db.prepare(
+      `INSERT INTO escalations (alert_id, user_id, level, justification) VALUES (?,?,?,?)`
+    ).run(alertId, user.id, validLevel, justification || null);
+    db.prepare(`UPDATE soc_alerts SET status='investigating' WHERE id=?`).run(alertId);
+    return jsonRes(res, 200, { ok: true, escalation_id: info.lastInsertRowid });
+  }
+
+  // ── GET /api/alerts/:id/escalations ──────────────────
+  const escalationsMatch = url.match(/^\/api\/alerts\/([A-Z0-9-]+)\/escalations$/);
+  if (method === 'GET' && escalationsMatch) {
+    const user = requireAuth(req, res); if (!user) return;
+    const alertId = escalationsMatch[1];
+    const rows = db.prepare(
+      `SELECT e.id, e.alert_id, e.level, e.justification, e.status, e.created_at,
+              u.username
+       FROM escalations e
+       JOIN users u ON u.id = e.user_id
+       WHERE e.alert_id = ?
+       ORDER BY e.created_at ASC`
+    ).all(alertId);
+    return jsonRes(res, 200, rows);
   }
 
   // 404 fallback

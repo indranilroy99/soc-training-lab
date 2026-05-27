@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS labs (
   category    TEXT,
   points      INTEGER DEFAULT 100,
   alert_refs  TEXT DEFAULT '[]',
-  order_index INTEGER DEFAULT 0
+  order_index INTEGER DEFAULT 0,
+  is_visible  INTEGER DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS questions (
@@ -113,3 +114,17 @@ CREATE INDEX IF NOT EXISTS idx_answers_user_lab ON user_answers(user_id, lab_id)
 CREATE INDEX IF NOT EXISTS idx_alerts_severity  ON soc_alerts(severity);
 CREATE INDEX IF NOT EXISTS idx_alerts_category  ON soc_alerts(category);
 CREATE INDEX IF NOT EXISTS idx_alerts_status    ON soc_alerts(status);
+
+CREATE TABLE IF NOT EXISTS escalations (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  alert_id     TEXT NOT NULL,
+  user_id      INTEGER NOT NULL,
+  level        TEXT NOT NULL DEFAULT 'L2',
+  justification TEXT,
+  status       TEXT DEFAULT 'pending',
+  created_at   TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_escalations_alert ON escalations(alert_id);
+CREATE INDEX IF NOT EXISTS idx_escalations_user  ON escalations(user_id);
