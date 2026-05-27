@@ -66,9 +66,9 @@ function requireAuth(req, res) {
   if (!token) { jsonRes(res, 401, { error: 'No token provided' }); return null; }
   const now = new Date().toISOString();
   const row = db.prepare(
-    `SELECT u.id, u.username, u.role, u.active
+    `SELECT u.id, u.username, u.role, u.is_active as active
      FROM sessions s JOIN users u ON u.id = s.user_id
-     WHERE s.token = ? AND s.expires_at > ? AND u.active = 1`
+     WHERE s.token = ? AND s.expires_at > ? AND u.is_active = 1`
   ).get(token, now);
   if (!row) { jsonRes(res, 401, { error: 'Invalid or expired session' }); return null; }
   return row;
@@ -97,36 +97,39 @@ function serveFile(res, filePath) {
 
 function getUserTotalScore(userId) {
   const row = db.prepare(
-    `SELECT COALESCE(SUM(pts_awarded),0) as total FROM answers WHERE user_id=? AND correct=1`
+    `SELECT COALESCE(SUM(pts_awarded),0) as total FROM user_answers WHERE user_id=? AND is_correct=1`
   ).get(userId);
   return row ? row.total : 0;
 }
 
 function getUserRank(userId) {
   const scores = db.prepare(
-    `SELECT user_id, SUM(pts_awarded) as total FROM answers WHERE correct=1 GROUP BY user_id ORDER BY total DESC`
+    `SELECT user_id, SUM(pts_awarded) as total FROM user_answers WHERE is_correct=1 GROUP BY user_id ORDER BY total DESC`
   ).all();
   const idx = scores.findIndex(r => r.user_id === userId);
-  return idx === -1 ? scores.length + 1 : idx + 1;
+  // return 0 if analyst has no score yet — frontend renders "–"
+  if (idx === -1) return 0;
+  return idx + 1;
 }
 
 function getLabsWithProgress(userId) {
-  const labs = db.prepare(`SELECT * FROM labs WHERE active=1 ORDER BY order_num`).all();
+  const labs = db.prepare(`SELECT * FROM labs ORDER BY order_index`).all();
   return labs.map(lab => {
     const prog = db.prepare(
-      `SELECT status, score, attempts, started_at, completed_at FROM progress WHERE user_id=? AND lab_id=?`
+      `SELECT status, score, started_at, completed_at FROM user_progress WHERE user_id=? AND lab_id=?`
     ).get(userId, lab.id);
     const totalQ = db.prepare(`SELECT COUNT(*) as c FROM questions WHERE lab_id=?`).get(lab.id).c;
     const doneQ  = db.prepare(
-      `SELECT COUNT(DISTINCT question_id) as c FROM answers WHERE user_id=? AND lab_id=? AND correct=1`
+      `SELECT COUNT(DISTINCT question_id) as c FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
     ).get(userId, lab.id).c;
+    const alertRefs = lab.alert_refs ? JSON.parse(lab.alert_refs) : [];
     return {
       ...lab,
-      status:       prog ? prog.status : 'not_started',
-      score:        prog ? prog.score  : 0,
-      attempts:     prog ? prog.attempts : 0,
-      started_at:   prog ? prog.started_at : null,
-      completed_at: prog ? prog.completed_at : null,
+      alert_refs:      alertRefs,
+      status:          prog ? prog.status : 'not_started',
+      score:           prog ? prog.score  : 0,
+      started_at:      prog ? prog.started_at : null,
+      completed_at:    prog ? prog.completed_at : null,
       questions_total: totalQ,
       questions_done:  doneQ,
     };
@@ -136,6 +139,8 @@ function getLabsWithProgress(userId) {
 // ── Routes ────────────────────────────────────────────────
 async function router(req, res) {
   const url    = req.url.split('?')[0];
+  const qs     = req.url.includes('?') ? req.url.split('?')[1] : '';
+  const params = new URLSearchParams(qs);
   const method = req.method.toUpperCase();
 
   // CORS preflight
@@ -155,7 +160,7 @@ async function router(req, res) {
     if (!username || !password) {
       return jsonRes(res, 400, { error: 'Username and password required' });
     }
-    const user = db.prepare(`SELECT * FROM users WHERE username=? AND active=1`).get(username);
+    const user = db.prepare(`SELECT * FROM users WHERE username=? AND is_active=1`).get(username);
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
       return jsonRes(res, 401, { error: 'Invalid username or password' });
     }
@@ -182,16 +187,16 @@ async function router(req, res) {
     const score = getUserTotalScore(user.id);
     const rank  = getUserRank(user.id);
     const labsDone = db.prepare(
-      `SELECT COUNT(*) as c FROM progress WHERE user_id=? AND status='completed'`
+      `SELECT COUNT(*) as c FROM user_progress WHERE user_id=? AND status='completed'`
     ).get(user.id).c;
     const labsInProgress = db.prepare(
-      `SELECT COUNT(*) as c FROM progress WHERE user_id=? AND status='in_progress'`
+      `SELECT COUNT(*) as c FROM user_progress WHERE user_id=? AND status='in_progress'`
     ).get(user.id).c;
     const totalAnswered = db.prepare(
-      `SELECT COUNT(*) as c FROM answers WHERE user_id=?`
+      `SELECT COUNT(*) as c FROM user_answers WHERE user_id=?`
     ).get(user.id).c;
     const correctAnswered = db.prepare(
-      `SELECT COUNT(*) as c FROM answers WHERE user_id=? AND correct=1`
+      `SELECT COUNT(*) as c FROM user_answers WHERE user_id=? AND is_correct=1`
     ).get(user.id).c;
     const accuracy = totalAnswered > 0 ? Math.round((correctAnswered / totalAnswered) * 100) : 0;
     return jsonRes(res, 200, {
@@ -212,32 +217,32 @@ async function router(req, res) {
   if (method === 'GET' && labMatch) {
     const user = requireAuth(req, res); if (!user) return;
     const slug = labMatch[1];
-    const lab  = db.prepare(`SELECT * FROM labs WHERE slug=? AND active=1`).get(slug);
+    const lab  = db.prepare(`SELECT * FROM labs WHERE slug=?`).get(slug);
     if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
     const questions = db.prepare(
-      `SELECT id, order_num, question_text, answer_type, options, points, hint FROM questions WHERE lab_id=? ORDER BY order_num`
+      `SELECT id, order_index, question, answer_type, options, points, hint FROM questions WHERE lab_id=? ORDER BY order_index`
     ).all(lab.id).map(q => ({
       ...q,
       options: q.options ? JSON.parse(q.options) : null
     }));
-    // attach per-question completion status for this user
     const answeredQ = db.prepare(
-      `SELECT question_id, correct, pts_awarded, attempts FROM answers WHERE user_id=? AND lab_id=? ORDER BY submitted_at DESC`
+      `SELECT question_id, is_correct, pts_awarded, attempt_number FROM user_answers WHERE user_id=? AND lab_id=? ORDER BY submitted_at DESC`
     ).all(user.id, lab.id);
-    // only keep most recent per question
     const answerMap = {};
     answeredQ.forEach(a => { if (!answerMap[a.question_id]) answerMap[a.question_id] = a; });
     const questionsWithStatus = questions.map(q => ({
       ...q,
-      completed:   !!(answerMap[q.id] && answerMap[q.id].correct),
-      attempts:    answerMap[q.id] ? answerMap[q.id].attempts : 0,
-      pts_earned:  answerMap[q.id] ? answerMap[q.id].pts_awarded : 0,
+      completed:  !!(answerMap[q.id] && answerMap[q.id].is_correct),
+      attempts:   answerMap[q.id] ? answerMap[q.id].attempt_number : 0,
+      pts_earned: answerMap[q.id] ? answerMap[q.id].pts_awarded : 0,
     }));
     const prog = db.prepare(
-      `SELECT status, score, started_at, completed_at FROM progress WHERE user_id=? AND lab_id=?`
+      `SELECT status, score, started_at, completed_at FROM user_progress WHERE user_id=? AND lab_id=?`
     ).get(user.id, lab.id);
+    const alertRefs = lab.alert_refs ? JSON.parse(lab.alert_refs) : [];
     return jsonRes(res, 200, {
       ...lab,
+      alert_refs: alertRefs,
       questions: questionsWithStatus,
       progress: prog || { status: 'not_started', score: 0 }
     });
@@ -248,7 +253,7 @@ async function router(req, res) {
   if (method === 'POST' && submitMatch) {
     const user = requireAuth(req, res); if (!user) return;
     const slug = submitMatch[1];
-    const lab  = db.prepare(`SELECT * FROM labs WHERE slug=? AND active=1`).get(slug);
+    const lab  = db.prepare(`SELECT * FROM labs WHERE slug=?`).get(slug);
     if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
     const { question_id, answer } = await parseBody(req);
     if (!question_id || answer === undefined) {
@@ -257,9 +262,9 @@ async function router(req, res) {
     const question = db.prepare(`SELECT * FROM questions WHERE id=? AND lab_id=?`).get(question_id, lab.id);
     if (!question) return jsonRes(res, 404, { error: 'Question not found' });
 
-    // Check if already correctly answered
+    // Already correctly answered?
     const alreadyCorrect = db.prepare(
-      `SELECT id FROM answers WHERE user_id=? AND question_id=? AND correct=1`
+      `SELECT id FROM user_answers WHERE user_id=? AND question_id=? AND is_correct=1`
     ).get(user.id, question_id);
     if (alreadyCorrect) {
       return jsonRes(res, 200, {
@@ -269,20 +274,18 @@ async function router(req, res) {
       });
     }
 
-    // Count prior attempts for this question
-    const priorAttempts = db.prepare(
-      `SELECT COUNT(*) as c FROM answers WHERE user_id=? AND question_id=?`
-    ).get(user.id, question_id).c;
+    const priorRow = db.prepare(
+      `SELECT attempt_number FROM user_answers WHERE user_id=? AND question_id=? ORDER BY submitted_at DESC LIMIT 1`
+    ).get(user.id, question_id);
+    const priorAttempts = priorRow ? priorRow.attempt_number : 0;
     const MAX_ATTEMPTS = 3;
 
-    // Normalise answer comparison — case-insensitive, trim, partial match for text type
-    const submitted  = String(answer).trim().toLowerCase();
-    const correct_a  = question.correct_answer.trim().toLowerCase();
+    const submitted = String(answer).trim().toLowerCase();
+    const correct_a = question.correct_answer.trim().toLowerCase();
     let correct = false;
     if (question.answer_type === 'choice') {
       correct = submitted === correct_a;
     } else {
-      // text — check if submitted contains key words from the correct answer
       const keywords = correct_a.split(/\s+/).filter(w => w.length > 4);
       const matchCount = keywords.filter(k => submitted.includes(k)).length;
       correct = matchCount >= Math.ceil(keywords.length * 0.35);
@@ -290,31 +293,28 @@ async function router(req, res) {
 
     const ptsAwarded = correct ? (priorAttempts === 0 ? question.points : Math.floor(question.points * 0.5)) : 0;
 
-    // Record answer
     db.prepare(
-      `INSERT INTO answers (user_id, lab_id, question_id, submitted_answer, correct, pts_awarded, attempts)
+      `INSERT OR REPLACE INTO user_answers (user_id, lab_id, question_id, submitted_answer, is_correct, pts_awarded, attempt_number)
        VALUES (?,?,?,?,?,?,?)`
     ).run(user.id, lab.id, question_id, answer, correct ? 1 : 0, ptsAwarded, priorAttempts + 1);
 
-    // Update / create progress row
     const totalQ = db.prepare(`SELECT COUNT(*) as c FROM questions WHERE lab_id=?`).get(lab.id).c;
     const doneQ  = db.prepare(
-      `SELECT COUNT(DISTINCT question_id) as c FROM answers WHERE user_id=? AND lab_id=? AND correct=1`
+      `SELECT COUNT(DISTINCT question_id) as c FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
     ).get(user.id, lab.id).c;
     const labScore = db.prepare(
-      `SELECT COALESCE(SUM(pts_awarded),0) as s FROM answers WHERE user_id=? AND lab_id=? AND correct=1`
+      `SELECT COALESCE(SUM(pts_awarded),0) as s FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
     ).get(user.id, lab.id).s;
     const newStatus = doneQ >= totalQ ? 'completed' : 'in_progress';
-    const existing  = db.prepare(`SELECT id FROM progress WHERE user_id=? AND lab_id=?`).get(user.id, lab.id);
+    const existing  = db.prepare(`SELECT id FROM user_progress WHERE user_id=? AND lab_id=?`).get(user.id, lab.id);
     if (existing) {
       db.prepare(
-        `UPDATE progress SET status=?, score=?, attempts=attempts+1, completed_at=?
-         WHERE user_id=? AND lab_id=?`
+        `UPDATE user_progress SET status=?, score=?, completed_at=? WHERE user_id=? AND lab_id=?`
       ).run(newStatus, labScore, newStatus === 'completed' ? new Date().toISOString() : null, user.id, lab.id);
     } else {
       db.prepare(
-        `INSERT INTO progress (user_id, lab_id, status, score, attempts, started_at, completed_at)
-         VALUES (?,?,?,?,1,?,?)`
+        `INSERT INTO user_progress (user_id, lab_id, status, score, started_at, completed_at)
+         VALUES (?,?,?,?,?,?)`
       ).run(user.id, lab.id, newStatus, labScore, new Date().toISOString(),
         newStatus === 'completed' ? new Date().toISOString() : null);
     }
@@ -333,7 +333,7 @@ async function router(req, res) {
     });
   }
 
-  // ── POST /api/user/password (self-service, any authenticated user) ──
+  // ── POST /api/user/password ───────────────────────────
   if (method === 'POST' && url === '/api/user/password') {
     const user = requireAuth(req, res); if (!user) return;
     const { current_password, new_password } = await parseBody(req);
@@ -358,18 +358,18 @@ async function router(req, res) {
     const user = requireAuth(req, res); if (!user) return;
     const rows = db.prepare(
       `SELECT u.id, u.username,
-         COALESCE(SUM(CASE WHEN a.correct=1 THEN a.pts_awarded ELSE 0 END),0) as score,
-         COUNT(DISTINCT CASE WHEN a.correct=1 THEN a.question_id END) as correct_answers,
+         COALESCE(SUM(CASE WHEN a.is_correct=1 THEN a.pts_awarded ELSE 0 END),0) as score,
+         COUNT(DISTINCT CASE WHEN a.is_correct=1 THEN a.question_id END) as correct_answers,
          COUNT(DISTINCT CASE WHEN p.status='completed' THEN p.lab_id END) as labs_done,
          COUNT(DISTINCT a.question_id) as total_answers
        FROM users u
-       LEFT JOIN answers a ON a.user_id = u.id
-       LEFT JOIN progress p ON p.user_id = u.id
-       WHERE u.role='analyst' AND u.active=1
+       LEFT JOIN user_answers a ON a.user_id = u.id
+       LEFT JOIN user_progress p ON p.user_id = u.id
+       WHERE u.role='analyst' AND u.is_active=1
        GROUP BY u.id ORDER BY score DESC LIMIT 50`
     ).all();
     const board = rows.map((r, i) => ({
-      rank: i + 1,
+      rank: r.score > 0 ? i + 1 : 0,
       id: r.id,
       username: r.username,
       score: r.score,
@@ -381,19 +381,74 @@ async function router(req, res) {
     return jsonRes(res, 200, board);
   }
 
+  // ── GET /api/alerts ───────────────────────────────────
+  if (method === 'GET' && url === '/api/alerts') {
+    const user = requireAuth(req, res); if (!user) return;
+    const severity  = params.get('severity');
+    const category  = params.get('category');
+    const status    = params.get('status');
+    const search    = params.get('q');
+    const limit     = Math.min(parseInt(params.get('limit') || '100'), 200);
+    const offset    = parseInt(params.get('offset') || '0');
+
+    let where = [];
+    let args  = [];
+    if (severity) { where.push('severity=?'); args.push(severity); }
+    if (category) { where.push('category=?'); args.push(category); }
+    if (status)   { where.push('status=?');   args.push(status); }
+    if (search)   {
+      where.push(`(title LIKE ? OR description LIKE ? OR host LIKE ? OR src_ip LIKE ? OR mitre_technique LIKE ?)`);
+      const q = `%${search}%`;
+      args.push(q, q, q, q, q);
+    }
+
+    const whereStr = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const alerts = db.prepare(
+      `SELECT id, severity, category, title, source, host, src_ip, dst_ip, username,
+              process, event_id, mitre_tactic, mitre_technique, status, timestamp
+       FROM soc_alerts ${whereStr}
+       ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,
+                timestamp DESC
+       LIMIT ? OFFSET ?`
+    ).all(...args, limit, offset);
+
+    const total = db.prepare(`SELECT COUNT(*) as c FROM soc_alerts ${whereStr}`).get(...args).c;
+
+    // summary counts
+    const counts = db.prepare(
+      `SELECT severity, COUNT(*) as n FROM soc_alerts GROUP BY severity`
+    ).all().reduce((acc, r) => { acc[r.severity] = r.n; return acc; }, {});
+
+    return jsonRes(res, 200, { alerts, total, counts });
+  }
+
+  // ── GET /api/alerts/:id ───────────────────────────────
+  const alertMatch = url.match(/^\/api\/alerts\/([A-Z0-9-]+)$/);
+  if (method === 'GET' && alertMatch) {
+    const user = requireAuth(req, res); if (!user) return;
+    const alert = db.prepare(`SELECT * FROM soc_alerts WHERE id=?`).get(alertMatch[1]);
+    if (!alert) return jsonRes(res, 404, { error: 'Alert not found' });
+    // parse JSON fields
+    ['iocs','timeline','network_flow'].forEach(f => {
+      try { alert[f] = JSON.parse(alert[f] || 'null'); } catch { alert[f] = null; }
+    });
+    return jsonRes(res, 200, alert);
+  }
+
   // ── GET /api/admin/stats ──────────────────────────────
   if (method === 'GET' && url === '/api/admin/stats') {
     const admin = requireAdmin(req, res); if (!admin) return;
-    const total_users   = db.prepare(`SELECT COUNT(*) as c FROM users WHERE role='analyst'`).get().c;
-    const active_users  = db.prepare(`SELECT COUNT(*) as c FROM users WHERE role='analyst' AND active=1`).get().c;
-    const labs_completed = db.prepare(`SELECT COUNT(*) as c FROM progress WHERE status='completed'`).get().c;
-    const total_labs    = db.prepare(`SELECT COUNT(*) as c FROM labs WHERE active=1`).get().c;
-    const avg_score_row = db.prepare(
-      `SELECT COALESCE(AVG(s),0) as avg FROM (SELECT SUM(pts_awarded) as s FROM answers WHERE correct=1 GROUP BY user_id)`
+    const total_users    = db.prepare(`SELECT COUNT(*) as c FROM users WHERE role='analyst'`).get().c;
+    const active_users   = db.prepare(`SELECT COUNT(*) as c FROM users WHERE role='analyst' AND is_active=1`).get().c;
+    const labs_completed = db.prepare(`SELECT COUNT(*) as c FROM user_progress WHERE status='completed'`).get().c;
+    const total_labs     = db.prepare(`SELECT COUNT(*) as c FROM labs`).get().c;
+    const total_alerts   = db.prepare(`SELECT COUNT(*) as c FROM soc_alerts`).get().c;
+    const avg_score_row  = db.prepare(
+      `SELECT COALESCE(AVG(s),0) as avg FROM (SELECT SUM(pts_awarded) as s FROM user_answers WHERE is_correct=1 GROUP BY user_id)`
     ).get();
-    const total_answers = db.prepare(`SELECT COUNT(*) as c FROM answers`).get().c;
+    const total_answers  = db.prepare(`SELECT COUNT(*) as c FROM user_answers`).get().c;
     return jsonRes(res, 200, {
-      total_users, active_users, labs_completed, total_labs,
+      total_users, active_users, labs_completed, total_labs, total_alerts,
       avg_score: Math.round(avg_score_row.avg),
       total_answers,
     });
@@ -403,13 +458,13 @@ async function router(req, res) {
   if (method === 'GET' && url === '/api/admin/users') {
     const admin = requireAdmin(req, res); if (!admin) return;
     const users = db.prepare(
-      `SELECT u.id, u.username, u.role, u.active, u.created_at,
-         COALESCE(SUM(CASE WHEN a.correct=1 THEN a.pts_awarded ELSE 0 END),0) as score,
+      `SELECT u.id, u.username, u.role, u.is_active, u.created_at,
+         COALESCE(SUM(CASE WHEN a.is_correct=1 THEN a.pts_awarded ELSE 0 END),0) as score,
          COUNT(DISTINCT CASE WHEN p.status='completed' THEN p.lab_id END) as labs_done,
          MAX(s.expires_at) as last_session
        FROM users u
-       LEFT JOIN answers a ON a.user_id = u.id
-       LEFT JOIN progress p ON p.user_id = u.id
+       LEFT JOIN user_answers a ON a.user_id = u.id
+       LEFT JOIN user_progress p ON p.user_id = u.id
        LEFT JOIN sessions s ON s.user_id = u.id
        GROUP BY u.id ORDER BY u.username`
     ).all();
@@ -440,7 +495,7 @@ async function router(req, res) {
     const user = db.prepare(`SELECT id FROM users WHERE id=?`).get(userId);
     if (!user) return jsonRes(res, 404, { error: 'User not found' });
     if (body.active !== undefined) {
-      db.prepare(`UPDATE users SET active=? WHERE id=?`).run(body.active ? 1 : 0, userId);
+      db.prepare(`UPDATE users SET is_active=? WHERE id=?`).run(body.active ? 1 : 0, userId);
     }
     if (body.password) {
       const hash = bcrypt.hashSync(body.password, 10);
@@ -464,13 +519,15 @@ async function router(req, res) {
   if (method === 'GET' && url === '/api/admin/progress') {
     const admin = requireAdmin(req, res); if (!admin) return;
     const users = db.prepare(`SELECT id, username FROM users WHERE role='analyst' ORDER BY username`).all();
-    const labs  = db.prepare(`SELECT id, slug, title, points FROM labs WHERE active=1 ORDER BY order_num`).all();
-    const allProgress = db.prepare(`SELECT user_id, lab_id, status, score, completed_at FROM progress`).all();
+    const labs  = db.prepare(`SELECT id, slug, title, points FROM labs ORDER BY order_index`).all();
+    const allProgress = db.prepare(`SELECT user_id, lab_id, status, score, completed_at FROM user_progress`).all();
     const matrix = users.map(u => {
       const row = { user_id: u.id, username: u.username, labs: {} };
       labs.forEach(l => {
         const p = allProgress.find(x => x.user_id === u.id && x.lab_id === l.id);
-        row.labs[l.slug] = p ? { status: p.status, score: p.score, completed_at: p.completed_at } : { status: 'not_started', score: 0 };
+        row.labs[l.slug] = p
+          ? { status: p.status, score: p.score, completed_at: p.completed_at }
+          : { status: 'not_started', score: 0 };
       });
       row.total_score = Object.values(row.labs).reduce((s, l) => s + l.score, 0);
       return row;
@@ -480,19 +537,15 @@ async function router(req, res) {
 
   // ── Static files & HTML routes ────────────────────────
   if (method === 'GET') {
-    // Route: / → login
     if (url === '/' || url === '/login' || url === '/login.html') {
       return serveFile(res, path.join(PUBLIC, 'login.html'));
     }
-    // Route: /analyst → analyst app
     if (url === '/analyst' || url === '/analyst/') {
       return serveFile(res, path.join(PUBLIC, 'analyst', 'index.html'));
     }
-    // Route: /admin → admin app
     if (url === '/admin' || url === '/admin/') {
       return serveFile(res, path.join(PUBLIC, 'admin', 'index.html'));
     }
-    // Static assets
     const filePath = path.join(PUBLIC, url);
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
       return serveFile(res, filePath);

@@ -478,6 +478,106 @@ input, textarea, select { font-family: var(--font); }
   .stats-row { grid-template-columns: repeat(2,1fr); }
   .profile-layout { grid-template-columns: 1fr; }
 }
+/* ── SOC DASHBOARD ── */
+.sev-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+}
+.sev-critical { background: rgba(255,71,87,0.18); color: #ff4757; border: 1px solid rgba(255,71,87,0.35); }
+.sev-high     { background: rgba(255,107,53,0.18); color: #ff6b35; border: 1px solid rgba(255,107,53,0.35); }
+.sev-medium   { background: rgba(255,211,42,0.14); color: #ffd32a; border: 1px solid rgba(255,211,42,0.3); }
+.sev-low      { background: rgba(74,158,255,0.14); color: #4a9eff; border: 1px solid rgba(74,158,255,0.3); }
+.sev-info     { background: rgba(157,165,180,0.12); color: #9da5b4; border: 1px solid rgba(157,165,180,0.25); }
+.alerts-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.alerts-toolbar input[type=text] {
+  background: var(--input-bg); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; padding: 6px 12px; font-size: 12.5px;
+  width: 240px; outline: none;
+}
+.alerts-toolbar input[type=text]:focus { border-color: var(--green); }
+.alerts-toolbar select {
+  background: var(--input-bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 10px; font-size: 12.5px; outline: none; cursor: pointer;
+}
+.alerts-table-wrap { overflow-x: auto; }
+.alerts-table {
+  width: 100%; border-collapse: collapse; font-size: 12.5px;
+}
+.alerts-table th {
+  text-align: left; padding: 8px 12px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.7px; text-transform: uppercase; color: var(--dim);
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.alerts-table td {
+  padding: 9px 12px; border-bottom: 1px solid rgba(46,49,72,0.6);
+  vertical-align: middle; white-space: nowrap;
+}
+.alerts-table tr:hover td { background: rgba(74,158,255,0.04); cursor: pointer; }
+.alerts-table .td-title { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.alerts-table .td-mono { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.alert-detail-overlay {
+  position: fixed; inset: 0; background: rgba(14,16,27,0.85);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999; padding: 24px;
+}
+.alert-detail-panel {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  width: 100%; max-width: 760px; max-height: 88vh; display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.alert-detail-header {
+  display: flex; align-items: flex-start; gap: 14px; padding: 18px 20px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.alert-detail-body { overflow-y: auto; padding: 18px 20px; flex: 1; }
+.alert-detail-close {
+  margin-left: auto; background: transparent; border: none; color: var(--muted);
+  font-size: 20px; cursor: pointer; flex-shrink: 0; line-height: 1;
+  padding: 2px 6px; border-radius: 4px;
+}
+.alert-detail-close:hover { background: var(--input-bg); color: var(--text); }
+.alert-kv-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; margin-bottom: 16px;
+}
+.alert-kv { display: flex; flex-direction: column; gap: 2px; }
+.alert-kv-label { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--dim); }
+.alert-kv-val { font-size: 12.5px; color: var(--text); font-family: var(--mono); }
+.alert-section-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase;
+  color: var(--dim); margin: 14px 0 8px; border-top: 1px solid var(--border); padding-top: 12px;
+}
+.alert-timeline { display: flex; flex-direction: column; gap: 6px; }
+.tl-entry {
+  display: grid; grid-template-columns: 140px 1fr; gap: 10px;
+  padding: 7px 10px; background: var(--input-bg); border-radius: 6px; font-size: 12px;
+}
+.tl-time { color: var(--dim); font-family: var(--mono); font-size: 11px; }
+.tl-event { color: var(--text); }
+.ioc-tag {
+  display: inline-flex; align-items: center; padding: 2px 8px;
+  background: rgba(74,158,255,0.1); border: 1px solid rgba(74,158,255,0.25);
+  border-radius: 4px; font-size: 11px; font-family: var(--mono); color: var(--blue);
+  margin: 2px;
+}
+.soc-counts-row {
+  display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.soc-count-chip {
+  display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+  background: var(--card2); border: 1px solid var(--border); border-radius: 6px;
+  font-size: 12px; cursor: pointer; transition: border-color 0.12s;
+}
+.soc-count-chip:hover, .soc-count-chip.active { border-color: rgba(74,158,255,0.5); }
+.soc-count-chip .scc-num { font-weight: 700; font-size: 15px; }
+.mitre-tag {
+  display: inline-flex; padding: 2px 8px; font-size: 11px; font-family: var(--mono);
+  background: rgba(43,204,139,0.08); border: 1px solid rgba(43,204,139,0.2);
+  border-radius: 4px; color: var(--green);
+}
+
 </style>
 </head>
 <body>
@@ -485,18 +585,19 @@ input, textarea, select { font-family: var(--font); }
   <!-- SIDEBAR -->
   <aside id="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-mark">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>
-      </div>
-      <div class="logo-name">DIAAS<span>-SEC</span></div>
+      <img src="https://diaas.in/assets/images/Diaas_Logo.png" alt="DIAAS" style="height:28px;width:auto;object-fit:contain;flex-shrink:0">
+      <div class="logo-name" style="font-size:13px;font-weight:800;letter-spacing:0.5px">DIAAS<span style="color:var(--green)">-SEC</span></div>
     </div>
     <nav class="sidebar-nav">
       <div class="nav-section-label">Navigation</div>
       <div class="nav-item active" data-page="dashboard">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         <span class="nav-label">Dashboard</span>
+      </div>
+      <div class="nav-item" data-page="soc">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="7" cy="10" r="1" fill="currentColor"/><path d="M10 10h7M10 13h5"/></svg>
+        <span class="nav-label">SOC Dashboard</span>
+        <span class="nav-badge" id="badge-soc" style="display:none">!</span>
       </div>
       <div class="nav-item" data-page="labs">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
@@ -601,6 +702,86 @@ input, textarea, select { font-family: var(--font); }
           <div style="overflow-x:auto" id="lb-wrap"><div class="loading-state"><div class="spinner"></div>Loading...</div></div>
         </div>
       </div>
+
+      <!-- SOC DASHBOARD -->
+      <div class="page" id="page-soc">
+        <div class="page-hdr">
+          <h1 class="page-title">SOC Dashboard</h1>
+          <p class="page-sub">Live alert queue — investigate each alert before answering lab questions.</p>
+        </div>
+        <!-- severity counts -->
+        <div class="soc-counts-row" id="soc-counts">
+          <div class="soc-count-chip active" data-sev="all" onclick="SocDash.filter('all',this)">
+            <span class="scc-num" id="scc-all">–</span><span style="color:var(--muted)">All</span>
+          </div>
+          <div class="soc-count-chip" data-sev="critical" onclick="SocDash.filter('critical',this)">
+            <span class="sev-badge sev-critical" style="padding:1px 6px">CRIT</span>
+            <span class="scc-num" id="scc-critical">–</span>
+          </div>
+          <div class="soc-count-chip" data-sev="high" onclick="SocDash.filter('high',this)">
+            <span class="sev-badge sev-high" style="padding:1px 6px">HIGH</span>
+            <span class="scc-num" id="scc-high">–</span>
+          </div>
+          <div class="soc-count-chip" data-sev="medium" onclick="SocDash.filter('medium',this)">
+            <span class="sev-badge sev-medium" style="padding:1px 6px">MED</span>
+            <span class="scc-num" id="scc-medium">–</span>
+          </div>
+          <div class="soc-count-chip" data-sev="low" onclick="SocDash.filter('low',this)">
+            <span class="sev-badge sev-low" style="padding:1px 6px">LOW</span>
+            <span class="scc-num" id="scc-low">–</span>
+          </div>
+        </div>
+        <!-- toolbar -->
+        <div class="alerts-toolbar">
+          <input type="text" id="soc-search" placeholder="Search alerts, hosts, IPs..." oninput="SocDash.search(this.value)">
+          <select id="soc-cat-filter" onchange="SocDash.filterCat(this.value)">
+            <option value="">All Categories</option>
+            <option>Credential Access</option>
+            <option>Execution</option>
+            <option>Exfiltration</option>
+            <option>Lateral Movement</option>
+            <option>Persistence</option>
+            <option>Ransomware</option>
+            <option>Reconnaissance</option>
+            <option>Defense Evasion</option>
+            <option>Command and Control</option>
+            <option>Collection</option>
+          </select>
+          <select id="soc-status-filter" onchange="SocDash.filterStatus(this.value)">
+            <option value="">All Statuses</option>
+            <option value="open">Open</option>
+            <option value="investigating">Investigating</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <span style="margin-left:auto;font-size:11.5px;color:var(--muted)" id="soc-count-label">Loading...</span>
+        </div>
+        <!-- table -->
+        <div class="card" style="padding:0">
+          <div class="alerts-table-wrap">
+            <table class="alerts-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Severity</th>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Host</th>
+                  <th>Source</th>
+                  <th>Timestamp</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="soc-alerts-body">
+                <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">
+                  <div class="spinner" style="margin:0 auto 10px"></div>Loading alerts...
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALERT DETAIL MODAL (appended to body dynamically) -->
 
       <!-- PROFILE -->
       <div class="page" id="page-profile">
@@ -774,14 +955,14 @@ const App = {
       App.meData = me;
       document.getElementById('sidebar-score').textContent  = me.score;
       document.getElementById('topbar-score').textContent   = me.score;
-      document.getElementById('topbar-rank').textContent    = '#' + me.rank;
+      document.getElementById('topbar-rank').textContent    = me.rank > 0 ? '#' + me.rank : '–';
       document.getElementById('welcome-title').textContent  = 'Welcome back, ' + me.username;
-      document.getElementById('ds-score').textContent   = me.score;
-      document.getElementById('ds-done').textContent    = me.labs_done;
-      document.getElementById('ds-progress').textContent = me.labs_in_progress;
-      document.getElementById('ds-rank').textContent    = '#' + me.rank;
-      document.getElementById('prof-score').textContent = me.score;
-      document.getElementById('prof-rank').textContent  = '#' + me.rank;
+      document.getElementById('ds-score').textContent       = me.score;
+      document.getElementById('ds-done').textContent        = me.labs_done;
+      document.getElementById('ds-progress').textContent    = me.labs_in_progress;
+      document.getElementById('ds-rank').textContent        = me.rank > 0 ? '#' + me.rank : '–';
+      document.getElementById('prof-score').textContent     = me.score;
+      document.getElementById('prof-rank').textContent      = me.rank > 0 ? '#' + me.rank : '–';
       document.getElementById('prof-done').textContent  = me.labs_done;
       document.getElementById('prof-acc').textContent   = me.accuracy + '%';
       document.getElementById('profile-username').textContent = me.username;
@@ -812,10 +993,11 @@ const App = {
     if (pageEl) pageEl.classList.add('active');
     if (navEl)  navEl.classList.add('active');
 
-    const labels = { dashboard:'Dashboard', labs:'My Labs', leaderboard:'Leaderboard', profile:'My Profile' };
+    const labels = { dashboard:'Dashboard', soc:'SOC Dashboard', labs:'My Labs', leaderboard:'Leaderboard', profile:'My Profile' };
     document.getElementById('bc-cur').textContent = labels[page] || page;
 
     if (page === 'dashboard')   { App.loadMe(); Pages.renderDashboardLabs(); }
+    if (page === 'soc')         SocDash.load();
     if (page === 'labs')        Pages.renderLabsGrid(Pages._currentCat || 'all');
     if (page === 'leaderboard') Pages.leaderboard();
     if (page === 'profile')     Pages.profile();
@@ -1012,7 +1194,7 @@ const Pages = {
     return `<div class="q-card ${done ? 'done' : ''} ${locked ? 'locked' : ''}" id="q-card-${q.id}">
       <div class="q-card-header">
         <div class="q-num">Question ${idx+1}</div>
-        <div class="q-text">${q.question_text}</div>
+        <div class="q-text">${q.question}</div>
       </div>
       <div class="q-card-body">
         ${inputHtml}
@@ -1134,7 +1316,7 @@ const Pages = {
           <th>Rank</th><th>Analyst</th><th>Score</th><th>Labs Done</th><th>Accuracy</th>
         </tr></thead>
         <tbody>${board.map(r => `<tr class="${r.is_me ? 'me' : ''}">
-          <td class="lb-rank ${r.rank <= 3 ? 'r'+r.rank : ''}">${rankIcons[r.rank-1] || '#'+r.rank}</td>
+          <td class="lb-rank ${r.rank <= 3 && r.rank > 0 ? 'r'+r.rank : ''}">${r.rank === 0 ? '–' : (rankIcons[r.rank-1] || '#'+r.rank)}</td>
           <td class="td-main">${r.username}${r.is_me ? ' <span style="color:var(--green);font-size:10px">(you)</span>' : ''}</td>
           <td class="td-mono" style="color:var(--green);font-weight:700">${r.score}</td>
           <td>${r.labs_done}</td>
@@ -1145,13 +1327,15 @@ const Pages = {
   },
 
   profile() {
-    // Heatmap — random activity for demo
+    // Heatmap — blank for new analysts, fill from real activity
     const hm = document.getElementById('heatmap');
     if (hm) {
-      hm.innerHTML = Array.from({length: 30}, (_, i) => {
-        const lvl = Math.random() < 0.4 ? 0 : Math.floor(Math.random() * 4) + 1;
-        return `<div class="hm-cell ${lvl > 0 ? 'l'+lvl : ''}"></div>`;
-      }).join('');
+      // Build activity map from answer history
+      const me = App.meData;
+      // For now render blank cells — real activity populates once answers exist
+      hm.innerHTML = Array.from({length: 30}, () =>
+        `<div class="hm-cell"></div>`
+      ).join('');
     }
   },
 
@@ -1183,9 +1367,191 @@ const Pages = {
   }
 };
 
+// ── SOC DASHBOARD ──────────────────────────────────────
+const SocDash = {
+  _all: [],           // full alert list from API
+  _filtered: [],      // after filters applied
+  _sev: 'all',
+  _cat: '',
+  _status: '',
+  _search: '',
+
+  async load() {
+    const tbody = document.getElementById('soc-alerts-body');
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)"><div class="spinner" style="margin:0 auto 10px"></div>Loading alerts...</td></tr>';
+    try {
+      const data = await API.get('/api/alerts?limit=200');
+      SocDash._all = data.alerts || [];
+      // Update counts
+      const c = data.counts || {};
+      const total = data.total || SocDash._all.length;
+      document.getElementById('scc-all').textContent      = total;
+      document.getElementById('scc-critical').textContent = c.critical || 0;
+      document.getElementById('scc-high').textContent     = c.high || 0;
+      document.getElementById('scc-medium').textContent   = c.medium || 0;
+      document.getElementById('scc-low').textContent      = c.low || 0;
+      SocDash._apply();
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--red)">Failed to load alerts</td></tr>';
+    }
+  },
+
+  filter(sev, el) {
+    SocDash._sev = sev;
+    document.querySelectorAll('.soc-count-chip').forEach(c => c.classList.remove('active'));
+    if (el) el.classList.add('active');
+    SocDash._apply();
+  },
+
+  filterCat(cat) {
+    SocDash._cat = cat;
+    SocDash._apply();
+  },
+
+  filterStatus(status) {
+    SocDash._status = status;
+    SocDash._apply();
+  },
+
+  search(q) {
+    SocDash._search = q.toLowerCase();
+    SocDash._apply();
+  },
+
+  _apply() {
+    let rows = SocDash._all;
+    if (SocDash._sev && SocDash._sev !== 'all')
+      rows = rows.filter(a => a.severity === SocDash._sev);
+    if (SocDash._cat)
+      rows = rows.filter(a => a.category === SocDash._cat);
+    if (SocDash._status)
+      rows = rows.filter(a => a.status === SocDash._status);
+    if (SocDash._search) {
+      const q = SocDash._search;
+      rows = rows.filter(a =>
+        (a.title||'').toLowerCase().includes(q) ||
+        (a.host||'').toLowerCase().includes(q) ||
+        (a.src_ip||'').toLowerCase().includes(q) ||
+        (a.category||'').toLowerCase().includes(q) ||
+        (a.id||'').toLowerCase().includes(q)
+      );
+    }
+    SocDash._filtered = rows;
+    const lbl = document.getElementById('soc-count-label');
+    if (lbl) lbl.textContent = rows.length + ' alert' + (rows.length !== 1 ? 's' : '');
+    SocDash._render(rows);
+  },
+
+  _render(rows) {
+    const tbody = document.getElementById('soc-alerts-body');
+    if (!tbody) return;
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">No alerts match your filters</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(a => {
+      const ts = a.timestamp ? a.timestamp.replace('T', ' ').replace(/\.\d+Z?$/, '') : '–';
+      const statusColor = a.status === 'resolved' ? 'var(--green)' : a.status === 'investigating' ? 'var(--yellow)' : 'var(--muted)';
+      return `<tr onclick="SocDash.openDetail('${a.id}')">
+        <td class="td-mono" style="color:var(--blue)">${a.id}</td>
+        <td><span class="sev-badge sev-${a.severity}">${a.severity.toUpperCase()}</span></td>
+        <td class="td-title">${a.title}</td>
+        <td style="color:var(--muted);font-size:11.5px">${a.category||'–'}</td>
+        <td class="td-mono">${a.host||'–'}</td>
+        <td class="td-mono">${a.source||'–'}</td>
+        <td class="td-mono">${ts}</td>
+        <td style="font-size:11.5px;font-weight:600;color:${statusColor};text-transform:capitalize">${a.status||'open'}</td>
+      </tr>`;
+    }).join('');
+  },
+
+  async openDetail(id) {
+    // Remove existing overlay
+    const old = document.getElementById('alert-detail-overlay');
+    if (old) old.remove();
+
+    // Loading overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'alert-detail-overlay';
+    overlay.className = 'alert-detail-overlay';
+    overlay.innerHTML = `<div class="alert-detail-panel" style="align-items:center;justify-content:center;min-height:200px">
+      <div class="spinner"></div>
+    </div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+
+    try {
+      const a = await API.get('/api/alerts/' + id);
+      const ts = a.timestamp ? a.timestamp.replace('T', ' ').replace(/\.\d+Z?$/, '') : '–';
+      const timeline = Array.isArray(a.timeline) ? a.timeline : [];
+      const iocs = Array.isArray(a.iocs) ? a.iocs : [];
+
+      overlay.innerHTML = `<div class="alert-detail-panel">
+        <div class="alert-detail-header">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+              <span class="sev-badge sev-${a.severity}">${a.severity.toUpperCase()}</span>
+              <span class="td-mono" style="color:var(--blue);font-size:12px">${a.id}</span>
+              <span style="font-size:11.5px;font-weight:600;color:var(--muted);text-transform:capitalize">${a.status||'open'}</span>
+            </div>
+            <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">${a.title}</div>
+            <div style="font-size:12px;color:var(--muted)">${a.description||''}</div>
+          </div>
+          <button class="alert-detail-close" onclick="document.getElementById('alert-detail-overlay').remove()">✕</button>
+        </div>
+        <div class="alert-detail-body">
+          <div class="alert-kv-grid">
+            <div class="alert-kv"><div class="alert-kv-label">Category</div><div class="alert-kv-val">${a.category||'–'}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Timestamp</div><div class="alert-kv-val">${ts}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Host / Endpoint</div><div class="alert-kv-val">${a.host||'–'}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Username</div><div class="alert-kv-val">${a.username||'–'}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Source IP</div><div class="alert-kv-val">${a.src_ip||'–'}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Destination IP</div><div class="alert-kv-val">${a.dst_ip||'–'}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Process</div><div class="alert-kv-val">${a.process||'–'}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Event ID</div><div class="alert-kv-val">${a.event_id||'–'}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Data Source</div><div class="alert-kv-val">${a.source||'–'}</div></div>
+            <div class="alert-kv">
+              <div class="alert-kv-label">MITRE</div>
+              <div class="alert-kv-val">
+                ${a.mitre_tactic ? `<span style="color:var(--muted);font-size:11px">${a.mitre_tactic} / </span>` : ''}
+                ${a.mitre_technique ? `<span class="mitre-tag">${a.mitre_technique}</span>` : '–'}
+              </div>
+            </div>
+          </div>
+
+          ${a.raw_log ? `<div class="alert-section-title">Raw Log</div>
+          <pre style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap;word-break:break-all">${a.raw_log}</pre>` : ''}
+
+          ${iocs.length > 0 ? `<div class="alert-section-title">Indicators of Compromise</div>
+          <div style="margin-bottom:4px">${iocs.map(i => `<span class="ioc-tag">${i}</span>`).join('')}</div>` : ''}
+
+          ${timeline.length > 0 ? `<div class="alert-section-title">Timeline</div>
+          <div class="alert-timeline">${timeline.map(e => `
+            <div class="tl-entry">
+              <div class="tl-time">${e.time||''}</div>
+              <div class="tl-event">${e.event||e.description||JSON.stringify(e)}</div>
+            </div>`).join('')}
+          </div>` : ''}
+
+          ${a.network_flow ? `<div class="alert-section-title">Network Flow</div>
+          <pre style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap">${typeof a.network_flow === 'string' ? a.network_flow : JSON.stringify(a.network_flow, null, 2)}</pre>` : ''}
+        </div>
+      </div>`;
+
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+      // Close on Escape
+      const escHandler = e => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); } };
+      document.addEventListener('keydown', escHandler);
+    } catch(e) {
+      overlay.innerHTML = `<div class="alert-detail-panel" style="align-items:center;justify-content:center;min-height:200px;color:var(--red)">Failed to load alert detail</div>`;
+    }
+  }
+};
+
 // ── BOOT ───────────────────────────────────────────────
-window.App   = App;
-window.Pages = Pages;
+window.App     = App;
+window.Pages   = Pages;
+window.SocDash = SocDash;
 document.addEventListener('DOMContentLoaded', App.init);
 </script>
 </body>
