@@ -165,7 +165,7 @@ input, textarea, select { font-family: var(--font); }
 .filter-tab.active { color: var(--text); border-bottom-color: var(--blue); }
 
 /* ── LAB VIEW ── */
-#lab-view { display: none; padding: 24px; animation: fadeIn 0.12s ease; }
+#lab-view { display: none; padding: 24px; animation: fadeIn 0.12s ease; overflow-y: auto; flex: 1; }
 #lab-view.active { display: block; }
 .lab-view-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
 .lab-info-panel { position: sticky; top: 0; }
