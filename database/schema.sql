@@ -149,3 +149,24 @@ CREATE TABLE IF NOT EXISTS incidents (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_incidents_alert ON incidents(alert_id);
 CREATE INDEX IF NOT EXISTS idx_incidents_stage ON incidents(stage);
+
+-- ── Alert Closures (per-analyst triage decisions with IR steps) ──────────────
+CREATE TABLE IF NOT EXISTS alert_closures (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  alert_id          TEXT NOT NULL,
+  user_id           INTEGER NOT NULL,
+  classification    TEXT NOT NULL,           -- 'closed' | 'false_positive'
+  triage_reason     TEXT,                    -- why analyst thinks it's TP
+  containment_steps TEXT,                    -- what containment was done
+  eradication_steps TEXT,                    -- what eradication was done
+  recovery_steps    TEXT,                    -- what recovery was done
+  rca_notes         TEXT,                    -- root cause analysis
+  fp_reason         TEXT,                    -- justification if FP
+  is_correct        INTEGER DEFAULT 0,       -- 1 if classification matches ground truth
+  points_awarded    INTEGER DEFAULT 0,
+  closed_at         TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY(user_id)  REFERENCES users(id)      ON DELETE CASCADE,
+  FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_closures_user  ON alert_closures(user_id);
+CREATE INDEX IF NOT EXISTS idx_closures_alert ON alert_closures(alert_id);

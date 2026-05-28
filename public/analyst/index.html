@@ -6,7 +6,7 @@
 <title>DIAAS-SEC — Analyst</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -29,8 +29,10 @@
   --text:       #F1F5F9;
   --muted:      #94A3B8;
   --dim:        #6B7280;
-  --font:       'Inter', system-ui, sans-serif;
+  --font:       'Space Grotesk', system-ui, sans-serif;
   --mono:       'JetBrains Mono', 'Fira Code', monospace;
+  --green:      #22C55E;
+  --green-dim:  rgba(34,197,94,0.1);
   --radius:     4px;
   --sidebar-w:  220px;
   --topbar-h:   52px;
@@ -95,12 +97,12 @@ input, textarea, select { font-family: var(--font); }
 
 /* ── PAGE HEADER ── */
 .page-hdr { margin-bottom: 24px; }
-.page-title { font-size: 20px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.page-title { font-size: 19px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
 .page-sub { font-size: 13px; color: var(--dim); }
 
 /* ── CARDS ── */
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
-.card-hdr { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; border-bottom: 1px solid var(--border); }
+.card-hdr { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .card-title { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; color: var(--dim); }
 .card-body { padding: 16px; }
 
@@ -127,9 +129,34 @@ input, textarea, select { font-family: var(--font); }
 .btn-red:hover { background: rgba(239,68,68,0.18); }
 .btn-warn { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
 .btn-warn:hover { background: rgba(249,115,22,0.2); }
+.btn-fp { background: var(--orange-dim); color: var(--orange); border: 1px solid var(--orange); }
+.btn-fp:hover { background: rgba(249,115,22,0.2); }
+.btn-resolve { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+.btn-resolve:hover { background: rgba(34,197,94,0.2); }
+.ir-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.ir-modal { background: var(--card); border: 1px solid var(--border); border-radius: 6px; width: 100%; max-width: 560px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+.ir-modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.ir-modal-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.ir-modal-body { flex: 1; overflow-y: auto; padding: 20px; }
+.ir-step { display: none; }
+.ir-step.active { display: block; }
+.ir-step-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--blue); margin-bottom: 6px; }
+.ir-step-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.ir-step-desc { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+.ir-textarea { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: var(--font); font-size: 13px; padding: 10px 12px; resize: vertical; min-height: 90px; transition: border-color 0.15s; }
+.ir-textarea:focus { outline: none; border-color: var(--blue); }
+.ir-textarea.error { border-color: var(--red); }
+.ir-progress { display: flex; gap: 6px; margin-bottom: 20px; }
+.ir-progress-step { flex: 1; height: 3px; border-radius: 2px; background: var(--border); transition: background 0.2s; }
+.ir-progress-step.done { background: var(--blue); }
+.ir-progress-step.active { background: var(--blue); opacity: 0.5; }
+.ir-modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 8px; }
+.ir-step-counter { font-size: 11.5px; color: var(--dim); }
+.ir-point-badge { font-size: 11px; color: var(--green); background: var(--green-dim); border: 1px solid var(--green); border-radius: 3px; padding: 2px 7px; }
 .btn-sm { padding: 5px 10px; font-size: 11.5px; }
 .btn-xs { padding: 3px 8px; font-size: 10.5px; }
 .btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+.btn:active { opacity: 0.8; transform: translateY(1px); }
 
 /* ── DIFFICULTY CHIPS ── */
 .diff { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; border: 1px solid; }
@@ -144,7 +171,7 @@ input, textarea, select { font-family: var(--font); }
 /* ── LAB CARDS GRID ── */
 .labs-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
 .lab-card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; transition: border-color 0.12s; cursor: pointer; }
-.lab-card:hover { border-color: #374151; }
+.lab-card:hover { border-color: var(--blue); }
 .lab-card.completed { border-left: 2px solid var(--blue); }
 .lab-card-top { padding: 14px 16px; border-bottom: 1px solid var(--border); }
 .lab-card-badges { display: flex; gap: 6px; margin-bottom: 10px; align-items: center; }
@@ -529,9 +556,9 @@ input, textarea, select { font-family: var(--font); }
           <p class="page-sub">Here's your progress overview.</p>
         </div>
         <div class="stats-row" id="dash-stats">
-          <div class="stat-card"><div class="stat-label">Total Score</div><div class="stat-val green" id="ds-score">0</div><div class="stat-sub">pts earned</div></div>
-          <div class="stat-card orange"><div class="stat-label">Labs Completed</div><div class="stat-val orange" id="ds-done">0</div><div class="stat-sub">of 6 labs</div></div>
-          <div class="stat-card blue"><div class="stat-label">In Progress</div><div class="stat-val blue" id="ds-progress">0</div><div class="stat-sub">labs started</div></div>
+          <div class="stat-card"><div class="stat-label">Total Score</div><div class="stat-val green" id="ds-score">–</div><div class="stat-sub">pts earned</div></div>
+          <div class="stat-card orange"><div class="stat-label">Labs Completed</div><div class="stat-val orange" id="ds-done">–</div><div class="stat-sub">of 6 labs</div></div>
+          <div class="stat-card blue"><div class="stat-label">In Progress</div><div class="stat-val blue" id="ds-progress">–</div><div class="stat-sub">labs started</div></div>
           <div class="stat-card red"><div class="stat-label">Your Rank</div><div class="stat-val" id="ds-rank">#–</div><div class="stat-sub">among analysts</div></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -763,6 +790,95 @@ input, textarea, select { font-family: var(--font); }
             <div class="loading-state"><div class="spinner"></div>Loading questions...</div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- IR Resolve Modal -->
+<div id="ir-resolve-modal" style="display:none" class="ir-modal-overlay" onclick="if(event.target===this)window.irCloseResolve()">
+  <div class="ir-modal">
+    <div class="ir-modal-header">
+      <span class="ir-modal-title">Close as Resolved</span>
+      <button class="btn btn-outline btn-sm" onclick="window.irCloseResolve()">✕</button>
+    </div>
+    <div class="ir-modal-body">
+      <div class="ir-progress">
+        <div class="ir-progress-step active" id="irp-0"></div>
+        <div class="ir-progress-step" id="irp-1"></div>
+        <div class="ir-progress-step" id="irp-2"></div>
+        <div class="ir-progress-step" id="irp-3"></div>
+        <div class="ir-progress-step" id="irp-4"></div>
+      </div>
+      <!-- Step 0: Initial Triage -->
+      <div class="ir-step active" id="ir-step-0">
+        <div class="ir-step-label">Step 1 of 5 — Initial Triage</div>
+        <div class="ir-step-title">Why is this a True Positive?</div>
+        <div class="ir-step-desc">Explain what evidence in the alert confirms this is a real incident. Be specific — reference fields from the raw log.</div>
+        <textarea class="ir-textarea" id="ir-ans-0" placeholder="e.g. The ParentImage field shows svch0st.exe spawning vssadmin — not a legitimate parent process. Combined with the target (shadow copies), this confirms ransomware pre-encryption activity."></textarea>
+      </div>
+      <!-- Step 1: Containment -->
+      <div class="ir-step" id="ir-step-1">
+        <div class="ir-step-label">Step 2 of 5 — Containment</div>
+        <div class="ir-step-title">What containment steps did you take?</div>
+        <div class="ir-step-desc">Describe the immediate actions to stop the threat from spreading. What did you isolate, block, or disable?</div>
+        <textarea class="ir-textarea" id="ir-ans-1" placeholder="e.g. Isolated FILE-SERVER-01 from the network by disabling the switch port. Blocked outbound C2 IP 185.220.101.47 at the firewall. Disabled the corp-svc-backup2 IAM credentials."></textarea>
+      </div>
+      <!-- Step 2: Eradication -->
+      <div class="ir-step" id="ir-step-2">
+        <div class="ir-step-label">Step 3 of 5 — Eradication</div>
+        <div class="ir-step-title">What eradication steps did you take?</div>
+        <div class="ir-step-desc">Describe how you removed the threat from all affected systems. Include binaries removed, persistence cleaned, credentials rotated.</div>
+        <textarea class="ir-textarea" id="ir-ans-2" placeholder="e.g. Removed C:\\Users\\Public\\svch0st.exe from FILE-SERVER-01. Deleted scheduled task 'WindowsUpdate_svc'. Rotated all local admin passwords. Scanned 3 other servers for the same binary hash."></textarea>
+      </div>
+      <!-- Step 3: Recovery -->
+      <div class="ir-step" id="ir-step-3">
+        <div class="ir-step-label">Step 4 of 5 — Recovery</div>
+        <div class="ir-step-title">What recovery steps did you take?</div>
+        <div class="ir-step-desc">Describe how the affected system or data was restored. What was verified before returning to production?</div>
+        <textarea class="ir-textarea" id="ir-ans-3" placeholder="e.g. Restored 847 encrypted files from backup dated 2024-03-14 22:00Z. Verified backup integrity via hash check. Applied all pending Windows patches. Monitored for 24 hours before reconnecting to network."></textarea>
+      </div>
+      <!-- Step 4: RCA -->
+      <div class="ir-step" id="ir-step-4">
+        <div class="ir-step-label">Step 5 of 5 — Root Cause Analysis</div>
+        <div class="ir-step-title">What was the root cause and what failed?</div>
+        <div class="ir-step-desc">Identify the initial access vector, what security controls failed, and what changes will prevent recurrence.</div>
+        <textarea class="ir-textarea" id="ir-ans-4" placeholder="e.g. Root cause: compromised service account credentials used to deploy ransomware binary via network share. Control failure: no EDR on FILE-SERVER-01, no alert on first vssadmin execution. Fix: deploy EDR, restrict service account to required permissions only, alert on shadow copy deletion."></textarea>
+      </div>
+    </div>
+    <div class="ir-modal-footer">
+      <span class="ir-step-counter" id="ir-step-counter">Step 1 of 5</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="ir-point-badge">+5 pts on correct close</span>
+        <button class="btn btn-outline btn-sm" id="ir-btn-back" onclick="window.irStepBack()" style="display:none">← Back</button>
+        <button class="btn btn-primary btn-sm" id="ir-btn-next" onclick="window.irStepNext()">Next →</button>
+        <button class="btn btn-resolve btn-sm" id="ir-btn-submit" onclick="window.irSubmitResolve()" style="display:none">Submit & Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- IR False Positive Modal -->
+<div id="ir-fp-modal" style="display:none" class="ir-modal-overlay" onclick="if(event.target===this)window.irCloseFP()">
+  <div class="ir-modal" style="max-width:480px">
+    <div class="ir-modal-header">
+      <span class="ir-modal-title">Close as False Positive</span>
+      <button class="btn btn-outline btn-sm" onclick="window.irCloseFP()">✕</button>
+    </div>
+    <div class="ir-modal-body">
+      <div class="ir-step-label">Justification Required</div>
+      <div class="ir-step-title">Why is this a false positive?</div>
+      <div class="ir-step-desc">Explain what evidence shows this is NOT a real incident. Reference specific fields in the alert. Your answer will be reviewed for scoring.</div>
+      <textarea class="ir-textarea" id="ir-fp-reason" placeholder="e.g. The source IP 185.220.101.47 is the company's external vulnerability scanner. The PutBucketAcl call was part of a scheduled DR test — verified against the change management ticket CM-2024-0312. No data was actually exfiltrated."></textarea>
+      <div style="margin-top:12px;padding:10px 12px;background:var(--orange-dim);border:1px solid var(--orange);border-radius:4px;font-size:12px;color:var(--orange)">
+        If this alert is a True Positive and you close it as False Positive, you will receive 0 points.
+      </div>
+    </div>
+    <div class="ir-modal-footer">
+      <span class="ir-point-badge">+3 pts on correct FP</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="window.irCloseFP()">Cancel</button>
+        <button class="btn btn-fp btn-sm" id="ir-fp-submit" onclick="window.irSubmitFP()">Submit False Positive</button>
       </div>
     </div>
   </div>
@@ -1538,26 +1654,14 @@ const SocDash = {
         </div>
         <div class="alert-actions-bar">
           <span style="font-size:11.5px;color:var(--dim)">Alert ID: ${a.id}</span>
-          <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('alert-detail-overlay').remove()">Close</button>
             <button class="btn btn-warn btn-sm" onclick="SocDash.openEscalate('${a.id}')">
               <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='18 15 12 9 6 15'/></svg>
               Escalate
             </button>
-            <button class="btn btn-sm" style="background:#92400E;color:#FDE68A;border:1px solid #B45309" onclick="window.irMarkFalsePositive('${a.id}', this)">False Positive</button>
-            <button class="btn btn-sm" style="background:#14532D;color:#86EFAC;border:1px solid #16A34A" onclick="window.irMarkResolved('${a.id}', this)">Mark Resolved</button>
-            <div style="position:relative">
-              <button class="btn btn-outline btn-sm" style="border-color:#1E2128" onclick="window.irToggleWorkflow(this)">IR Workflow ▾</button>
-              <div class="ir-workflow-panel" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:#13151A;border:1px solid #1E2128;border-radius:6px;padding:10px 12px;min-width:210px;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,0.5)">
-                <div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;font-weight:600">IR Stage</div>
-                <div style="display:flex;flex-direction:column;gap:6px">
-                  <button class="btn btn-sm" style="background:#1E3A5F;color:#93C5FD;border:1px solid #1D4ED8;text-align:left;justify-content:flex-start" onclick="window.irSetStage('${a.id}','containment',this)">🔒 Containment</button>
-                  <button class="btn btn-sm" style="background:#3B1F63;color:#C4B5FD;border:1px solid #7C3AED;text-align:left;justify-content:flex-start" onclick="window.irSetStage('${a.id}','eradication',this)">🧹 Eradication</button>
-                  <button class="btn btn-sm" style="background:#14532D;color:#86EFAC;border:1px solid #16A34A;text-align:left;justify-content:flex-start" onclick="window.irSetStage('${a.id}','recovery',this)">♻ Recovery</button>
-                  <button class="btn btn-sm" style="background:#1C1917;color:#D6D3D1;border:1px solid #44403C;text-align:left;justify-content:flex-start" onclick="window.irSetStage('${a.id}','rca',this)">📋 RCA</button>
-                </div>
-              </div>
-            </div>
+            <button class="btn btn-fp btn-sm" onclick="window.irOpenFP('${a.id}')">False Positive</button>
+            <button class="btn btn-resolve btn-sm" onclick="window.irOpenResolve('${a.id}')">Mark as Resolved</button>
           </div>
         </div>
       </div>`;
@@ -1608,76 +1712,145 @@ window.SocDash = SocDash;
 document.addEventListener('DOMContentLoaded', App.init);
 
 // ── IR WORKFLOW FUNCTIONS ───────────────────────────────
-window.irToggleWorkflow = function(triggerBtn) {
-  const panel = triggerBtn.nextElementSibling;
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  // Close all other open panels first
-  document.querySelectorAll('.ir-workflow-panel').forEach(p => { p.style.display = 'none'; });
-  if (!isOpen) {
-    panel.style.display = 'block';
-    // Close panel when clicking outside
-    const handler = function(e) {
-      if (!panel.contains(e.target) && e.target !== triggerBtn) {
-        panel.style.display = 'none';
-        document.removeEventListener('click', handler, true);
-      }
-    };
-    setTimeout(() => document.addEventListener('click', handler, true), 0);
+let _irAlertId = null;
+let _irStep = 0;
+const IR_STEPS = 5;
+
+window.irOpenResolve = function(alertId) {
+  _irAlertId = alertId;
+  _irStep = 0;
+  // Clear all answers
+  for (let i = 0; i < IR_STEPS; i++) {
+    const el = document.getElementById('ir-ans-' + i);
+    if (el) { el.value = ''; el.classList.remove('error'); }
   }
+  window.irRenderStep();
+  document.getElementById('ir-resolve-modal').style.display = 'flex';
+};
+
+window.irCloseResolve = function() {
+  document.getElementById('ir-resolve-modal').style.display = 'none';
+  _irAlertId = null;
+};
+
+window.irRenderStep = function() {
+  for (let i = 0; i < IR_STEPS; i++) {
+    const stepEl = document.getElementById('ir-step-' + i);
+    if (stepEl) stepEl.classList.toggle('active', i === _irStep);
+    const progEl = document.getElementById('irp-' + i);
+    if (progEl) {
+      progEl.classList.remove('done', 'active');
+      if (i < _irStep) progEl.classList.add('done');
+      else if (i === _irStep) progEl.classList.add('active');
+    }
+  }
+  const counter = document.getElementById('ir-step-counter');
+  if (counter) counter.textContent = 'Step ' + (_irStep + 1) + ' of ' + IR_STEPS;
+  const backBtn = document.getElementById('ir-btn-back');
+  const nextBtn = document.getElementById('ir-btn-next');
+  const submitBtn = document.getElementById('ir-btn-submit');
+  if (backBtn) backBtn.style.display = _irStep > 0 ? '' : 'none';
+  if (nextBtn) nextBtn.style.display = _irStep < IR_STEPS - 1 ? '' : 'none';
+  if (submitBtn) submitBtn.style.display = _irStep === IR_STEPS - 1 ? '' : 'none';
+};
+
+window.irStepNext = function() {
+  const textarea = document.getElementById('ir-ans-' + _irStep);
+  if (!textarea || !textarea.value.trim()) {
+    if (textarea) textarea.classList.add('error');
+    toast('Please fill in this field before continuing.', 'error');
+    return;
+  }
+  if (textarea) textarea.classList.remove('error');
+  if (_irStep < IR_STEPS - 1) { _irStep++; window.irRenderStep(); }
+};
+
+window.irStepBack = function() {
+  if (_irStep > 0) { _irStep--; window.irRenderStep(); }
+};
+
+window.irSubmitResolve = async function() {
+  // Validate all steps filled
+  for (let i = 0; i < IR_STEPS; i++) {
+    const el = document.getElementById('ir-ans-' + i);
+    if (!el || !el.value.trim()) {
+      el.classList.add('error');
+      _irStep = i;
+      window.irRenderStep();
+      toast('Please fill in step ' + (i + 1) + ' before submitting.', 'error');
+      return;
+    }
+  }
+  const submitBtn = document.getElementById('ir-btn-submit');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; }
+  try {
+    const payload = {
+      status: 'closed',
+      triage_reason:     document.getElementById('ir-ans-0').value.trim(),
+      containment_steps: document.getElementById('ir-ans-1').value.trim(),
+      eradication_steps: document.getElementById('ir-ans-2').value.trim(),
+      recovery_steps:    document.getElementById('ir-ans-3').value.trim(),
+      rca_notes:         document.getElementById('ir-ans-4').value.trim()
+    };
+    const res = await API.post(`/api/alerts/${_irAlertId}/status`, payload);
+    if (res.ok) {
+      const pts = res.data.points_awarded || 0;
+      window.irCloseResolve();
+      document.getElementById('alert-detail-overlay')?.remove();
+      toast(pts > 0 ? `Alert closed. +${pts} points awarded.` : 'Alert closed. Classification was incorrect — 0 points.', pts > 0 ? 'success' : 'warn');
+      SocDash.load();
+      App.loadMe();
+    } else {
+      toast((res.data && res.data.error) || 'Failed to close alert', 'error');
+    }
+  } catch(e) { toast('Network error', 'error'); }
+  finally { if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit & Close'; } }
+};
+
+window.irOpenFP = function(alertId) {
+  _irAlertId = alertId;
+  const ta = document.getElementById('ir-fp-reason');
+  if (ta) { ta.value = ''; ta.classList.remove('error'); }
+  document.getElementById('ir-fp-modal').style.display = 'flex';
+};
+
+window.irCloseFP = function() {
+  document.getElementById('ir-fp-modal').style.display = 'none';
+  _irAlertId = null;
+};
+
+window.irSubmitFP = async function() {
+  const reason = document.getElementById('ir-fp-reason').value.trim();
+  if (!reason) {
+    document.getElementById('ir-fp-reason').classList.add('error');
+    toast('Please provide a justification before submitting.', 'error');
+    return;
+  }
+  document.getElementById('ir-fp-reason').classList.remove('error');
+  const btn = document.getElementById('ir-fp-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  try {
+    const res = await API.post(`/api/alerts/${_irAlertId}/status`, {
+      status: 'false_positive',
+      fp_reason: reason
+    });
+    if (res.ok) {
+      const pts = res.data.points_awarded || 0;
+      window.irCloseFP();
+      document.getElementById('alert-detail-overlay')?.remove();
+      toast(pts > 0 ? `Marked as False Positive. +${pts} points.` : 'Marked as False Positive. Classification was incorrect — 0 points.', pts > 0 ? 'success' : 'warn');
+      SocDash.load();
+      App.loadMe();
+    } else {
+      toast((res.data && res.data.error) || 'Failed to submit', 'error');
+    }
+  } catch(e) { toast('Network error', 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Submit False Positive'; } }
 };
 
 window.irUpdateStatusBadge = function(newStatus) {
   const badge = document.getElementById('alert-detail-status-badge');
   if (badge) badge.textContent = newStatus;
-};
-
-window.irMarkFalsePositive = async function(alertId, btn) {
-  if (btn) { btn.disabled = true; btn.textContent = '…'; }
-  try {
-    const res = await API.post(`/api/alerts/${alertId}/status`, { status: 'false_positive' });
-    if (res.ok) {
-      toast(`Alert ${alertId} marked as false positive`, 'success');
-      window.irUpdateStatusBadge('false_positive');
-      SocDash.load();
-    } else {
-      toast((res.data && res.data.error) || 'Failed to update status', 'error');
-    }
-  } catch(e) { toast('Network error', 'error'); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'False Positive'; } }
-};
-
-window.irMarkResolved = async function(alertId, btn) {
-  if (btn) { btn.disabled = true; btn.textContent = '…'; }
-  try {
-    const res = await API.post(`/api/alerts/${alertId}/status`, { status: 'closed' });
-    if (res.ok) {
-      toast(`Alert ${alertId} marked as resolved`, 'success');
-      window.irUpdateStatusBadge('closed');
-      SocDash.load();
-    } else {
-      toast((res.data && res.data.error) || 'Failed to update status', 'error');
-    }
-  } catch(e) { toast('Network error', 'error'); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Mark Resolved'; } }
-};
-
-window.irSetStage = async function(alertId, stage, btn) {
-  if (btn) { btn.disabled = true; }
-  try {
-    const res = await API.post(`/api/alerts/${alertId}/incident`, { stage });
-    if (res.ok) {
-      toast(`IR stage set to ${stage} for alert ${alertId}`, 'success');
-      window.irUpdateStatusBadge(stage);
-      // Close the workflow panel
-      const panel = btn.closest('.ir-workflow-panel');
-      if (panel) panel.style.display = 'none';
-      SocDash.load();
-    } else {
-      toast((res.data && res.data.error) || `Failed to set stage: ${stage}`, 'error');
-    }
-  } catch(e) { toast('Network error', 'error'); }
-  finally { if (btn) { btn.disabled = false; } }
 };
 </script>
 </body>

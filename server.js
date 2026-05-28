@@ -708,18 +708,82 @@ async function router(req, res) {
   }
 
   // ── POST /api/alerts/:id/status ─────────────────────
-  // Body: { status: 'investigating' | 'false_positive' | 'closed' | 'open' }
+  // Body: { status, triage_reason?, containment_steps?, eradication_steps?,
+  //         recovery_steps?, rca_notes?, fp_reason? }
   const statusMatch = url.match(/^\/api\/alerts\/([A-Z0-9-]+)\/status$/);
   if (method === 'POST' && statusMatch) {
     const user = requireAuth(req, res); if (!user) return;
     const alertId = statusMatch[1];
-    const { status, reason } = await parseBody(req);
+    const body = await parseBody(req);
+    const { status, triage_reason, containment_steps, eradication_steps,
+            recovery_steps, rca_notes, fp_reason } = body;
+
     const allowed = ['open', 'investigating', 'false_positive', 'closed'];
     if (!allowed.includes(status)) return jsonRes(res, 400, { error: 'Invalid status' });
-    const alert = db.prepare('SELECT id FROM soc_alerts WHERE id=?').get(alertId);
+
+    const alert = db.prepare('SELECT id, category, severity FROM soc_alerts WHERE id=?').get(alertId);
     if (!alert) return jsonRes(res, 404, { error: 'Alert not found' });
+
+    // Ensure alert_closures table exists (idempotent migration)
+    db.prepare(`CREATE TABLE IF NOT EXISTS alert_closures (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      alert_id TEXT NOT NULL, user_id INTEGER NOT NULL,
+      classification TEXT NOT NULL,
+      triage_reason TEXT, containment_steps TEXT, eradication_steps TEXT,
+      recovery_steps TEXT, rca_notes TEXT, fp_reason TEXT,
+      is_correct INTEGER DEFAULT 0, points_awarded INTEGER DEFAULT 0,
+      closed_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
+    )`).run();
+
+    let points_awarded = 0;
+    let is_correct = 0;
+
+    if (status === 'closed' || status === 'false_positive') {
+      // Validate: require justification for both paths
+      if (status === 'false_positive' && !fp_reason) {
+        return jsonRes(res, 400, { error: 'Justification required to close as false positive' });
+      }
+      if (status === 'closed' && (!triage_reason || !containment_steps || !eradication_steps || !recovery_steps || !rca_notes)) {
+        return jsonRes(res, 400, { error: 'All IR steps are required to close as resolved' });
+      }
+
+      // Ground truth: alerts with category containing 'Test' or title containing
+      // 'false positive' or '[BENIGN]' are FP; everything else is TP.
+      // Simple heuristic — in a real system this would be a db field.
+      const title = String(db.prepare('SELECT title FROM soc_alerts WHERE id=?').get(alertId)?.title || '');
+      const isTruePositive = !title.toLowerCase().includes('[benign]') &&
+                             !title.toLowerCase().includes('false positive') &&
+                             !alert.category?.toLowerCase().includes('test');
+
+      if (status === 'closed' && isTruePositive) {
+        is_correct = 1; points_awarded = 5;
+      } else if (status === 'false_positive' && !isTruePositive) {
+        is_correct = 1; points_awarded = 3;
+      }
+      // wrong classification = 0 points (no negatives)
+
+      // Record closure
+      db.prepare(`INSERT INTO alert_closures
+        (alert_id, user_id, classification, triage_reason, containment_steps,
+         eradication_steps, recovery_steps, rca_notes, fp_reason, is_correct, points_awarded)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+      ).run(alertId, user.id, status,
+        triage_reason || null, containment_steps || null,
+        eradication_steps || null, recovery_steps || null,
+        rca_notes || null, fp_reason || null,
+        is_correct, points_awarded);
+
+      // Award points to user if correct
+      if (points_awarded > 0) {
+        db.prepare('UPDATE users SET points = COALESCE(points,0) + ? WHERE id=?')
+          .run(points_awarded, user.id);
+      }
+    }
+
     db.prepare('UPDATE soc_alerts SET status=? WHERE id=?').run(status, alertId);
-    return jsonRes(res, 200, { ok: true, alertId, status, reason: reason || null });
+    return jsonRes(res, 200, { ok: true, alertId, status, is_correct, points_awarded });
   }
 
   // ── GET /api/alerts/:id/incident ─────────────────────
@@ -825,6 +889,70 @@ async function router(req, res) {
        ORDER BY e.created_at ASC`
     ).all(alertId);
     return jsonRes(res, 200, rows);
+  }
+
+  // ── GET /api/admin/analysts/:id/activity ──────────────────
+  const analystActivityMatch = url.match(/^\/api\/admin\/analysts\/(\d+)\/activity$/);
+  if (method === 'GET' && analystActivityMatch) {
+    const admin = requireAuth(req, res); if (!admin) return;
+    if (admin.role !== 'admin') return jsonRes(res, 403, { error: 'Forbidden' });
+    const userId = parseInt(analystActivityMatch[1]);
+
+    // Ensure table exists
+    db.prepare(`CREATE TABLE IF NOT EXISTS alert_closures (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      alert_id TEXT NOT NULL, user_id INTEGER NOT NULL,
+      classification TEXT NOT NULL,
+      triage_reason TEXT, containment_steps TEXT, eradication_steps TEXT,
+      recovery_steps TEXT, rca_notes TEXT, fp_reason TEXT,
+      is_correct INTEGER DEFAULT 0, points_awarded INTEGER DEFAULT 0,
+      closed_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
+    )`).run();
+
+    const closures = db.prepare(`
+      SELECT ac.*, sa.title as alert_title, sa.severity, sa.category
+      FROM alert_closures ac
+      LEFT JOIN soc_alerts sa ON sa.id = ac.alert_id
+      WHERE ac.user_id = ?
+      ORDER BY ac.closed_at DESC
+      LIMIT 50
+    `).all(userId);
+
+    const total = closures.length;
+    const correct = closures.filter(c => c.is_correct).length;
+    const fps = closures.filter(c => c.classification === 'false_positive');
+    const tps = closures.filter(c => c.classification === 'closed');
+    const fp_correct = fps.filter(c => c.is_correct).length;
+    const fp_accuracy = fps.length > 0 ? Math.round((fp_correct / fps.length) * 100) + '%' : 'N/A';
+    const triage_score = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const total_points = closures.reduce((s, c) => s + (c.points_awarded || 0), 0);
+
+    const records = closures.map(c => ({
+      alert_id: c.alert_id,
+      alert_title: c.alert_title,
+      severity: c.severity,
+      classification: c.classification,
+      is_correct: !!c.is_correct,
+      points: c.points_awarded,
+      fp_reason: c.fp_reason,
+      triage_reason: c.triage_reason,
+      containment_steps: c.containment_steps,
+      eradication_steps: c.eradication_steps,
+      recovery_steps: c.recovery_steps,
+      rca_notes: c.rca_notes,
+      closed_at: c.closed_at
+    }));
+
+    return jsonRes(res, 200, {
+      alerts_triaged: total,
+      correct_closes: correct,
+      fp_accuracy,
+      triage_score,
+      total_points,
+      records
+    });
   }
 
   // 404 fallback
