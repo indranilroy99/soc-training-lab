@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role         TEXT NOT NULL DEFAULT 'analyst',
   is_active    INTEGER NOT NULL DEFAULT 1,
+  points       INTEGER DEFAULT 0,
   created_at   TEXT DEFAULT (datetime('now'))
 );
 

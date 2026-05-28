@@ -26,9 +26,26 @@ db.pragma('foreign_keys = ON');
 try {
   db.prepare(`ALTER TABLE labs ADD COLUMN is_visible INTEGER DEFAULT 1`).run();
   console.log('[migrate] Added labs.is_visible column');
-} catch(e) {
-  // Column already exists — ignore
-}
+} catch(e) { /* already exists */ }
+
+try {
+  db.prepare(`ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0`).run();
+  console.log('[migrate] Added users.points column');
+} catch(e) { /* already exists */ }
+
+try {
+  db.prepare(`CREATE TABLE IF NOT EXISTS alert_closures (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alert_id TEXT NOT NULL, user_id INTEGER NOT NULL,
+    classification TEXT NOT NULL,
+    triage_reason TEXT, containment_steps TEXT, eradication_steps TEXT,
+    recovery_steps TEXT, rca_notes TEXT, fp_reason TEXT,
+    is_correct INTEGER DEFAULT 0, points_awarded INTEGER DEFAULT 0,
+    closed_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
+  )`).run();
+} catch(e) { /* already exists */ }
 
 // ── MIME types ────────────────────────────────────────────
 const MIME = {
@@ -724,19 +741,6 @@ async function router(req, res) {
     const alert = db.prepare('SELECT id, category, severity FROM soc_alerts WHERE id=?').get(alertId);
     if (!alert) return jsonRes(res, 404, { error: 'Alert not found' });
 
-    // Ensure alert_closures table exists (idempotent migration)
-    db.prepare(`CREATE TABLE IF NOT EXISTS alert_closures (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      alert_id TEXT NOT NULL, user_id INTEGER NOT NULL,
-      classification TEXT NOT NULL,
-      triage_reason TEXT, containment_steps TEXT, eradication_steps TEXT,
-      recovery_steps TEXT, rca_notes TEXT, fp_reason TEXT,
-      is_correct INTEGER DEFAULT 0, points_awarded INTEGER DEFAULT 0,
-      closed_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
-    )`).run();
-
     let points_awarded = 0;
     let is_correct = 0;
 
@@ -953,6 +957,30 @@ async function router(req, res) {
       total_points,
       records
     });
+  }
+
+  // ── GET /api/me/closures ──────────────────────────────────
+  if (method === 'GET' && url === '/api/me/closures') {
+    const user = requireAuth(req, res); if (!user) return;
+    const closures = db.prepare(`
+      SELECT ac.*, sa.title as alert_title, sa.severity
+      FROM alert_closures ac
+      LEFT JOIN soc_alerts sa ON sa.id = ac.alert_id
+      WHERE ac.user_id = ?
+      ORDER BY ac.closed_at DESC
+      LIMIT 50
+    `).all(user.id);
+    const records = closures.map(c => ({
+      alert_id:          c.alert_id,
+      alert_title:       c.alert_title,
+      classification:    c.classification,
+      is_correct:        !!c.is_correct,
+      points:            c.points_awarded,
+      triage_reason:     c.triage_reason,
+      fp_reason:         c.fp_reason,
+      closed_at:         c.closed_at
+    }));
+    return jsonRes(res, 200, { records });
   }
 
   // 404 fallback

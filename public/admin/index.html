@@ -492,6 +492,36 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
         </div>
       </div>
 
+      <!-- ANALYST PROFILE PAGE -->
+      <div class="page" id="page-analyst-profile">
+        <div class="page-hdr" style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-outline btn-sm" onclick="Pages.showPage('users')" style="padding:4px 10px">&larr; Back</button>
+          <div>
+            <h1 class="page-title" id="ap-name">Analyst Profile</h1>
+            <p class="page-sub" id="ap-meta">Loading&hellip;</p>
+          </div>
+        </div>
+
+        <!-- 4-stat summary row -->
+        <div class="stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="stat-card"><div class="stat-sub">ALERTS TRIAGED</div><div class="stat-val" id="ap-total">&ndash;</div></div>
+          <div class="stat-card"><div class="stat-sub">CORRECT CLOSES</div><div class="stat-val" id="ap-correct">&ndash;</div></div>
+          <div class="stat-card"><div class="stat-sub">TRIAGE ACCURACY</div><div class="stat-val" id="ap-accuracy">&ndash;</div></div>
+          <div class="stat-card"><div class="stat-sub">TOTAL POINTS</div><div class="stat-val" id="ap-points">&ndash;</div></div>
+        </div>
+
+        <!-- Alert activity table -->
+        <div class="card">
+          <div class="card-hdr">
+            <span class="card-title">Alert Investigations</span>
+            <span class="card-meta" id="ap-count">0 records</span>
+          </div>
+          <div id="ap-alert-list" style="padding:0">
+            <div style="padding:40px;text-align:center;color:var(--dim);font-size:13px">Loading&hellip;</div>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /#content -->
   </div><!-- /#main -->
 </div><!-- /#app -->
@@ -727,53 +757,7 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
   </div>
 </div>
 
-<!-- ANALYST PROFILE MODAL -->
-<div class="modal-overlay" id="modal-analyst-profile">
-  <div class="modal modal-wide" style="max-height:90vh;display:flex;flex-direction:column">
-    <div class="modal-header">
-      <span class="modal-title" id="ap-modal-title">Analyst Profile</span>
-      <button class="modal-close" onclick="Modals.close('modal-analyst-profile')">✕</button>
-    </div>
-    <div class="modal-body" style="overflow-y:auto;flex:1">
-      <!-- Identity row -->
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
-        <div style="width:48px;height:48px;border-radius:var(--radius);background:var(--blue);color:#fff;font-size:18px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0" id="ap-avatar">–</div>
-        <div>
-          <div style="font-size:16px;font-weight:600;margin-bottom:3px" id="ap-username">–</div>
-          <div style="font-size:12px;color:var(--dim)" id="ap-meta">–</div>
-        </div>
-      </div>
-      <!-- Performance section -->
-      <div class="profile-perf">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px">
-          <div class="stat-card">
-            <div class="stat-sub">ALERTS TRIAGED</div>
-            <div class="stat-val" id="pp-alerts">–</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-sub">CORRECT CLOSES</div>
-            <div class="stat-val" id="pp-correct">–</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-sub">FP ACCURACY</div>
-            <div class="stat-val" id="pp-fp-acc">–</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-sub">TRIAGE SCORE</div>
-            <div class="stat-val" id="pp-score">–</div>
-          </div>
-        </div>
-        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">Recent Alert Activity</div>
-        <div id="pp-alert-list" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto">
-          <div style="color:var(--dim);font-size:13px;padding:20px 0;text-align:center">Loading…</div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="Modals.close('modal-analyst-profile')">Close</button>
-    </div>
-  </div>
-</div>
+
 
 <div id="toasts"></div>
 
@@ -859,7 +843,7 @@ const App = {
     const navEl  = document.querySelector(`.nav-item[data-page="${page}"]`);
     if (pageEl) pageEl.classList.add('active');
     if (navEl)  navEl.classList.add('active');
-    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', leaderboard:'Leaderboard', labs:'Labs & Questions' };
+    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', leaderboard:'Leaderboard', labs:'Labs & Questions', 'analyst-profile':'Analyst Profile' };
     document.getElementById('bc-cur').textContent = labels[page] || page;
     if (page === 'overview')    Pages.loadOverview();
     if (page === 'users')       Pages.loadUsers();
@@ -886,6 +870,8 @@ const App = {
 const Pages = {
   _usersRaw: [],
   _filterQ: '',
+
+  showPage(name) { App.navigate(name); },
 
   async loadOverview() {
     try {
@@ -967,7 +953,7 @@ const Pages = {
           ? new Date(u.last_session).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
           : 'Never';
         return `<tr>
-          <td class="td-main">${u.username}</td>
+          <td class="td-main"><span style="cursor:pointer;color:var(--blue)" onclick="Pages.viewProfile(${u.id}, '${u.username}', '${u.role}')">${u.username}</span></td>
           <td><span class="chip ${u.role==='admin'?'chip-orange':'chip-blue'}">${u.role}</span></td>
           <td><span class="chip ${u.active?'chip-blue':'chip-red'}">${u.active?'Active':'Disabled'}</span></td>
           <td class="td-mono" style="color:var(--blue)">${u.score}</td>
@@ -1103,56 +1089,71 @@ const Pages = {
   },
 
   async viewProfile(userId, username, role) {
-    // Reset modal state
-    document.getElementById('ap-modal-title').textContent = username + ' — Profile';
-    document.getElementById('ap-avatar').textContent = username.slice(0,2).toUpperCase();
-    document.getElementById('ap-username').textContent = username;
-    document.getElementById('ap-meta').textContent = role + ' · Loading…';
-    document.getElementById('pp-alerts').textContent = '–';
-    document.getElementById('pp-correct').textContent = '–';
-    document.getElementById('pp-fp-acc').textContent = '–';
-    document.getElementById('pp-score').textContent = '–';
-    document.getElementById('pp-alert-list').innerHTML = '<div style="color:var(--dim);font-size:13px;padding:20px 0;text-align:center">Loading…</div>';
-    Modals.open('modal-analyst-profile');
+    // Update header
+    const nameEl = document.getElementById('ap-name');
+    const metaEl = document.getElementById('ap-meta');
+    if (nameEl) nameEl.textContent = username;
+    if (metaEl) metaEl.textContent = role + ' • ID ' + userId;
 
-    // Fetch analyst activity
+    // Reset stats
+    ['ap-total','ap-correct','ap-accuracy','ap-points'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.textContent = '–';
+    });
+    const listEl = document.getElementById('ap-alert-list');
+    if (listEl) listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--dim);font-size:13px">Loading…</div>';
+
+    // Navigate to the profile page
+    Pages.showPage('analyst-profile');
+
     try {
-      const r = await fetch(`/api/admin/analysts/${userId}/activity`, { headers: API.headers() });
-      if (r.status === 401) { App.logout(); return; }
-      if (!r.ok) {
-        document.getElementById('ap-meta').textContent = role;
-        document.getElementById('pp-alert-list').innerHTML = '<div style="color:var(--dim);font-size:13px;padding:20px 0;text-align:center">No activity data available.</div>';
-        return;
-      }
-      const data = await r.json();
+      const data = await API.get('/api/admin/analysts/' + userId + '/activity');
+
       // Populate summary stats
-      document.getElementById('ap-meta').textContent = role;
-      document.getElementById('pp-alerts').textContent  = data.alerts_triaged  != null ? data.alerts_triaged  : '–';
-      document.getElementById('pp-correct').textContent = data.correct_closes  != null ? data.correct_closes  : '–';
-      document.getElementById('pp-fp-acc').textContent  = data.fp_accuracy     != null ? data.fp_accuracy + '%' : '–';
-      document.getElementById('pp-score').textContent   = data.triage_score    != null ? data.triage_score    : '–';
-      // Render alert list
-      const records = Array.isArray(data.records) ? data.records : [];
-      if (records.length === 0) {
-        document.getElementById('pp-alert-list').innerHTML = '<div style="color:var(--dim);font-size:13px;padding:20px 0;text-align:center">No alert activity recorded yet.</div>';
+      const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+      setEl('ap-total',    data.alerts_triaged   ?? '–');
+      setEl('ap-correct',  data.correct_closes   ?? '–');
+      const acc = data.alerts_triaged > 0
+        ? Math.round((data.correct_closes / data.alerts_triaged) * 100) + '%'
+        : '–';
+      setEl('ap-accuracy', acc);
+      setEl('ap-points',   data.total_points     ?? '–');
+      const countEl = document.getElementById('ap-count');
+      if (countEl) countEl.textContent = (data.records?.length || 0) + ' records';
+
+      // Render per-alert table
+      if (!listEl) return;
+      if (!data.records || data.records.length === 0) {
+        listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--dim);font-size:13px">No closed alerts yet.</div>';
         return;
       }
-      document.getElementById('pp-alert-list').innerHTML = records.map(record => `
-        <div style="background:var(--card2);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-size:12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-            <span style="font-family:var(--mono);color:var(--blue)">${record.alert_id}</span>
-            <span style="color:${record.correct ? 'var(--green)' : 'var(--red)'};font-weight:600">${record.correct ? '+' + record.points + ' pts' : '0 pts'}</span>
+
+      listEl.innerHTML = data.records.map((c, i) => `
+        <div style="border-bottom:1px solid var(--border);padding:14px 20px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px">
+            <div>
+              <span style="font-family:var(--mono);font-size:12px;color:var(--blue);margin-right:10px">${c.alert_id}</span>
+              <span style="font-size:12px;color:var(--muted)">${c.alert_title || ''}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              <span style="font-size:11px;padding:2px 7px;border-radius:3px;font-weight:600;background:${c.classification === 'false_positive' ? 'rgba(249,115,22,0.1)' : 'rgba(59,130,246,0.1)'};color:${c.classification === 'false_positive' ? 'var(--orange)' : 'var(--blue)'}">${c.classification === 'false_positive' ? 'False Positive' : 'Resolved'}</span>
+              <span style="font-size:11px;font-weight:700;color:${c.is_correct ? 'var(--green)' : 'var(--red)'}">${c.is_correct ? '+' + c.points + ' pts' : '0 pts'}</span>
+            </div>
           </div>
-          <div style="color:var(--muted)">${record.classification} — ${record.closed_at ? new Date(record.closed_at).toLocaleDateString() : 'In progress'}</div>
-          ${record.fp_reason ? '<div style="color:var(--dim);margin-top:4px">FP reason: ' + record.fp_reason + '</div>' : ''}
-          ${record.triage_reason ? '<div style="color:var(--dim);margin-top:4px">Triage: ' + record.triage_reason.substring(0,120) + (record.triage_reason.length > 120 ? '…' : '') + '</div>' : ''}
-        </div>`).join('');
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+            ${c.triage_reason ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 10px"><div style="color:var(--dim);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Initial Triage</div><div style="color:var(--muted)">${c.triage_reason}</div></div>` : ''}
+            ${c.containment_steps ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 10px"><div style="color:var(--dim);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Containment</div><div style="color:var(--muted)">${c.containment_steps}</div></div>` : ''}
+            ${c.eradication_steps ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 10px"><div style="color:var(--dim);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Eradication</div><div style="color:var(--muted)">${c.eradication_steps}</div></div>` : ''}
+            ${c.recovery_steps ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 10px"><div style="color:var(--dim);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Recovery</div><div style="color:var(--muted)">${c.recovery_steps}</div></div>` : ''}
+            ${c.rca_notes ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 10px;grid-column:1/-1"><div style="color:var(--dim);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Root Cause Analysis</div><div style="color:var(--muted)">${c.rca_notes}</div></div>` : ''}
+            ${c.fp_reason ? `<div style="background:rgba(249,115,22,0.05);border:1px solid rgba(249,115,22,0.2);border-radius:4px;padding:8px 10px;grid-column:1/-1"><div style="color:var(--orange);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">False Positive Justification</div><div style="color:var(--muted)">${c.fp_reason}</div></div>` : ''}
+          </div>
+          <div style="margin-top:6px;font-size:11px;color:var(--dim)">${c.closed_at ? new Date(c.closed_at).toLocaleString() : ''}</div>
+        </div>
+      `).join('');
     } catch(e) {
-      console.error('viewProfile error:', e);
-      document.getElementById('ap-meta').textContent = role;
-      document.getElementById('pp-alert-list').innerHTML = '<div style="color:var(--dim);font-size:13px;padding:20px 0;text-align:center">Failed to load activity.</div>';
+      if (listEl) listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--red);font-size:13px">Failed to load activity.</div>';
     }
-  }
+  },
 };
 
 // ── LAB MODALS ──────────────────────────────────────────
