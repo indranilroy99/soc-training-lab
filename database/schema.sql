@@ -171,3 +171,13 @@ CREATE TABLE IF NOT EXISTS alert_closures (
 );
 CREATE INDEX IF NOT EXISTS idx_closures_user  ON alert_closures(user_id);
 CREATE INDEX IF NOT EXISTS idx_closures_alert ON alert_closures(alert_id);
+
+-- ── Alert Rubrics (per-alert, per-step scoring rubrics) ──────────
+CREATE TABLE IF NOT EXISTS alert_rubrics (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  alert_id    TEXT NOT NULL UNIQUE,
+  rubric_json TEXT NOT NULL,           -- full rubric as JSON
+  created_at  TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_rubrics_alert ON alert_rubrics(alert_id);

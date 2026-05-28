@@ -152,6 +152,11 @@ input, textarea, select { font-family: var(--font); }
 .ir-progress-step.active { background: var(--blue); opacity: 0.5; }
 .ir-modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 8px; }
 .ir-step-counter { font-size: 11.5px; color: var(--dim); }
+.ir-word-count { font-size: 11px; color: var(--dim); margin-top: 4px; text-align: right; }
+.ir-word-count.ok { color: var(--green); }
+.ir-score-feedback { background: var(--input-bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; margin-top: 10px; font-size: 12px; }
+.ir-score-bar { height: 4px; border-radius: 2px; background: var(--border); margin: 6px 0; overflow: hidden; }
+.ir-score-bar-fill { height: 100%; border-radius: 2px; background: var(--blue); transition: width 0.4s; }
 .ir-point-badge { font-size: 11px; color: var(--green); background: var(--green-dim); border: 1px solid var(--green); border-radius: 3px; padding: 2px 7px; }
 .btn-sm { padding: 5px 10px; font-size: 11.5px; }
 .btn-xs { padding: 3px 8px; font-size: 10.5px; }
@@ -813,35 +818,40 @@ input, textarea, select { font-family: var(--font); }
         <div class="ir-step-label">Step 1 of 5 — Initial Triage</div>
         <div class="ir-step-title">Why is this a True Positive?</div>
         <div class="ir-step-desc">Explain what evidence in the alert confirms this is a real incident. Be specific — reference fields from the raw log.</div>
-        <textarea class="ir-textarea" id="ir-ans-0" placeholder="e.g. The ParentImage field shows svch0st.exe spawning vssadmin — not a legitimate parent process. Combined with the target (shadow copies), this confirms ransomware pre-encryption activity."></textarea>
+        <textarea class="ir-textarea" id="ir-ans-0" placeholder="e.g. The ParentImage field shows svch0st.exe spawning vssadmin — not a legitimate parent process. Combined with the target (shadow copies), this confirms ransomware pre-encryption activity." oninput="window.irUpdateWordCount(0)"></textarea>
+        <div class="ir-word-count" id="ir-wc-0"><span id="ir-wc-num-0">0</span> / 15 words min <span id="ir-wc-ok-0" style="display:none;color:var(--green)">✓</span></div>
       </div>
       <!-- Step 1: Containment -->
       <div class="ir-step" id="ir-step-1">
         <div class="ir-step-label">Step 2 of 5 — Containment</div>
         <div class="ir-step-title">What containment steps did you take?</div>
         <div class="ir-step-desc">Describe the immediate actions to stop the threat from spreading. What did you isolate, block, or disable?</div>
-        <textarea class="ir-textarea" id="ir-ans-1" placeholder="e.g. Isolated FILE-SERVER-01 from the network by disabling the switch port. Blocked outbound C2 IP 185.220.101.47 at the firewall. Disabled the corp-svc-backup2 IAM credentials."></textarea>
+        <textarea class="ir-textarea" id="ir-ans-1" placeholder="e.g. Isolated FILE-SERVER-01 from the network by disabling the switch port. Blocked outbound C2 IP 185.220.101.47 at the firewall. Disabled the corp-svc-backup2 IAM credentials." oninput="window.irUpdateWordCount(1)"></textarea>
+        <div class="ir-word-count" id="ir-wc-1"><span id="ir-wc-num-1">0</span> / 15 words min <span id="ir-wc-ok-1" style="display:none;color:var(--green)">✓</span></div>
       </div>
       <!-- Step 2: Eradication -->
       <div class="ir-step" id="ir-step-2">
         <div class="ir-step-label">Step 3 of 5 — Eradication</div>
         <div class="ir-step-title">What eradication steps did you take?</div>
         <div class="ir-step-desc">Describe how you removed the threat from all affected systems. Include binaries removed, persistence cleaned, credentials rotated.</div>
-        <textarea class="ir-textarea" id="ir-ans-2" placeholder="e.g. Removed C:\\Users\\Public\\svch0st.exe from FILE-SERVER-01. Deleted scheduled task 'WindowsUpdate_svc'. Rotated all local admin passwords. Scanned 3 other servers for the same binary hash."></textarea>
+        <textarea class="ir-textarea" id="ir-ans-2" placeholder="e.g. Removed C:\\Users\\Public\\svch0st.exe from FILE-SERVER-01. Deleted scheduled task 'WindowsUpdate_svc'. Rotated all local admin passwords. Scanned 3 other servers for the same binary hash." oninput="window.irUpdateWordCount(2)"></textarea>
+        <div class="ir-word-count" id="ir-wc-2"><span id="ir-wc-num-2">0</span> / 15 words min <span id="ir-wc-ok-2" style="display:none;color:var(--green)">✓</span></div>
       </div>
       <!-- Step 3: Recovery -->
       <div class="ir-step" id="ir-step-3">
         <div class="ir-step-label">Step 4 of 5 — Recovery</div>
         <div class="ir-step-title">What recovery steps did you take?</div>
         <div class="ir-step-desc">Describe how the affected system or data was restored. What was verified before returning to production?</div>
-        <textarea class="ir-textarea" id="ir-ans-3" placeholder="e.g. Restored 847 encrypted files from backup dated 2024-03-14 22:00Z. Verified backup integrity via hash check. Applied all pending Windows patches. Monitored for 24 hours before reconnecting to network."></textarea>
+        <textarea class="ir-textarea" id="ir-ans-3" placeholder="e.g. Restored 847 encrypted files from backup dated 2024-03-14 22:00Z. Verified backup integrity via hash check. Applied all pending Windows patches. Monitored for 24 hours before reconnecting to network." oninput="window.irUpdateWordCount(3)"></textarea>
+        <div class="ir-word-count" id="ir-wc-3"><span id="ir-wc-num-3">0</span> / 15 words min <span id="ir-wc-ok-3" style="display:none;color:var(--green)">✓</span></div>
       </div>
       <!-- Step 4: RCA -->
       <div class="ir-step" id="ir-step-4">
         <div class="ir-step-label">Step 5 of 5 — Root Cause Analysis</div>
         <div class="ir-step-title">What was the root cause and what failed?</div>
         <div class="ir-step-desc">Identify the initial access vector, what security controls failed, and what changes will prevent recurrence.</div>
-        <textarea class="ir-textarea" id="ir-ans-4" placeholder="e.g. Root cause: compromised service account credentials used to deploy ransomware binary via network share. Control failure: no EDR on FILE-SERVER-01, no alert on first vssadmin execution. Fix: deploy EDR, restrict service account to required permissions only, alert on shadow copy deletion."></textarea>
+        <textarea class="ir-textarea" id="ir-ans-4" placeholder="e.g. Root cause: compromised service account credentials used to deploy ransomware binary via network share. Control failure: no EDR on FILE-SERVER-01, no alert on first vssadmin execution. Fix: deploy EDR, restrict service account to required permissions only, alert on shadow copy deletion." oninput="window.irUpdateWordCount(4)"></textarea>
+        <div class="ir-word-count" id="ir-wc-4"><span id="ir-wc-num-4">0</span> / 15 words min <span id="ir-wc-ok-4" style="display:none;color:var(--green)">✓</span></div>
       </div>
     </div>
     <div class="ir-modal-footer">
@@ -1738,6 +1748,22 @@ window.irOpenResolve = function(alertId) {
   document.getElementById('ir-resolve-modal').style.display = 'flex';
 };
 
+window.irUpdateWordCount = function(stepIdx) {
+  const el = document.getElementById('ir-ans-' + stepIdx);
+  const numEl = document.getElementById('ir-wc-num-' + stepIdx);
+  const okEl = document.getElementById('ir-wc-ok-' + stepIdx);
+  const wcEl = document.getElementById('ir-wc-' + stepIdx);
+  if (!el || !numEl) return;
+  const words = el.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+  numEl.textContent = words;
+  if (okEl) okEl.style.display = words >= 15 ? 'inline' : 'none';
+  if (wcEl) {
+    wcEl.classList.toggle('ok', words >= 15);
+    wcEl.classList.toggle('error-text', words > 0 && words < 15);
+  }
+  el.classList.remove('error');
+};
+
 window.irCloseResolve = function() {
   document.getElementById('ir-resolve-modal').style.display = 'none';
   _irAlertId = null;
@@ -1765,6 +1791,18 @@ window.irRenderStep = function() {
 };
 
 window.irStepNext = function() {
+  // Enforce 15-word minimum on current step before advancing
+  const currentTextarea = document.getElementById('ir-ans-' + _irStep);
+  if (currentTextarea) {
+    const words = currentTextarea.value.trim().split(/\s+/).filter(w => w.length > 0).length;
+    if (words < 15) {
+      currentTextarea.classList.add('error');
+      document.getElementById('ir-wc-' + _irStep)?.classList.add('error-text');
+      toast('Please write at least 15 words before continuing.', 'error');
+      return;
+    }
+    currentTextarea.classList.remove('error');
+  }
   const textarea = document.getElementById('ir-ans-' + _irStep);
   if (!textarea || !textarea.value.trim()) {
     if (textarea) textarea.classList.add('error');
@@ -1804,10 +1842,31 @@ window.irSubmitResolve = async function() {
     };
     const res = await API.post(`/api/alerts/${_irAlertId}/status`, payload);
     if (res.ok) {
-      const pts = res.data.points_awarded || 0;
+      const pts   = res.data.points_awarded || 0;
+      const score = res.data.investigation_score || 0;
+      const feedback = res.data.scoring_feedback || [];
       window.irCloseResolve();
       document.getElementById('alert-detail-overlay')?.remove();
-      toast(pts > 0 ? `Alert closed. +${pts} points awarded.` : 'Alert closed. Classification was incorrect — 0 points.', pts > 0 ? 'success' : 'warn');
+      // Build rich toast message
+      let msg = pts > 0
+        ? `Closed. +${pts} pts | Investigation score: ${score}%`
+        : 'Closed. Classification incorrect — 0 points.';
+      toast(msg, pts > 0 ? 'success' : 'warn');
+      // Show score feedback panel if there is feedback
+      if (feedback.length > 0) {
+        const fb = document.createElement('div');
+        fb.className = 'ir-score-feedback';
+        fb.style.cssText = 'position:fixed;bottom:80px;right:20px;width:320px;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px 16px;font-size:12px';
+        fb.innerHTML = `
+          <div style="font-weight:600;color:var(--text);margin-bottom:8px">Investigation Score: ${score}%</div>
+          <div class="ir-score-bar"><div class="ir-score-bar-fill" style="width:${score}%"></div></div>
+          <div style="color:var(--muted);margin-top:8px;margin-bottom:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Feedback</div>
+          ${feedback.map(f => `<div style="color:var(--dim);margin-bottom:4px">• ${f}</div>`).join('')}
+          <button onclick="this.parentElement.remove()" style="margin-top:10px;font-size:11px;color:var(--dim);background:none;border:none;cursor:pointer;padding:0">Dismiss</button>
+        `;
+        document.body.appendChild(fb);
+        setTimeout(() => fb.remove(), 15000);
+      }
       SocDash.load();
       App.loadMe();
     } else {

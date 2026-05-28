@@ -22,6 +22,71 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+// ── Rubric Scoring Engine ─────────────────────────────────
+// Scores analyst IR answers against stored rubric concepts.
+// Returns { investigation_score: 0-100, step_scores: {...}, feedback: [...] }
+function scoreIRAnswers(alertId, answers) {
+  const rubricRow = db.prepare('SELECT rubric_json FROM alert_rubrics WHERE alert_id=?').get(alertId);
+  if (!rubricRow) {
+    // No rubric for this alert — use word count heuristic only
+    const totalWords = Object.values(answers).reduce((sum, v) => sum + (v || '').trim().split(/\s+/).length, 0);
+    const score = Math.min(100, Math.round((totalWords / 100) * 100)); // 100 words = 100%
+    return { investigation_score: score, step_scores: {}, feedback: ['No rubric available — scored on response depth.'], rubric_used: false };
+  }
+
+  const rubric = JSON.parse(rubricRow.rubric_json);
+  const stepNames = ['triage_reason','containment_steps','eradication_steps','recovery_steps','rca_notes'];
+  const stepScores = {};
+  const feedback = [];
+  let totalEarned = 0;
+  let totalPossible = 0;
+
+  // Check required keywords across ALL answers combined
+  const allText = Object.values(answers).join(' ').toLowerCase();
+  if (rubric.required_keywords && rubric.min_keywords_required) {
+    const found = rubric.required_keywords.filter(kw => allText.includes(kw.toLowerCase()));
+    if (found.length < rubric.min_keywords_required) {
+      feedback.push(`Answer must reference specific alert evidence (e.g. ${rubric.required_keywords.slice(0,3).join(', ')}).`);
+    }
+  }
+
+  for (const stepName of stepNames) {
+    const stepRubric = rubric.steps?.[stepName];
+    if (!stepRubric) continue;
+
+    const text = (answers[stepName] || '').toLowerCase();
+    const wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+    let stepEarned = 0;
+    const stepMax = stepRubric.max_points || 10;
+    totalPossible += stepMax;
+
+    // Word count gate: must have at least 15 words per step
+    if (wordCount < 15) {
+      feedback.push(`${stepName.replace('_',' ')}: too brief (${wordCount} words, need 15+).`);
+      stepScores[stepName] = { earned: 0, max: stepMax, pct: 0 };
+      continue;
+    }
+
+    // Score each concept
+    for (const concept of (stepRubric.concepts || [])) {
+      const matched = concept.keywords.some(kw => text.includes(kw.toLowerCase()));
+      if (matched) stepEarned += concept.points;
+    }
+
+    // Cap at max
+    stepEarned = Math.min(stepEarned, stepMax);
+    totalEarned += stepEarned;
+    stepScores[stepName] = { earned: stepEarned, max: stepMax, pct: Math.round((stepEarned / stepMax) * 100) };
+
+    if (stepEarned < stepMax * 0.4) {
+      feedback.push(`${stepName.replace(/_/g,' ')}: weak — include specific technical steps and alert evidence.`);
+    }
+  }
+
+  const investigationScore = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
+  return { investigation_score: investigationScore, step_scores: stepScores, feedback, rubric_used: true };
+}
+
 // ── Migrations (idempotent) ───────────────────────────────
 try {
   db.prepare(`ALTER TABLE labs ADD COLUMN is_visible INTEGER DEFAULT 1`).run();
@@ -41,8 +106,25 @@ try {
     triage_reason TEXT, containment_steps TEXT, eradication_steps TEXT,
     recovery_steps TEXT, rca_notes TEXT, fp_reason TEXT,
     is_correct INTEGER DEFAULT 0, points_awarded INTEGER DEFAULT 0,
+    investigation_score INTEGER DEFAULT 0,
+    step_scores TEXT DEFAULT '{}',
+    scoring_feedback TEXT DEFAULT '[]',
     closed_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
+  )`).run();
+} catch(e) { /* already exists */ }
+try { db.prepare('ALTER TABLE alert_closures ADD COLUMN investigation_score INTEGER DEFAULT 0').run(); } catch(e) {}
+try { db.prepare('ALTER TABLE alert_closures ADD COLUMN step_scores TEXT DEFAULT "{}"').run(); } catch(e) {}
+try { db.prepare('ALTER TABLE alert_closures ADD COLUMN scoring_feedback TEXT DEFAULT "[]"').run(); } catch(e) {}
+try { db.prepare('ALTER TABLE alert_rubrics ADD COLUMN created_at TEXT DEFAULT (datetime(\'now\'))').run(); } catch(e) {}
+
+try {
+  db.prepare(`CREATE TABLE IF NOT EXISTS alert_rubrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    alert_id TEXT NOT NULL UNIQUE,
+    rubric_json TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
   )`).run();
 } catch(e) { /* already exists */ }
@@ -761,8 +843,26 @@ async function router(req, res) {
                              !title.toLowerCase().includes('false positive') &&
                              !alert.category?.toLowerCase().includes('test');
 
+      let investigation_score = 0;
+      let step_scores = {};
+      let scoring_feedback = [];
+
       if (status === 'closed' && isTruePositive) {
-        is_correct = 1; points_awarded = 5;
+        is_correct = 1;
+        // Run rubric scoring
+        const scoreResult = scoreIRAnswers(alertId, {
+          triage_reason, containment_steps, eradication_steps, recovery_steps, rca_notes
+        });
+        investigation_score = scoreResult.investigation_score;
+        step_scores = scoreResult.step_scores;
+        scoring_feedback = scoreResult.feedback;
+        // Points: 1-5 based on investigation score
+        // 0-39%: 1pt, 40-59%: 2pts, 60-74%: 3pts, 75-89%: 4pts, 90-100%: 5pts
+        if      (investigation_score >= 90) points_awarded = 5;
+        else if (investigation_score >= 75) points_awarded = 4;
+        else if (investigation_score >= 60) points_awarded = 3;
+        else if (investigation_score >= 40) points_awarded = 2;
+        else                               points_awarded = 1;
       } else if (status === 'false_positive' && !isTruePositive) {
         is_correct = 1; points_awarded = 3;
       }
@@ -771,13 +871,17 @@ async function router(req, res) {
       // Record closure
       db.prepare(`INSERT INTO alert_closures
         (alert_id, user_id, classification, triage_reason, containment_steps,
-         eradication_steps, recovery_steps, rca_notes, fp_reason, is_correct, points_awarded)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+         eradication_steps, recovery_steps, rca_notes, fp_reason, is_correct, points_awarded,
+         investigation_score, step_scores, scoring_feedback)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       ).run(alertId, user.id, status,
         triage_reason || null, containment_steps || null,
         eradication_steps || null, recovery_steps || null,
         rca_notes || null, fp_reason || null,
-        is_correct, points_awarded);
+        is_correct, points_awarded,
+        investigation_score || 0,
+        JSON.stringify(step_scores || {}),
+        JSON.stringify(scoring_feedback || []));
 
       // Award points to user if correct
       if (points_awarded > 0) {
@@ -787,7 +891,10 @@ async function router(req, res) {
     }
 
     db.prepare('UPDATE soc_alerts SET status=? WHERE id=?').run(status, alertId);
-    return jsonRes(res, 200, { ok: true, alertId, status, is_correct, points_awarded });
+    return jsonRes(res, 200, { ok: true, alertId, status, is_correct, points_awarded,
+      investigation_score: investigation_score || 0,
+      step_scores: step_scores || {},
+      scoring_feedback: scoring_feedback || [] });
   }
 
   // ── GET /api/alerts/:id/incident ─────────────────────
@@ -940,6 +1047,9 @@ async function router(req, res) {
       classification: c.classification,
       is_correct: !!c.is_correct,
       points: c.points_awarded,
+      investigation_score: c.investigation_score || 0,
+      step_scores: c.step_scores ? JSON.parse(c.step_scores) : {},
+      scoring_feedback: c.scoring_feedback ? JSON.parse(c.scoring_feedback) : [],
       fp_reason: c.fp_reason,
       triage_reason: c.triage_reason,
       containment_steps: c.containment_steps,
@@ -976,6 +1086,9 @@ async function router(req, res) {
       classification:    c.classification,
       is_correct:        !!c.is_correct,
       points:            c.points_awarded,
+      investigation_score: c.investigation_score || 0,
+      step_scores: c.step_scores ? JSON.parse(c.step_scores) : {},
+      scoring_feedback: c.scoring_feedback ? JSON.parse(c.scoring_feedback) : [],
       triage_reason:     c.triage_reason,
       fp_reason:         c.fp_reason,
       closed_at:         c.closed_at

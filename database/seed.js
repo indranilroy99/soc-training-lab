@@ -6244,5 +6244,538 @@ db.prepare(`INSERT OR IGNORE INTO leaderboard (user_id, total_score, rank, labs_
   SELECT id, 0, 0, 0, 0.0 FROM users WHERE role = 'analyst'`).run();
 console.log('✓ Leaderboard initialised (all analysts start at rank 0, score 0)');
 
+// ── Seed Alert Rubrics ─────────────────────────────────────────
+const rubrics = [
+  {
+    alert_id: 'ALT-085',
+    rubric: {
+      required_keywords: ['vssadmin','svch0st','FILE-SERVER-01','shadow','svc_backup'],
+      min_keywords_required: 2,
+      steps: {
+        triage_reason: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['vssadmin','shadow cop'], points: 3 },
+            { keywords: ['svch0st','parent'], points: 3 },
+            { keywords: ['ransomware','precursor','pre-ransomware'], points: 2 },
+            { keywords: ['FILE-SERVER-01','file server'], points: 1 },
+            { keywords: ['T1490','impact'], points: 1 }
+          ]
+        },
+        containment_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['isolat','network','disconnect','offline'], points: 3 },
+            { keywords: ['kill','terminate','svch0st','pid'], points: 3 },
+            { keywords: ['block','firewall','185.220.101.47'], points: 2 },
+            { keywords: ['disable','svc_backup','account','credential'], points: 2 }
+          ]
+        },
+        eradication_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['svch0st.exe','remov','delet'], points: 3 },
+            { keywords: ['persist','schedul','task','registry','service'], points: 3 },
+            { keywords: ['hash','scan','hunt','endpoint'], points: 2 },
+            { keywords: ['rotat','password','credential','reset'], points: 2 }
+          ]
+        },
+        recovery_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['backup','restore','recover'], points: 3 },
+            { keywords: ['verif','integrit','hash','check'], points: 3 },
+            { keywords: ['patch','update','harden'], points: 2 },
+            { keywords: ['monitor','watch','24'], points: 2 }
+          ]
+        },
+        rca_notes: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['lateral','movement','svc_backup'], points: 3 },
+            { keywords: ['edr','endpoint','detection','control fail'], points: 3 },
+            { keywords: ['vssadmin','alert','detect','rule'], points: 2 },
+            { keywords: ['applock','wdac','restrict','prevent'], points: 2 }
+          ]
+        }
+      }
+    }
+  },
+  {
+    alert_id: 'ALT-121',
+    rubric: {
+      required_keywords: ['svch0st','enc1','847','FILE-SERVER-01','7823'],
+      min_keywords_required: 2,
+      steps: {
+        triage_reason: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['847','files','encrypt','renamed'], points: 3 },
+            { keywords: ['svch0st','C:\\Users\\Public','not legitimate'], points: 3 },
+            { keywords: ['.enc1','extension'], points: 2 },
+            { keywords: ['90 second','rate','9.4'], points: 2 }
+          ]
+        },
+        containment_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['isolat','network','FILE-SERVER-01','offline'], points: 4 },
+            { keywords: ['kill','svch0st','7823','pid'], points: 3 },
+            { keywords: ['share','disconnect','unmount'], points: 3 }
+          ]
+        },
+        eradication_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['svch0st.exe','delet','remov'], points: 4 },
+            { keywords: ['scan','other','endpoint','spread'], points: 3 },
+            { keywords: ['persist','schedul','service','task'], points: 3 }
+          ]
+        },
+        recovery_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['backup','restore','2024-03-14','offline'], points: 4 },
+            { keywords: ['verif','hash','integrit'], points: 3 },
+            { keywords: ['share','reconnect','monitor'], points: 3 }
+          ]
+        },
+        rca_notes: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['shadow','vss','delet','ALT-123'], points: 3 },
+            { keywords: ['lateral','movement','FILE-SERVER'], points: 3 },
+            { keywords: ['wazuh','fim','detect','rule'], points: 2 },
+            { keywords: ['immutabl','offlin','backup'], points: 2 }
+          ]
+        }
+      }
+    }
+  },
+  {
+    alert_id: 'ALT-123',
+    rubric: {
+      required_keywords: ['vssadmin','svch0st','SYSTEM','shadow','T1490'],
+      min_keywords_required: 2,
+      steps: {
+        triage_reason: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['vssadmin','delete shadows','all','quiet'], points: 4 },
+            { keywords: ['svch0st','parent','C:\\Users\\Public'], points: 3 },
+            { keywords: ['SYSTEM','context','escalat'], points: 3 }
+          ]
+        },
+        containment_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['isolat','FILE-SERVER-01','network'], points: 4 },
+            { keywords: ['kill','svch0st','process'], points: 3 },
+            { keywords: ['block','c2','185.220.101.47'], points: 3 }
+          ]
+        },
+        eradication_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['svch0st','remov','delet'], points: 4 },
+            { keywords: ['vssadmin','restrict','block','wdac','applock'], points: 3 },
+            { keywords: ['persist','clean','scan'], points: 3 }
+          ]
+        },
+        recovery_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['backup','offlin','restor'], points: 4 },
+            { keywords: ['vss','shadow','re-enabl','creat'], points: 3 },
+            { keywords: ['monitor','verif','patch'], points: 3 }
+          ]
+        },
+        rca_notes: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['lateral','svc_backup','credenti'], points: 3 },
+            { keywords: ['no alert','detect fail','vssadmin rule'], points: 3 },
+            { keywords: ['T1490','shadow copy','protect'], points: 2 },
+            { keywords: ['tamper','protect','immutabl'], points: 2 }
+          ]
+        }
+      }
+    }
+  },
+  {
+    alert_id: 'ALT-011',
+    rubric: {
+      required_keywords: ['corp-prod-customer-data','PutBucketAcl','public-read','corp-svc-backup2','CloudTrail'],
+      min_keywords_required: 2,
+      steps: {
+        triage_reason: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['PutBucketAcl','public-read','acl'], points: 4 },
+            { keywords: ['corp-svc-backup2','iam','user','actor'], points: 3 },
+            { keywords: ['corp-prod-customer-data','bucket'], points: 3 }
+          ]
+        },
+        containment_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['revert','acl','private','bucket polic'], points: 4 },
+            { keywords: ['disable','suspend','corp-svc-backup2','iam'], points: 3 },
+            { keywords: ['block','public access','s3'], points: 3 }
+          ]
+        },
+        eradication_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['rotat','access key','credenti'], points: 3 },
+            { keywords: ['audit','iam','permiss','least priv'], points: 3 },
+            { keywords: ['cloudtrail','log','review'], points: 2 },
+            { keywords: ['scp','block','organiz'], points: 2 }
+          ]
+        },
+        recovery_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['verif','private','bucket','acl'], points: 4 },
+            { keywords: ['scan','data','exfil','expos'], points: 3 },
+            { keywords: ['notify','legal','compliance','breach'], points: 3 }
+          ]
+        },
+        rca_notes: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['misconfigur','iam','permiss','excess'], points: 3 },
+            { keywords: ['no alert','detect','cloudtrail','rule'], points: 3 },
+            { keywords: ['scp','prevent','block','public'], points: 2 },
+            { keywords: ['least priv','iam polic','review'], points: 2 }
+          ]
+        }
+      }
+    }
+  },
+  {
+    alert_id: 'ALT-048',
+    rubric: {
+      required_keywords: ['GetObject','5000','corp-svc-backup2','185.220.101.47','4.7 GB'],
+      min_keywords_required: 2,
+      steps: {
+        triage_reason: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['5000','GetObject','10 minut','bulk'], points: 4 },
+            { keywords: ['4.7 GB','data','transfer','exfil'], points: 3 },
+            { keywords: ['185.220.101.47','external','ip'], points: 3 }
+          ]
+        },
+        containment_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['block','185.220.101.47','ip','firewall','nacl'], points: 4 },
+            { keywords: ['disable','corp-svc-backup2','iam','suspend'], points: 3 },
+            { keywords: ['bucket','polic','deny','restrict'], points: 3 }
+          ]
+        },
+        eradication_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['rotat','access key','credenti'], points: 3 },
+            { keywords: ['audit','s3','log','who access'], points: 3 },
+            { keywords: ['remove','access','polic','iam'], points: 2 },
+            { keywords: ['cloudtrail','athena','investigat'], points: 2 }
+          ]
+        },
+        recovery_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['assess','data','expos','pii','scope'], points: 4 },
+            { keywords: ['notify','legal','gdpr','breach','regulat'], points: 3 },
+            { keywords: ['encrypt','kms','bucket','protect'], points: 3 }
+          ]
+        },
+        rca_notes: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['ALT-011','public','acl','chain','preced'], points: 3 },
+            { keywords: ['no rate','alert','5000','detect'], points: 3 },
+            { keywords: ['macie','dlp','guard','detect'], points: 2 },
+            { keywords: ['least priv','iam','restrict','prevent'], points: 2 }
+          ]
+        }
+      }
+    }
+  },
+  {
+    alert_id: 'ALT-050',
+    rubric: {
+      required_keywords: ['sg-','0.0.0.0/0','AuthorizeSecurityGroupIngress','corp-svc-backup2','aws'],
+      min_keywords_required: 2,
+      steps: {
+        triage_reason: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['0.0.0.0/0','all traffic','open','any'], points: 4 },
+            { keywords: ['AuthorizeSecurityGroupIngress','security group'], points: 3 },
+            { keywords: ['corp-svc-backup2','actor','iam'], points: 3 }
+          ]
+        },
+        containment_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['revert','remove','rule','security group','ingress'], points: 4 },
+            { keywords: ['disable','corp-svc-backup2','iam'], points: 3 },
+            { keywords: ['audit','other','security group','vpc'], points: 3 }
+          ]
+        },
+        eradication_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['rotat','credenti','access key'], points: 3 },
+            { keywords: ['scp','guardrail','prevent','org'], points: 3 },
+            { keywords: ['config','rule','detect','complian'], points: 2 },
+            { keywords: ['iam polic','least priv','restrict'], points: 2 }
+          ]
+        },
+        recovery_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['verif','security group','rule','correct'], points: 4 },
+            { keywords: ['scan','exposed','port','access'], points: 3 },
+            { keywords: ['monitor','cloudwatch','alert'], points: 3 }
+          ]
+        },
+        rca_notes: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['compromis','svc_backup','credenti','chain'], points: 3 },
+            { keywords: ['no approval','change','process','guard'], points: 3 },
+            { keywords: ['aws config','detect','rule'], points: 2 },
+            { keywords: ['scp','prevent','0.0.0.0','block'], points: 2 }
+          ]
+        }
+      }
+    }
+  },
+  {
+    alert_id: 'ALT-005',
+    rubric: {
+      required_keywords: ['HKCU','Run','updater.exe','jsmith','WS-HR-07'],
+      min_keywords_required: 2,
+      steps: {
+        triage_reason: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['HKCU','Run','persist','registry'], points: 4 },
+            { keywords: ['updater.exe','not legitimat','unknown','malici'], points: 3 },
+            { keywords: ['jsmith','WS-HR-07','user'], points: 3 }
+          ]
+        },
+        containment_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['isolat','WS-HR-07','network'], points: 4 },
+            { keywords: ['disable','jsmith','account'], points: 3 },
+            { keywords: ['block','updater.exe','hash','process'], points: 3 }
+          ]
+        },
+        eradication_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['delet','registry','run key','HKCU'], points: 4 },
+            { keywords: ['remov','updater.exe','binary'], points: 3 },
+            { keywords: ['scan','other','endpoint','same'], points: 3 }
+          ]
+        },
+        recovery_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['verif','registry','clean','no persist'], points: 4 },
+            { keywords: ['password','reset','jsmith','credenti'], points: 3 },
+            { keywords: ['monitor','hunt','run key'], points: 3 }
+          ]
+        },
+        rca_notes: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['phish','initial access','download'], points: 3 },
+            { keywords: ['no edr','detect','sysmon','rule'], points: 3 },
+            { keywords: ['applocker','block','user write'], points: 2 },
+            { keywords: ['user train','awareness'], points: 2 }
+          ]
+        }
+      }
+    }
+  },
+  {
+    alert_id: 'ALT-033',
+    rubric: {
+      required_keywords: ['rootkit','kernel','module','linux','hidden'],
+      min_keywords_required: 2,
+      steps: {
+        triage_reason: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['rootkit','kernel','module','hidden'], points: 4 },
+            { keywords: ['linux','process','pid','hook'], points: 3 },
+            { keywords: ['wazuh','alert','rule','detect'], points: 3 }
+          ]
+        },
+        containment_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['isolat','host','network','offline'], points: 4 },
+            { keywords: ['snapshot','forensic','image','preserve'], points: 3 },
+            { keywords: ['block','outbound','c2','connect'], points: 3 }
+          ]
+        },
+        eradication_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['rebuild','reimag','clean install','os'], points: 4 },
+            { keywords: ['kernel','module','remov','unload'], points: 3 },
+            { keywords: ['scan','other','linux','host'], points: 3 }
+          ]
+        },
+        recovery_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['clean','os','restor','backup'], points: 4 },
+            { keywords: ['verif','integrit','checksum','kernel'], points: 3 },
+            { keywords: ['monitor','reboot','watch'], points: 3 }
+          ]
+        },
+        rca_notes: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['privesc','exploit','root','sudo'], points: 3 },
+            { keywords: ['no integrit','aide','tripwire','detect'], points: 3 },
+            { keywords: ['kernel','patch','update','harden'], points: 2 },
+            { keywords: ['audit','log','syslog','monitor'], points: 2 }
+          ]
+        }
+      }
+    }
+  },
+  {
+    alert_id: 'ALT-034',
+    rubric: {
+      required_keywords: ['linpeas','privesc','linux','script','curl'],
+      min_keywords_required: 2,
+      steps: {
+        triage_reason: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['linpeas','privesc','priv esc','privilege esc'], points: 4 },
+            { keywords: ['curl','wget','download','script'], points: 3 },
+            { keywords: ['linux','host','user'], points: 3 }
+          ]
+        },
+        containment_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['isolat','host','network'], points: 4 },
+            { keywords: ['disable','account','user'], points: 3 },
+            { keywords: ['block','outbound','download','curl'], points: 3 }
+          ]
+        },
+        eradication_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['remov','linpeas','script','delet'], points: 4 },
+            { keywords: ['audit','sudo','suid','permiss'], points: 3 },
+            { keywords: ['scan','other','host','tool'], points: 3 }
+          ]
+        },
+        recovery_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['verif','no escalat','privesc','check'], points: 4 },
+            { keywords: ['password','reset','account'], points: 3 },
+            { keywords: ['monitor','sudo','log','watch'], points: 3 }
+          ]
+        },
+        rca_notes: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['initial access','credenti','weak','ssh'], points: 3 },
+            { keywords: ['no alert','linpeas','detect','wazuh'], points: 3 },
+            { keywords: ['harden','sudo','suid','restrict'], points: 2 },
+            { keywords: ['egress','block','download','policy'], points: 2 }
+          ]
+        }
+      }
+    }
+  },
+  {
+    alert_id: 'ALT-041',
+    rubric: {
+      required_keywords: ['masscan','port','scan','192.168.56','445'],
+      min_keywords_required: 2,
+      steps: {
+        triage_reason: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['masscan','port scan','sweep'], points: 4 },
+            { keywords: ['192.168.56','internal','lateral'], points: 3 },
+            { keywords: ['445','smb','rdp','port'], points: 3 }
+          ]
+        },
+        containment_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['isolat','source','host','network'], points: 4 },
+            { keywords: ['block','firewall','segment','port'], points: 3 },
+            { keywords: ['disable','account','user'], points: 3 }
+          ]
+        },
+        eradication_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['masscan','remov','tool','delet'], points: 4 },
+            { keywords: ['scan','what','access','obtain'], points: 3 },
+            { keywords: ['lateral','movement','check','correlat'], points: 3 }
+          ]
+        },
+        recovery_steps: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['verif','no lateral','movement'], points: 4 },
+            { keywords: ['patch','harden','smb','port'], points: 3 },
+            { keywords: ['monitor','ids','detect','scan'], points: 3 }
+          ]
+        },
+        rca_notes: {
+          max_points: 10,
+          concepts: [
+            { keywords: ['credenti','comprom','initial','access'], points: 3 },
+            { keywords: ['no detect','masscan','rule','alert'], points: 3 },
+            { keywords: ['segment','block','smb','firewall'], points: 2 },
+            { keywords: ['edr','hunt','lateral'], points: 2 }
+          ]
+        }
+      }
+    }
+  }
+];
+
+// Upsert rubrics
+const insertRubric = db.prepare(`
+  INSERT OR REPLACE INTO alert_rubrics (alert_id, rubric_json)
+  VALUES (?, ?)
+`);
+const upsertRubrics = db.transaction(() => {
+  let count = 0;
+  for (const r of rubrics) {
+    try {
+      insertRubric.run(r.alert_id, JSON.stringify(r.rubric));
+      count++;
+    } catch(e) {
+      console.error('[rubric] Failed to insert rubric for', r.alert_id, e.message);
+    }
+  }
+  return count;
+});
+const rubricCount = upsertRubrics();
+console.log(`[seed] Rubrics seeded: ${rubricCount}`);
+
 console.log('\n✓ Seed complete.');
 db.close();
