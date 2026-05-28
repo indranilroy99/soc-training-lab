@@ -707,6 +707,94 @@ async function router(req, res) {
     }
   }
 
+  // ── POST /api/alerts/:id/status ─────────────────────
+  // Body: { status: 'investigating' | 'false_positive' | 'closed' | 'open' }
+  const statusMatch = url.match(/^\/api\/alerts\/([A-Z0-9-]+)\/status$/);
+  if (method === 'POST' && statusMatch) {
+    const user = requireAuth(req, res); if (!user) return;
+    const alertId = statusMatch[1];
+    const { status, reason } = await parseBody(req);
+    const allowed = ['open', 'investigating', 'false_positive', 'closed'];
+    if (!allowed.includes(status)) return jsonRes(res, 400, { error: 'Invalid status' });
+    const alert = db.prepare('SELECT id FROM soc_alerts WHERE id=?').get(alertId);
+    if (!alert) return jsonRes(res, 404, { error: 'Alert not found' });
+    db.prepare('UPDATE soc_alerts SET status=? WHERE id=?').run(status, alertId);
+    return jsonRes(res, 200, { ok: true, alertId, status, reason: reason || null });
+  }
+
+  // ── GET /api/alerts/:id/incident ─────────────────────
+  const incidentGetMatch = url.match(/^\/api\/alerts\/([A-Z0-9-]+)\/incident$/);
+  if (method === 'GET' && incidentGetMatch) {
+    const user = requireAuth(req, res); if (!user) return;
+    const alertId = incidentGetMatch[1];
+    // ensure incidents table exists (migration)
+    db.prepare(`CREATE TABLE IF NOT EXISTS incidents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      alert_id TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      title TEXT,
+      stage TEXT NOT NULL DEFAULT 'identification',
+      containment_at TEXT, eradication_at TEXT, recovery_at TEXT, rca_at TEXT, closed_at TEXT,
+      notes TEXT DEFAULT '{}',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
+    )`).run();
+    const inc = db.prepare('SELECT * FROM incidents WHERE alert_id=?').get(alertId);
+    return jsonRes(res, 200, inc || null);
+  }
+
+  // ── POST /api/alerts/:id/incident ─────────────────────
+  // Body: { stage: 'identification'|'containment'|'eradication'|'recovery'|'rca'|'closed', notes?: '...', title?: '...' }
+  const incidentPostMatch = url.match(/^\/api\/alerts\/([A-Z0-9-]+)\/incident$/);
+  if (method === 'POST' && incidentPostMatch) {
+    const user = requireAuth(req, res); if (!user) return;
+    const alertId = incidentPostMatch[1];
+    const { stage, notes, title } = await parseBody(req);
+    const validStages = ['identification','containment','eradication','recovery','rca','closed'];
+    if (!validStages.includes(stage)) return jsonRes(res, 400, { error: 'Invalid stage' });
+    // ensure table exists
+    db.prepare(`CREATE TABLE IF NOT EXISTS incidents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      alert_id TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      title TEXT,
+      stage TEXT NOT NULL DEFAULT 'identification',
+      containment_at TEXT, eradication_at TEXT, recovery_at TEXT, rca_at TEXT, closed_at TEXT,
+      notes TEXT DEFAULT '{}',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
+    )`).run();
+    const existing = db.prepare('SELECT * FROM incidents WHERE alert_id=?').get(alertId);
+    const now = new Date().toISOString();
+    const stageCol = { containment: 'containment_at', eradication: 'eradication_at', recovery: 'recovery_at', rca: 'rca_at', closed: 'closed_at' }[stage];
+    if (!existing) {
+      // create incident record at identification stage
+      const mergedNotes = JSON.stringify({ identification: notes || '' });
+      db.prepare(
+        `INSERT INTO incidents (alert_id, user_id, title, stage, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?)`
+      ).run(alertId, user.id, title || null, stage, mergedNotes, now, now);
+    } else {
+      // advance stage + record timestamp + merge notes
+      let parsedNotes = {};
+      try { parsedNotes = JSON.parse(existing.notes || '{}'); } catch(e) {}
+      if (notes) parsedNotes[stage] = notes;
+      const updates = [`stage=?`, `notes=?`, `updated_at=?`];
+      const vals = [stage, JSON.stringify(parsedNotes), now];
+      if (stageCol && !existing[stageCol]) { updates.push(`${stageCol}=?`); vals.push(now); }
+      vals.push(alertId);
+      db.prepare(`UPDATE incidents SET ${updates.join(', ')} WHERE alert_id=?`).run(...vals);
+    }
+    // also update alert status
+    const alertStatus = stage === 'closed' ? 'closed' : 'investigating';
+    db.prepare('UPDATE soc_alerts SET status=? WHERE id=?').run(alertStatus, alertId);
+    const result = db.prepare('SELECT * FROM incidents WHERE alert_id=?').get(alertId);
+    return jsonRes(res, 200, { ok: true, incident: result });
+  }
+
   // ── POST /api/alerts/:id/escalate ────────────────────
   const escalateMatch = url.match(/^\/api\/alerts\/([A-Z0-9-]+)\/escalate$/);
   if (method === 'POST' && escalateMatch) {

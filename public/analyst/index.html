@@ -1492,7 +1492,7 @@ const SocDash = {
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
               <span class="sev-badge sev-${a.severity}">${a.severity.toUpperCase()}</span>
               <span class="td-mono" style="color:var(--blue);font-size:12px">${a.id}</span>
-              <span style="font-size:11.5px;font-weight:600;color:var(--muted);text-transform:capitalize">${a.status||'open'}</span>
+              <span id="alert-detail-status-badge" style="font-size:11.5px;font-weight:600;color:var(--muted);text-transform:capitalize">${a.status||'open'}</span>
             </div>
             <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">${a.title}</div>
             <div style="font-size:12px;color:var(--muted)">${a.description||''}</div>
@@ -1538,12 +1538,26 @@ const SocDash = {
         </div>
         <div class="alert-actions-bar">
           <span style="font-size:11.5px;color:var(--dim)">Alert ID: ${a.id}</span>
-          <div style="margin-left:auto;display:flex;gap:8px">
+          <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('alert-detail-overlay').remove()">Close</button>
             <button class="btn btn-warn btn-sm" onclick="SocDash.openEscalate('${a.id}')">
               <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='18 15 12 9 6 15'/></svg>
               Escalate
             </button>
+            <button class="btn btn-sm" style="background:#92400E;color:#FDE68A;border:1px solid #B45309" onclick="window.irMarkFalsePositive('${a.id}', this)">False Positive</button>
+            <button class="btn btn-sm" style="background:#14532D;color:#86EFAC;border:1px solid #16A34A" onclick="window.irMarkResolved('${a.id}', this)">Mark Resolved</button>
+            <div style="position:relative">
+              <button class="btn btn-outline btn-sm" style="border-color:#1E2128" onclick="window.irToggleWorkflow(this)">IR Workflow ▾</button>
+              <div class="ir-workflow-panel" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:#13151A;border:1px solid #1E2128;border-radius:6px;padding:10px 12px;min-width:210px;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,0.5)">
+                <div style="font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;font-weight:600">IR Stage</div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <button class="btn btn-sm" style="background:#1E3A5F;color:#93C5FD;border:1px solid #1D4ED8;text-align:left;justify-content:flex-start" onclick="window.irSetStage('${a.id}','containment',this)">🔒 Containment</button>
+                  <button class="btn btn-sm" style="background:#3B1F63;color:#C4B5FD;border:1px solid #7C3AED;text-align:left;justify-content:flex-start" onclick="window.irSetStage('${a.id}','eradication',this)">🧹 Eradication</button>
+                  <button class="btn btn-sm" style="background:#14532D;color:#86EFAC;border:1px solid #16A34A;text-align:left;justify-content:flex-start" onclick="window.irSetStage('${a.id}','recovery',this)">♻ Recovery</button>
+                  <button class="btn btn-sm" style="background:#1C1917;color:#D6D3D1;border:1px solid #44403C;text-align:left;justify-content:flex-start" onclick="window.irSetStage('${a.id}','rca',this)">📋 RCA</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>`;
@@ -1592,6 +1606,79 @@ window.App     = App;
 window.Pages   = Pages;
 window.SocDash = SocDash;
 document.addEventListener('DOMContentLoaded', App.init);
+
+// ── IR WORKFLOW FUNCTIONS ───────────────────────────────
+window.irToggleWorkflow = function(triggerBtn) {
+  const panel = triggerBtn.nextElementSibling;
+  if (!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  // Close all other open panels first
+  document.querySelectorAll('.ir-workflow-panel').forEach(p => { p.style.display = 'none'; });
+  if (!isOpen) {
+    panel.style.display = 'block';
+    // Close panel when clicking outside
+    const handler = function(e) {
+      if (!panel.contains(e.target) && e.target !== triggerBtn) {
+        panel.style.display = 'none';
+        document.removeEventListener('click', handler, true);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', handler, true), 0);
+  }
+};
+
+window.irUpdateStatusBadge = function(newStatus) {
+  const badge = document.getElementById('alert-detail-status-badge');
+  if (badge) badge.textContent = newStatus;
+};
+
+window.irMarkFalsePositive = async function(alertId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const res = await API.post(`/api/alerts/${alertId}/status`, { status: 'false_positive' });
+    if (res.ok) {
+      toast(`Alert ${alertId} marked as false positive`, 'success');
+      window.irUpdateStatusBadge('false_positive');
+      SocDash.load();
+    } else {
+      toast((res.data && res.data.error) || 'Failed to update status', 'error');
+    }
+  } catch(e) { toast('Network error', 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'False Positive'; } }
+};
+
+window.irMarkResolved = async function(alertId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const res = await API.post(`/api/alerts/${alertId}/status`, { status: 'closed' });
+    if (res.ok) {
+      toast(`Alert ${alertId} marked as resolved`, 'success');
+      window.irUpdateStatusBadge('closed');
+      SocDash.load();
+    } else {
+      toast((res.data && res.data.error) || 'Failed to update status', 'error');
+    }
+  } catch(e) { toast('Network error', 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Mark Resolved'; } }
+};
+
+window.irSetStage = async function(alertId, stage, btn) {
+  if (btn) { btn.disabled = true; }
+  try {
+    const res = await API.post(`/api/alerts/${alertId}/incident`, { stage });
+    if (res.ok) {
+      toast(`IR stage set to ${stage} for alert ${alertId}`, 'success');
+      window.irUpdateStatusBadge(stage);
+      // Close the workflow panel
+      const panel = btn.closest('.ir-workflow-panel');
+      if (panel) panel.style.display = 'none';
+      SocDash.load();
+    } else {
+      toast((res.data && res.data.error) || `Failed to set stage: ${stage}`, 'error');
+    }
+  } catch(e) { toast('Network error', 'error'); }
+  finally { if (btn) { btn.disabled = false; } }
+};
 </script>
 </body>
 </html>

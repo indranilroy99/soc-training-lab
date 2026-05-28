@@ -128,3 +128,24 @@ CREATE TABLE IF NOT EXISTS escalations (
 );
 CREATE INDEX IF NOT EXISTS idx_escalations_alert ON escalations(alert_id);
 CREATE INDEX IF NOT EXISTS idx_escalations_user  ON escalations(user_id);
+
+-- ── Incident Response Workflow ────────────────────────────────────
+CREATE TABLE IF NOT EXISTS incidents (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  alert_id        TEXT NOT NULL,
+  user_id         INTEGER NOT NULL,
+  title           TEXT,
+  stage           TEXT NOT NULL DEFAULT 'identification',
+  containment_at  TEXT,
+  eradication_at  TEXT,
+  recovery_at     TEXT,
+  rca_at          TEXT,
+  closed_at       TEXT,
+  notes           TEXT DEFAULT '{}',
+  created_at      TEXT DEFAULT (datetime('now')),
+  updated_at      TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY(user_id)  REFERENCES users(id)      ON DELETE CASCADE,
+  FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_incidents_alert ON incidents(alert_id);
+CREATE INDEX IF NOT EXISTS idx_incidents_stage ON incidents(stage);
