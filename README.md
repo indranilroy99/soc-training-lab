@@ -128,11 +128,11 @@ npm install
 If you are deploying on a Ubuntu server with Apache proxying port 80 → 3000:
 
 ```bash
-# SSH into the server
-ssh tyrell@system
+# SSH into your server, then:
+cd /path/to/diaas-sec
 
 # Pull the latest code
-cd /var/www/diaas-sec && git pull origin main
+git pull origin main
 
 # Install/update dependencies
 npm install
@@ -491,7 +491,7 @@ If you see `table X has no column named Y`, the DB schema is out of date. The se
 
 ```bash
 # Nuclear option — wipe and reseed (loses all analyst progress)
-rm /var/www/diaas-sec/database/diaas.db
+rm database/diaas.db
 node database/seed.js
 ```
 
@@ -500,7 +500,7 @@ node database/seed.js
 Check `alert_closures` has the `investigation_score` column:
 
 ```bash
-sqlite3 /var/www/diaas-sec/database/diaas.db ".schema alert_closures"
+sqlite3 database/diaas.db ".schema alert_closures"
 ```
 
 If missing, restart the server — the migration adds it automatically.
@@ -510,7 +510,7 @@ If missing, restart the server — the migration adds it automatically.
 Fixed in commit `e2a6ffb`. Pull and restart:
 
 ```bash
-cd /var/www/diaas-sec && git pull origin main
+git pull origin main
 kill $(lsof -ti:3000) 2>/dev/null; sleep 1
 nohup node server.js > /tmp/diaas.log 2>&1 &
 ```
@@ -520,7 +520,7 @@ nohup node server.js > /tmp/diaas.log 2>&1 &
 Every question in `seed.js` has an `alert_refs` field. If it references an ALT-XXX that doesn't exist in `soc_alerts`, answers won't work. Check with:
 
 ```bash
-sqlite3 /var/www/diaas-sec/database/diaas.db \
+sqlite3 database/diaas.db \
   "SELECT id, title FROM soc_alerts WHERE id = 'ALT-085';"
 ```
 
