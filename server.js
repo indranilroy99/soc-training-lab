@@ -825,6 +825,9 @@ async function router(req, res) {
 
     let points_awarded = 0;
     let is_correct = 0;
+    let investigation_score = 0;
+    let step_scores = {};
+    let scoring_feedback = [];
 
     if (status === 'closed' || status === 'false_positive') {
       // Validate: require justification for both paths
@@ -842,10 +845,6 @@ async function router(req, res) {
       const isTruePositive = !title.toLowerCase().includes('[benign]') &&
                              !title.toLowerCase().includes('false positive') &&
                              !alert.category?.toLowerCase().includes('test');
-
-      let investigation_score = 0;
-      let step_scores = {};
-      let scoring_feedback = [];
 
       if (status === 'closed' && isTruePositive) {
         is_correct = 1;

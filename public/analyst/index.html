@@ -813,12 +813,12 @@ input, textarea, select { font-family: var(--font); }
         <div class="ir-progress-step" id="irp-3"></div>
         <div class="ir-progress-step" id="irp-4"></div>
       </div>
-      <!-- Step 0: Initial Triage -->
+      <!-- Step 0: Initial Triage (5W+H) -->
       <div class="ir-step active" id="ir-step-0">
         <div class="ir-step-label">Step 1 of 5 — Initial Triage</div>
-        <div class="ir-step-title">Why is this a True Positive?</div>
-        <div class="ir-step-desc">Explain what evidence in the alert confirms this is a real incident. Be specific — reference fields from the raw log.</div>
-        <textarea class="ir-textarea" id="ir-ans-0" placeholder="e.g. The ParentImage field shows svch0st.exe spawning vssadmin — not a legitimate parent process. Combined with the target (shadow copies), this confirms ransomware pre-encryption activity." oninput="window.irUpdateWordCount(0)"></textarea>
+        <div class="ir-step-title">5W+H — What happened and why does it matter?</div>
+        <div class="ir-step-desc">Answer all six: <strong>Who</strong> (actor / account), <strong>What</strong> (action taken), <strong>When</strong> (timestamp), <strong>Where</strong> (host / service), <strong>Why</strong> (intent / impact), <strong>How</strong> (technique / tool used). Reference specific fields from the raw log.</div>
+        <textarea class="ir-textarea" id="ir-ans-0" placeholder="Who: corp-svc-backup2 (compromised service account). What: executed vssadmin delete shadows /all /quiet via svch0st.exe. When: 2024-03-15 03:47:23 UTC. Where: FILE-SERVER-01. Why: pre-encryption shadow copy deletion — ransomware imminent. How: lateral movement from DC using stolen credentials, binary dropped to C:\Users\Public\svch0st.exe." oninput="window.irUpdateWordCount(0)"></textarea>
         <div class="ir-word-count" id="ir-wc-0"><span id="ir-wc-num-0">0</span> / 15 words min <span id="ir-wc-ok-0" style="display:none;color:var(--green)">✓</span></div>
       </div>
       <!-- Step 1: Containment -->
