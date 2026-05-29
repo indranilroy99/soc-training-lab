@@ -552,6 +552,60 @@ async function router(req, res) {
     return jsonRes(res, 200, { saved: true });
   }
 
+  // ── POST /api/me/draft ──────────────────────────────────────────
+  if (method === 'POST' && url === '/api/me/draft') {
+    const user = requireAuth(req, res); if (!user) return;
+    const { lab_slug, question_id, answer } = await parseBody(req);
+    
+    if (!lab_slug || !question_id) {
+      return jsonRes(res, 400, { error: 'lab_slug and question_id required' });
+    }
+    
+    const lab = db.prepare(`SELECT id FROM labs WHERE slug=?`).get(lab_slug);
+    if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
+    
+    // Only save if not already submitted correctly
+    const existing = db.prepare(
+      `SELECT is_correct FROM user_answers WHERE user_id=? AND question_id=?`
+    ).get(user.id, question_id);
+    
+    if (existing?.is_correct) {
+      return jsonRes(res, 200, { saved: false, reason: 'already_answered' });
+    }
+    
+    // Upsert draft
+    db.prepare(
+      `INSERT INTO draft_answers (user_id, lab_id, question_id, draft_answer, saved_at)
+       VALUES (?,?,?,?,?)
+       ON CONFLICT(user_id, lab_id, question_id) DO UPDATE SET
+         draft_answer=excluded.draft_answer,
+         saved_at=excluded.saved_at`
+    ).run(user.id, lab.id, question_id, answer || '', new Date().toISOString());
+    
+    return jsonRes(res, 200, { saved: true, saved_at: new Date().toISOString() });
+  }
+
+  // ── GET /api/me/drafts/:lab_slug ──────────────────────────
+  const draftsMatch = url.match(/^\/api\/me\/drafts\/([^/]+)$/);
+  if (method === 'GET' && draftsMatch) {
+    const user = requireAuth(req, res); if (!user) return;
+    const slug = draftsMatch[1];
+    
+    const lab = db.prepare(`SELECT id FROM labs WHERE slug=?`).get(slug);
+    if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
+    
+    const drafts = db.prepare(
+      `SELECT d.question_id, d.draft_answer, d.saved_at
+       FROM draft_answers d
+       WHERE d.user_id=? AND d.lab_id=?`
+    ).all(user.id, lab.id);
+    
+    const draftMap = {};
+    drafts.forEach(d => { draftMap[d.question_id] = d.draft_answer; });
+    
+    return jsonRes(res, 200, { drafts: draftMap });
+  }
+
   // ── GET /api/labs ─────────────────────────────────────
   if (method === 'GET' && url === '/api/labs') {
     const user = requireAuth(req, res); if (!user) return;

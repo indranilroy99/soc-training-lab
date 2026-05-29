@@ -87,6 +87,22 @@ CREATE TABLE IF NOT EXISTS user_answers (
   FOREIGN KEY(question_id) REFERENCES questions(id) ON DELETE CASCADE
 );
 
+-- Draft answers for autosave (not yet submitted)
+CREATE TABLE IF NOT EXISTS draft_answers (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      INTEGER NOT NULL,
+  lab_id       INTEGER NOT NULL,
+  question_id  INTEGER NOT NULL,
+  draft_answer TEXT NOT NULL,
+  saved_at     TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, lab_id, question_id),
+  FOREIGN KEY(user_id)     REFERENCES users(id)     ON DELETE CASCADE,
+  FOREIGN KEY(lab_id)     REFERENCES labs(id)       ON DELETE CASCADE,
+  FOREIGN KEY(question_id) REFERENCES questions(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_drafts_user ON draft_answers(user_id);
+CREATE INDEX IF NOT EXISTS idx_drafts_lab ON draft_answers(lab_id);
+
 CREATE TABLE IF NOT EXISTS leaderboard (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id        INTEGER UNIQUE NOT NULL,

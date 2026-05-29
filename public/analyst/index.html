@@ -1088,6 +1088,9 @@ const App = {
     document.getElementById('questions-panel').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading questions...</div>';
     try {
       const lab = await API.get('/api/labs/' + slug);
+      // Load draft answers for this lab
+      const draftsRes = await API.get('/api/me/drafts/' + slug);
+      Pages._draftAnswers = draftsRes.drafts || {};
       Pages.renderLabView(lab);
     } catch(e) { toast('Failed to load lab', 'error'); }
   },
@@ -1285,11 +1288,14 @@ const Pages = {
     Pages._activeLabSlug = lab.slug;
     Pages._activeLabQuestionIds = lab.questions.map(q => q.id);
     Pages._labDraftAnswers = {};
+    Pages._draftAnswers = Pages._draftAnswers || {}; // From server
     lab.questions.forEach(q => {
+      // Priority: server draft > existing submitted > empty
+      const serverDraft = Pages._draftAnswers[q.id];
       const existingAnswer = q.answer_type === 'choice'
         ? (q.selected_option || '')
         : (q.submitted_answer || '');
-      Pages._labDraftAnswers[q.id] = existingAnswer;
+      Pages._labDraftAnswers[q.id] = serverDraft !== undefined ? serverDraft : existingAnswer;
     });
 
     const panel = document.getElementById('questions-panel');
@@ -1327,6 +1333,8 @@ const Pages = {
             const input = el.querySelector('input');
             if (input) input.checked = true;
             Pages._labDraftAnswers[q.id] = input ? input.value : '';
+            // Autosave MCQ selection
+            Pages._debouncedAutosave(q.id, input ? input.value : '', lab.slug);
           });
         });
       } else {
@@ -1334,6 +1342,8 @@ const Pages = {
         if (input) {
           input.addEventListener('input', () => {
             Pages._labDraftAnswers[q.id] = input.value.trim();
+            // Autosave text input
+            Pages._debouncedAutosave(q.id, input.value.trim(), lab.slug);
           });
         }
       }
@@ -1349,6 +1359,40 @@ const Pages = {
   _activeLabSlug: null,
   _activeLabQuestionIds: [],
   _qObserver: null,
+
+  // Autosave state
+  _autosaveTimer: null,
+  _autosaveStatus: {},
+  
+  _debouncedAutosave(qid, answer, labSlug) {
+    if (Pages._autosaveTimer) clearTimeout(Pages._autosaveTimer);
+    Pages._autosaveTimer = setTimeout(() => {
+      Pages._doAutosave(qid, answer, labSlug);
+    }, 1000); // 1 second debounce
+  },
+  
+  async _doAutosave(qid, answer, labSlug) {
+    if (!labSlug || !qid) return;
+    
+    // Show saving indicator
+    const indicator = document.getElementById(`autosave-${qid}`);
+    if (indicator) indicator.textContent = 'Saving...';
+    
+    try {
+      const res = await API.post('/api/me/draft', {
+        lab_slug: labSlug,
+        question_id: qid,
+        answer: answer || ''
+      });
+      
+      if (indicator) {
+        indicator.textContent = res.saved ? 'Draft saved' : '';
+        setTimeout(() => { if (indicator) indicator.textContent = ''; }, 2000);
+      }
+    } catch(e) {
+      if (indicator) indicator.textContent = 'Save failed';
+    }
+  },
 
   _initQObserver() {
     if (Pages._qObserver) Pages._qObserver.disconnect();
@@ -1424,7 +1468,8 @@ const Pages = {
           ${done
             ? `<span style="color:var(--blue);font-size:12.5px;font-weight:600">✓ Solved (+${q.pts_earned} pts)</span>`
             : `<button class="btn btn-green btn-sm" onclick="Pages.submitAnswer('${slug}', ${q.id}, '${q.answer_type}')" ${locked ? 'disabled' : ''}>Submit Answer</button>
-               <span class="q-attempts">${hintsUsed > 0 ? `Hints used: ${hintsUsed}/3` : ''}</span>`
+               <span class="q-attempts">${hintsUsed > 0 ? `Hints used: ${hintsUsed}/3` : ''}</span>
+               <span class="autosave-indicator" id="autosave-${q.id}" style="font-size:11px;color:var(--muted);margin-left:8px;font-style:italic"></span>`
           }
         </div>
         <div class="q-feedback" id="q-fb-${q.id}"></div>
@@ -1525,6 +1570,10 @@ const Pages = {
         toast('Correct answer submitted.', 'success');
         document.getElementById('topbar-score').textContent  = d.total_score;
         document.getElementById('sidebar-score').textContent = d.total_score;
+        
+        // Clear draft from server since answer is now submitted
+        delete Pages._draftAnswers[questionId];
+        
         Pages._unlockNext(questionId);
         if (d.lab_status === 'completed') {
           setTimeout(() => {
