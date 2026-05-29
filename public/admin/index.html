@@ -1345,6 +1345,7 @@ const LabBuilder = {
       options: ['', ''],
       correct_answer: '',
       hint: '',
+      hint_levels: ['', ''],
       explanation: '',
       points: 20,
       difficulty: 'medium',
@@ -1434,12 +1435,22 @@ const LabBuilder = {
         </div>
         <div class="form-row-2">
           <div class="form-group">
-            <label class="form-label">Hint</label>
-            <input type="text" class="form-input" value="${esc(q.hint)}" placeholder="Optional hint" oninput="LabBuilder.updateQuestion(${idx}, 'hint', this.value)">
+            <label class="form-label">Hint 1: Where to look</label>
+            <input type="text" class="form-input" value="${esc(q.hint || '')}" placeholder="Guide the analyst to the right logs, evidence, or alert" oninput="LabBuilder.updateQuestion(${idx}, 'hint', this.value)">
           </div>
           <div class="form-group">
             <label class="form-label">Points</label>
             <input type="number" class="form-input" value="${Number(q.points) || 20}" min="5" max="999" oninput="LabBuilder.updateQuestion(${idx}, 'points', this.value)">
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Hint 2: Narrow it down</label>
+            <input type="text" class="form-input" value="${esc((q.hint_levels && q.hint_levels[0]) || '')}" placeholder="Make the student re-check the exact field or value" oninput="LabBuilder.questions[${idx}].hint_levels[0] = this.value">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Hint 3</label>
+            <input type="text" class="form-input" value="${esc((q.hint_levels && q.hint_levels[1]) || '')}" placeholder="Optional final clue. If blank, the system will show a masked answer pattern." oninput="LabBuilder.questions[${idx}].hint_levels[1] = this.value">
           </div>
         </div>
         <div class="form-group">
@@ -1472,6 +1483,7 @@ const LabBuilder = {
         options: (Array.isArray(q.options) ? q.options : []).map(o => String(o || '').trim()).filter(Boolean),
         correct_answer: String(q.correct_answer || '').trim(),
         hint: String(q.hint || '').trim(),
+        hint_levels: (Array.isArray(q.hint_levels) ? q.hint_levels : []).map(h => String(h || '').trim()).filter(Boolean),
         explanation: String(q.explanation || '').trim(),
         points: parseInt(q.points) || 20,
         difficulty: q.difficulty || 'medium',

@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS questions (
   options        TEXT,
   correct_answer TEXT NOT NULL,
   hint           TEXT,
+  hint_levels    TEXT,
   explanation    TEXT,
   alert_ref      TEXT,
   FOREIGN KEY(lab_id) REFERENCES labs(id) ON DELETE CASCADE
@@ -69,6 +70,7 @@ CREATE TABLE IF NOT EXISTS user_answers (
   submitted_answer TEXT NOT NULL,
   is_correct       INTEGER DEFAULT 0,
   pts_awarded      INTEGER DEFAULT 0,
+  hints_used       INTEGER DEFAULT 0,
   attempt_number   INTEGER DEFAULT 1,
   submitted_at     TEXT DEFAULT (datetime('now')),
   UNIQUE(user_id, question_id),

@@ -1237,20 +1237,21 @@ const Pages = {
 
     const panel = document.getElementById('questions-panel');
     panel.innerHTML = lab.questions.map((q, i) => {
-      return Pages._renderQuestion(q, i, lab.slug, false, lab.questions.length);
-    }).join('') + Pages._renderLabSubmitBar(lab);
+      const isLocked = i > 0 && !lab.questions[i - 1].completed;
+      return Pages._renderQuestion(q, i, lab.slug, isLocked, lab.questions.length);
+    }).join('');
 
     // Attach event handlers
     lab.questions.forEach(q => {
       if (q.answer_type === 'choice') {
         document.querySelectorAll(`#q-choices-${q.id} .q-choice`).forEach(el => {
           el.addEventListener('click', () => {
+            if (document.getElementById('q-card-' + q.id)?.classList.contains('locked')) return;
             document.querySelectorAll(`#q-choices-${q.id} .q-choice`).forEach(c => c.classList.remove('selected'));
             el.classList.add('selected');
             const input = el.querySelector('input');
             if (input) input.checked = true;
             Pages._labDraftAnswers[q.id] = input ? input.value : '';
-            Pages._updateLabSubmitState();
           });
         });
       } else {
@@ -1258,13 +1259,10 @@ const Pages = {
         if (input) {
           input.addEventListener('input', () => {
             Pages._labDraftAnswers[q.id] = input.value.trim();
-            Pages._updateLabSubmitState();
           });
         }
       }
     });
-
-    Pages._updateLabSubmitState();
 
     // IntersectionObserver — highlight current question dot in left panel
     Pages._labQuestionsData = lab.questions;
@@ -1313,33 +1311,40 @@ const Pages = {
   },
 
   _renderQuestion(q, idx, slug, locked, totalQ) {
+    const done = q.completed;
     const isFirst = idx === 0;
     const isLast  = idx === totalQ - 1;
     const savedAnswer = Pages._labDraftAnswers[q.id] || '';
+    const hintsUsed = Number(q.hints_used || 0);
+    const remainingPoints = done ? Number(q.pts_earned || 0) : Math.max(0, Number(q.points || 0) - (hintsUsed === 1 ? 5 : hintsUsed === 2 ? 15 : hintsUsed >= 3 ? Number(q.points || 0) : 0));
     let inputHtml = '';
     if (q.answer_type === 'choice' && q.options) {
       const opts = JSON.parse(typeof q.options === 'string' ? q.options : JSON.stringify(q.options));
       inputHtml = `<div class="q-choices" id="q-choices-${q.id}">
-        ${opts.map(opt => `<label class="q-choice ${savedAnswer === opt ? 'selected' : ''}">
-          <input type="radio" name="q-${q.id}" value="${opt}" ${savedAnswer === opt ? 'checked' : ''}> ${opt}
+        ${opts.map(opt => `<label class="q-choice ${savedAnswer === opt ? 'selected' : ''} ${done ? 'correct' : ''}">
+          <input type="radio" name="q-${q.id}" value="${opt}" ${savedAnswer === opt ? 'checked' : ''} ${done ? 'disabled' : ''}> ${opt}
         </label>`).join('')}
       </div>`;
     } else {
-      inputHtml = `<input type="text" class="q-text-input" id="q-input-${q.id}" placeholder="Type your answer here..." value="${savedAnswer.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}">`;
+      inputHtml = `<input type="text" class="q-text-input" id="q-input-${q.id}" placeholder="Type your answer here..." value="${savedAnswer.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}" ${done ? 'disabled' : ''}>`;
     }
-    return `<div class="q-card ${locked ? 'locked' : ''}" id="q-card-${q.id}" id="question-${idx+1}" data-qidx="${idx}" data-qid="${q.id}">
+    return `<div class="q-card ${done ? 'done' : ''} ${locked ? 'locked' : ''}" id="q-card-${q.id}" id="question-${idx+1}" data-qidx="${idx}" data-qid="${q.id}">
       <div class="q-card-header">
         <div class="q-num">Question ${idx+1}</div>
         <div class="q-text">${q.question}</div>
       </div>
       <div class="q-card-body">
         ${inputHtml}
-        ${q.hint ? `<div style="margin-bottom:10px">
-          <button class="q-hint-btn" onclick="Pages.toggleHint(${q.id})">💡 Show hint</button>
-          <div class="q-hint-text" id="q-hint-${q.id}">${q.hint}</div>
-        </div>` : ''}
+        <div style="margin-bottom:10px">
+          <button class="q-hint-btn" onclick="Pages.requestHint('${slug}', ${q.id})" ${locked || done || hintsUsed >= 3 ? 'disabled' : ''}>💡 ${hintsUsed === 0 ? 'Get Hint' : `Hint ${Math.min(hintsUsed + 1, 3)}`}</button>
+          <div class="q-hint-text ${hintsUsed > 0 ? 'visible' : ''}" id="q-hint-${q.id}">${hintsUsed > 0 ? (q.hint_plan?.[hintsUsed - 1] || '') : ''}</div>
+        </div>
         <div class="q-actions">
-          <span class="q-attempts">Answer every question, then submit the full lab for evaluation.</span>
+          ${done
+            ? `<span style="color:var(--blue);font-size:12.5px;font-weight:600">✓ Solved (+${q.pts_earned} pts)</span>`
+            : `<button class="btn btn-green btn-sm" onclick="Pages.submitAnswer('${slug}', ${q.id}, '${q.answer_type}')" ${locked ? 'disabled' : ''}>Submit Answer</button>
+               <span class="q-attempts">Hints used: ${hintsUsed}/3 • Remaining points: ${remainingPoints}</span>`
+          }
         </div>
         <div class="q-feedback" id="q-fb-${q.id}"></div>
         <div class="q-nav-btns">
@@ -1350,133 +1355,116 @@ const Pages = {
     </div>`;
   },
 
-  _renderLabSubmitBar(lab) {
-    const completed = lab.progress && lab.progress.status === 'completed';
-    return `<div class="card" style="margin-top:16px">
-      <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Strict Lab Submission</div>
-          <div style="font-size:12px;color:var(--muted)">${completed ? 'This lab has already been completed. You may retake it if needed, but full points are only awarded for a fully correct submission.' : 'No answers are revealed. You must answer every question correctly in a single submission to earn points.'}</div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="Pages.retakeLab()">Retake Lab</button>
-          <button class="btn btn-green btn-sm" id="lab-submit-btn" onclick="Pages.submitLab()">Submit Lab</button>
-        </div>
-      </div>
-      <div id="lab-submit-feedback" style="display:none;padding:0 16px 16px"></div>
-    </div>`;
-  },
-
-  _updateLabSubmitState() {
-    const btn = document.getElementById('lab-submit-btn');
-    if (!btn) return;
-    const total = Pages._activeLabQuestionIds.length;
-    const answered = Pages._activeLabQuestionIds.filter(id => {
-      const val = Pages._labDraftAnswers[id];
-      return val !== undefined && String(val).trim() !== '';
-    }).length;
-    btn.disabled = answered !== total || total === 0;
-    btn.textContent = answered === total && total > 0 ? 'Submit Lab' : `Answer All Questions (${answered}/${total})`;
-  },
-
-  retakeLab() {
-    Pages._activeLabQuestionIds.forEach(id => {
-      Pages._labDraftAnswers[id] = '';
-      const textInput = document.getElementById('q-input-' + id);
-      if (textInput) textInput.value = '';
-      document.querySelectorAll(`#q-choices-${id} .q-choice`).forEach(choice => choice.classList.remove('selected'));
-      document.querySelectorAll(`#q-choices-${id} input[type=radio]`).forEach(input => { input.checked = false; });
-      const fb = document.getElementById('q-fb-' + id);
-      if (fb) {
-        fb.className = 'q-feedback';
-        fb.innerHTML = '';
+  async requestHint(slug, questionId) {
+    const res = await API.post(`/api/labs/${slug}/hint`, { question_id: questionId });
+    const fbEl = document.getElementById('q-fb-' + questionId);
+    const hintEl = document.getElementById('q-hint-' + questionId);
+    const card = document.getElementById('q-card-' + questionId);
+    if (!res.ok) {
+      toast(res.data?.error || 'Failed to load hint.', 'error');
+      if (fbEl && res.data?.error) {
+        fbEl.className = 'q-feedback wrong visible';
+        fbEl.innerHTML = `<div class="fb-title">Hint unavailable</div>${res.data.error}`;
       }
-    });
-    const submitFeedback = document.getElementById('lab-submit-feedback');
-    if (submitFeedback) {
-      submitFeedback.style.display = 'none';
-      submitFeedback.innerHTML = '';
-    }
-    Pages._updateLabSubmitState();
-    toast('Lab reset. Re-answer every question before submitting.', 'info');
-  },
-
-  async submitLab() {
-    const slug = Pages._activeLabSlug;
-    if (!slug) { toast('No lab is currently open.', 'error'); return; }
-
-    const answers = {};
-    const missing = [];
-    Pages._activeLabQuestionIds.forEach(id => {
-      const val = (Pages._labDraftAnswers[id] || '').trim();
-      if (!val) missing.push(id);
-      answers[id] = val;
-    });
-
-    if (missing.length) {
-      toast('Answer every question before submitting the lab.', 'error');
       return;
     }
-
-    const btn = document.getElementById('lab-submit-btn');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Submitting...';
+    const d = res.data;
+    if (hintEl && d.hint) {
+      hintEl.textContent = d.hint;
+      hintEl.classList.add('visible');
     }
-
-    try {
-      const res = await API.post(`/api/labs/${slug}/submit`, { answers });
-      const feedback = document.getElementById('lab-submit-feedback');
-      if (!res.ok) {
-        toast(res.data?.error || 'Lab submission failed.', 'error');
-        if (feedback && res.data?.error) {
-          feedback.style.display = 'block';
-          feedback.innerHTML = `<div class="q-feedback wrong visible"><div class="fb-title">Submission blocked</div>${res.data.error}</div>`;
-        }
-        Pages._updateLabSubmitState();
-        return;
-      }
-
-      const d = res.data;
-      if (feedback) {
-        feedback.style.display = 'block';
-        if (d.passed) {
-          feedback.innerHTML = `<div class="q-feedback correct visible"><div class="fb-title">Lab passed</div>${d.message}</div>`;
-        } else {
-          feedback.innerHTML = `<div class="q-feedback wrong visible"><div class="fb-title">Lab failed</div>${d.message}</div>`;
-        }
-      }
-
-      if (d.passed) {
-        toast('Lab completed. Full score awarded.', 'success');
-        document.getElementById('topbar-score').textContent  = d.total_score;
-        document.getElementById('sidebar-score').textContent = d.total_score;
-        document.getElementById('lab-completion-banner').innerHTML = `<div class="completion-banner">
-          <div class="completion-icon">🎉</div>
-          <div class="completion-text"><h3>Lab Complete!</h3><p>${d.message}</p></div>
-          <div class="completion-score"><div class="completion-pts">${d.score_awarded}</div><div class="completion-pts-label">pts earned</div></div>
-        </div>`;
-        App.loadMe();
-        App.loadLabs();
-      } else {
-        Pages.retakeLab();
-        const feedbackAfterReset = document.getElementById('lab-submit-feedback');
-        if (feedbackAfterReset) {
-          feedbackAfterReset.style.display = 'block';
-          feedbackAfterReset.innerHTML = `<div class="q-feedback wrong visible"><div class="fb-title">Lab failed</div>${d.message}</div>`;
-        }
-        toast('Lab failed. Full retake required.', 'error');
-      }
-    } catch (e) {
-      toast('Network error', 'error');
-    } finally {
-      Pages._updateLabSubmitState();
+    if (fbEl) {
+      fbEl.className = 'q-feedback visible';
+      fbEl.innerHTML = `<div class="fb-title">Hint ${d.hint_level}/${d.max_hints}</div>${d.message}<div style="margin-top:6px;color:var(--muted)">Remaining points for this question: ${d.remaining_points}</div>`;
     }
+    const attempts = card ? card.querySelector('.q-attempts') : null;
+    if (attempts) attempts.textContent = `Hints used: ${d.hint_level}/3 • Remaining points: ${d.remaining_points}`;
+    const hintBtn = card ? card.querySelector('.q-hint-btn') : null;
+    if (hintBtn) {
+      hintBtn.textContent = d.hint_level >= d.max_hints ? 'Max Hints Used' : `💡 Hint ${Math.min(d.hint_level + 1, d.max_hints)}`;
+      hintBtn.disabled = d.hint_level >= d.max_hints;
+    }
+    toast('Hint unlocked.', 'info');
   },
 
   toggleHint(qid) {
     const el = document.getElementById('q-hint-' + qid);
     if (el) el.classList.toggle('visible');
+  },
+
+  async submitAnswer(slug, questionId, type) {
+    let answer = '';
+    if (type === 'choice') {
+      const checked = document.querySelector(`#q-choices-${questionId} input[type=radio]:checked`);
+      if (!checked) { toast('Please select an answer.', 'error'); return; }
+      answer = checked.value;
+    } else {
+      const input = document.getElementById('q-input-' + questionId);
+      answer = input ? input.value.trim() : '';
+      if (!answer) { toast('Please type an answer.', 'error'); return; }
+    }
+
+    const btn = document.querySelector(`#q-card-${questionId} .btn-green`);
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+    try {
+      const res = await API.post(`/api/labs/${slug}/submit`, { question_id: questionId, answer });
+      if (!res.ok) {
+        toast(res.data?.error || 'Submission failed', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Submit Answer'; }
+        return;
+      }
+      const d = res.data;
+      const fbEl = document.getElementById('q-fb-' + questionId);
+      const card = document.getElementById('q-card-' + questionId);
+
+      if (d.correct) {
+        if (card) card.classList.add('done');
+        const dot = document.getElementById('qdot-' + questionId);
+        if (dot) dot.classList.add('done');
+        const actEl = card ? card.querySelector('.q-actions') : null;
+        if (actEl) actEl.innerHTML = `<span style="color:var(--blue);font-size:12.5px;font-weight:600">✓ Solved (+${d.pts} pts)</span>`;
+        const inp = document.getElementById('q-input-' + questionId);
+        if (inp) inp.disabled = true;
+        document.querySelectorAll(`#q-choices-${questionId} .q-choice`).forEach(el => { el.classList.add('correct'); el.style.pointerEvents = 'none'; });
+        const hintBtn = card ? card.querySelector('.q-hint-btn') : null;
+        if (hintBtn) hintBtn.disabled = true;
+        if (fbEl) {
+          fbEl.className = 'q-feedback correct visible';
+          fbEl.innerHTML = `<div class="fb-title">✓ Correct! +${d.pts} pts</div>${d.message}`;
+        }
+        toast('Correct answer submitted.', 'success');
+        document.getElementById('topbar-score').textContent  = d.total_score;
+        document.getElementById('sidebar-score').textContent = d.total_score;
+        Pages._unlockNext(questionId);
+        if (d.lab_status === 'completed') {
+          setTimeout(() => {
+            document.getElementById('lab-completion-banner').innerHTML = `<div class="completion-banner">
+              <div class="completion-icon">🎉</div>
+              <div class="completion-text"><h3>Lab Complete!</h3><p>You solved every question. Final score reflects hint usage.</p></div>
+              <div class="completion-score"><div class="completion-pts">${d.total_score}</div><div class="completion-pts-label">total pts</div></div>
+            </div>`;
+            App.loadMe();
+            App.loadLabs();
+          }, 300);
+        }
+      } else {
+        if (fbEl) {
+          fbEl.className = 'q-feedback wrong visible';
+          fbEl.innerHTML = `<div class="fb-title">Not quite</div>${d.message}<div style="margin-top:6px;color:var(--muted)">Remaining points: ${d.remaining_points}. Use a hint if you need guidance.</div>`;
+        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Submit Answer'; }
+        toast('Incorrect. Check the evidence and try again.', 'error');
+      }
+    } catch(e) {
+      toast('Network error', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Submit Answer'; }
+    }
+  },
+
+  _unlockNext(questionId) {
+    const cards = Array.from(document.querySelectorAll('.q-card.locked'));
+    if (cards.length > 0) cards[0].classList.remove('locked');
   },
 
   async leaderboard() {

@@ -104,6 +104,16 @@ try {
 } catch(e) { /* already exists */ }
 
 try {
+  db.prepare(`ALTER TABLE questions ADD COLUMN hint_levels TEXT`).run();
+  console.log('[migrate] Added questions.hint_levels column');
+} catch(e) { /* already exists */ }
+
+try {
+  db.prepare(`ALTER TABLE user_answers ADD COLUMN hints_used INTEGER DEFAULT 0`).run();
+  console.log('[migrate] Added user_answers.hints_used column');
+} catch(e) { /* already exists */ }
+
+try {
   db.prepare(`ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0`).run();
   console.log('[migrate] Added users.points column');
 } catch(e) { /* already exists */ }
@@ -229,6 +239,46 @@ function getUserRank(userId) {
   return idx + 1;
 }
 
+function parseHintLevels(question) {
+  let configured = [];
+  try { configured = question.hint_levels ? JSON.parse(question.hint_levels) : []; } catch { configured = []; }
+  configured = Array.isArray(configured) ? configured.filter(Boolean).map(h => String(h).trim()).filter(Boolean) : [];
+  if (question.hint && String(question.hint).trim()) configured.unshift(String(question.hint).trim());
+  return configured.slice(0, 2);
+}
+
+function buildMaskedAnswer(answer) {
+  const text = String(answer || '').trim();
+  if (!text) return '';
+  return text.split(/(\s+)/).map(token => {
+    if (/^\s+$/.test(token)) return token;
+    if (token.length <= 1) return token;
+    if (token.length === 2) return token[0] + '_';
+    return token[0] + ' ' + Array.from({ length: token.length - 1 }, () => '_').join(' ');
+  }).join('');
+}
+
+function getHintPlan(question) {
+  const configured = parseHintLevels(question);
+  const answer = String(question.correct_answer || '').trim();
+  const fallback1 = question.alert_ref
+    ? `Focus on the investigation material linked to ${question.alert_ref}. The answer is visible in the provided logs or evidence.`
+    : 'Review the evidence, logs, and investigation notes carefully. The answer is present in the lab material.';
+  const fallback2 = configured[0]
+    ? configured[0]
+    : 'Re-check the exact field, indicator, or value in the evidence. Do not guess from memory.';
+  const fallback3 = `The correct answer matches this pattern: ${buildMaskedAnswer(answer)}`;
+  return [fallback1, fallback2, configured[1] || fallback3].slice(0, 3);
+}
+
+function getHintPenalty(basePoints, hintCount) {
+  const pts = Math.max(0, parseInt(basePoints) || 0);
+  if (hintCount <= 0) return pts;
+  if (hintCount === 1) return Math.max(0, pts - 5);
+  if (hintCount === 2) return Math.max(0, pts - 15);
+  return 0;
+}
+
 function getLabsWithProgress(userId) {
   const labs = db.prepare(`SELECT * FROM labs WHERE is_visible=1 OR is_visible IS NULL ORDER BY order_index`).all();
   return labs.map(lab => {
@@ -340,13 +390,13 @@ async function router(req, res) {
     const lab  = db.prepare(`SELECT * FROM labs WHERE slug=?`).get(slug);
     if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
     const questions = db.prepare(
-      `SELECT id, order_index, question, answer_type, options, points, hint, alert_ref FROM questions WHERE lab_id=? ORDER BY order_index`
+      `SELECT id, order_index, question, answer_type, options, points, hint, hint_levels, alert_ref FROM questions WHERE lab_id=? ORDER BY order_index`
     ).all(lab.id).map(q => ({
       ...q,
       options: q.options ? JSON.parse(q.options) : null
     }));
     const answeredQ = db.prepare(
-      `SELECT question_id, is_correct, pts_awarded, attempt_number FROM user_answers WHERE user_id=? AND lab_id=? ORDER BY submitted_at DESC`
+      `SELECT question_id, is_correct, pts_awarded, attempt_number, hints_used, submitted_answer FROM user_answers WHERE user_id=? AND lab_id=? ORDER BY submitted_at DESC`
     ).all(user.id, lab.id);
     const answerMap = {};
     answeredQ.forEach(a => { if (!answerMap[a.question_id]) answerMap[a.question_id] = a; });
@@ -355,6 +405,9 @@ async function router(req, res) {
       completed:  !!(answerMap[q.id] && answerMap[q.id].is_correct),
       attempts:   answerMap[q.id] ? answerMap[q.id].attempt_number : 0,
       pts_earned: answerMap[q.id] ? answerMap[q.id].pts_awarded : 0,
+      hints_used: answerMap[q.id] ? (answerMap[q.id].hints_used || 0) : 0,
+      submitted_answer: answerMap[q.id] ? (answerMap[q.id].submitted_answer || '') : '',
+      hint_plan: getHintPlan(q)
     }));
     const prog = db.prepare(
       `SELECT status, score, started_at, completed_at FROM user_progress WHERE user_id=? AND lab_id=?`
@@ -379,85 +432,91 @@ async function router(req, res) {
     const lab  = db.prepare(`SELECT * FROM labs WHERE slug=?`).get(slug);
     if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
 
-    const { answers } = await parseBody(req);
-    if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
-      return jsonRes(res, 400, { error: 'answers object required' });
+    const { question_id, answer } = await parseBody(req);
+    const questionId = parseInt(question_id, 10);
+    if (!questionId || !answer || !String(answer).trim()) {
+      return jsonRes(res, 400, { error: 'question_id and answer are required' });
     }
 
-    const questions = db.prepare(
-      `SELECT id, answer_type, correct_answer, points FROM questions WHERE lab_id=? ORDER BY order_index`
-    ).all(lab.id);
-    if (!questions.length) {
-      return jsonRes(res, 400, { error: 'This lab has no questions configured' });
-    }
+    const question = db.prepare(
+      `SELECT id, answer_type, correct_answer, points FROM questions WHERE id=? AND lab_id=?`
+    ).get(questionId, lab.id);
+    if (!question) return jsonRes(res, 404, { error: 'Question not found' });
 
-    const missing = questions.filter(q => {
-      const raw = answers[q.id] ?? answers[String(q.id)];
-      return raw === undefined || String(raw).trim() === '';
-    });
-    if (missing.length) {
-      return jsonRes(res, 400, {
-        error: 'All questions must be answered before submission.',
-        missing_question_ids: missing.map(q => q.id)
+    const prior = db.prepare(
+      `SELECT attempt_number, hints_used, is_correct FROM user_answers WHERE user_id=? AND question_id=?`
+    ).get(user.id, question.id);
+    if (prior?.is_correct) {
+      return jsonRes(res, 200, {
+        correct: true,
+        already_completed: true,
+        pts: prior.pts_awarded || getHintPenalty(question.points, prior.hints_used || 0),
+        hints_used: prior.hints_used || 0,
+        total_score: getUserTotalScore(user.id),
+        message: 'Question already completed.'
       });
     }
 
-    const evaluateAnswer = (question, rawAnswer) => {
-      const submitted = String(rawAnswer).trim().toLowerCase();
-      const correct_a = String(question.correct_answer || '').trim().toLowerCase();
-      if (question.answer_type === 'choice') return submitted === correct_a;
-      const keywords = correct_a.split(/\s+/).filter(w => w.length > 4);
-      if (!keywords.length) return submitted === correct_a;
-      const matchCount = keywords.filter(k => submitted.includes(k)).length;
-      return matchCount >= Math.ceil(keywords.length * 0.35);
-    };
+    const submitted = String(answer).trim();
+    const submittedNorm = submitted.toLowerCase();
+    const correctAnswer = String(question.correct_answer || '').trim();
+    const correctNorm = correctAnswer.toLowerCase();
+    const isCorrect = question.answer_type === 'choice'
+      ? submittedNorm === correctNorm
+      : (() => {
+          const keywords = correctNorm.split(/\s+/).filter(w => w.length > 4);
+          if (!keywords.length) return submittedNorm === correctNorm;
+          const matchCount = keywords.filter(k => submittedNorm.includes(k)).length;
+          return matchCount >= Math.ceil(keywords.length * 0.35);
+        })();
 
-    const evaluated = questions.map(q => {
-      const submittedAnswer = answers[q.id] ?? answers[String(q.id)] ?? '';
-      const isCorrect = evaluateAnswer(q, submittedAnswer);
-      return {
-        question_id: q.id,
-        submitted_answer: String(submittedAnswer),
-        is_correct: isCorrect,
-        points: q.points || 0
-      };
-    });
-
-    const wrongQuestions = evaluated.filter(q => !q.is_correct).map(q => q.question_id);
-    const passed = wrongQuestions.length === 0;
-    const labScore = passed ? evaluated.reduce((sum, q) => sum + (q.points || 0), 0) : 0;
+    const nextAttempt = (prior?.attempt_number || 0) + 1;
+    const hintsUsed = prior?.hints_used || 0;
+    const ptsAwarded = isCorrect ? getHintPenalty(question.points, hintsUsed) : 0;
     const now = new Date().toISOString();
-    const priorProgress = db.prepare(`SELECT id, started_at FROM user_progress WHERE user_id=? AND lab_id=?`).get(user.id, lab.id);
-    const startedAt = priorProgress?.started_at || now;
 
-    const saveSubmission = db.transaction(() => {
-      db.prepare(`DELETE FROM user_answers WHERE user_id=? AND lab_id=?`).run(user.id, lab.id);
-
-      const insertAnswer = db.prepare(
-        `INSERT INTO user_answers (user_id, lab_id, question_id, submitted_answer, is_correct, pts_awarded, attempt_number)
-         VALUES (?,?,?,?,?,?,?)`
+    const saveAnswer = db.transaction(() => {
+      db.prepare(
+        `INSERT INTO user_answers (user_id, lab_id, question_id, submitted_answer, is_correct, pts_awarded, hints_used, attempt_number, submitted_at)
+         VALUES (?,?,?,?,?,?,?,?,?)
+         ON CONFLICT(user_id, question_id) DO UPDATE SET
+           submitted_answer=excluded.submitted_answer,
+           is_correct=excluded.is_correct,
+           pts_awarded=excluded.pts_awarded,
+           hints_used=excluded.hints_used,
+           attempt_number=excluded.attempt_number,
+           submitted_at=excluded.submitted_at`
+      ).run(
+        user.id,
+        lab.id,
+        question.id,
+        submitted,
+        isCorrect ? 1 : 0,
+        ptsAwarded,
+        hintsUsed,
+        nextAttempt,
+        now
       );
 
-      evaluated.forEach(item => {
-        insertAnswer.run(
-          user.id,
-          lab.id,
-          item.question_id,
-          item.submitted_answer,
-          item.is_correct ? 1 : 0,
-          passed ? item.points : 0,
-          1
-        );
-      });
+      const totalQuestions = db.prepare(`SELECT COUNT(*) as c FROM questions WHERE lab_id=?`).get(lab.id).c;
+      const solvedQuestions = db.prepare(
+        `SELECT COUNT(*) as c FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
+      ).get(user.id, lab.id).c;
+      const currentScore = db.prepare(
+        `SELECT COALESCE(SUM(pts_awarded),0) as total FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
+      ).get(user.id, lab.id).total;
+      const completed = solvedQuestions >= totalQuestions && totalQuestions > 0;
+      const existingProgress = db.prepare(`SELECT id, started_at FROM user_progress WHERE user_id=? AND lab_id=?`).get(user.id, lab.id);
+      const startedAt = existingProgress?.started_at || now;
 
-      if (priorProgress) {
+      if (existingProgress) {
         db.prepare(
           `UPDATE user_progress SET status=?, score=?, started_at=?, completed_at=? WHERE user_id=? AND lab_id=?`
         ).run(
-          passed ? 'completed' : 'not_started',
-          labScore,
+          completed ? 'completed' : 'in_progress',
+          currentScore,
           startedAt,
-          passed ? now : null,
+          completed ? now : null,
           user.id,
           lab.id
         );
@@ -468,26 +527,111 @@ async function router(req, res) {
         ).run(
           user.id,
           lab.id,
-          passed ? 'completed' : 'not_started',
-          labScore,
+          completed ? 'completed' : 'in_progress',
+          currentScore,
           startedAt,
-          passed ? now : null
+          completed ? now : null
         );
       }
     });
 
-    saveSubmission();
+    saveAnswer();
+
+    const totalQuestions = db.prepare(`SELECT COUNT(*) as c FROM questions WHERE lab_id=?`).get(lab.id).c;
+    const solvedQuestions = db.prepare(
+      `SELECT COUNT(*) as c FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
+    ).get(user.id, lab.id).c;
+    const completed = solvedQuestions >= totalQuestions && totalQuestions > 0;
 
     return jsonRes(res, 200, {
-      passed,
-      lab_status: passed ? 'completed' : 'not_started',
-      score_awarded: labScore,
-      wrong_question_ids: wrongQuestions,
-      total_questions: questions.length,
+      correct: isCorrect,
+      pts: ptsAwarded,
+      hints_used: hintsUsed,
+      attempts: nextAttempt,
+      remaining_points: isCorrect ? ptsAwarded : getHintPenalty(question.points, hintsUsed),
+      lab_status: completed ? 'completed' : 'in_progress',
+      completed_questions: solvedQuestions,
+      total_questions: totalQuestions,
       total_score: getUserTotalScore(user.id),
-      message: passed
-        ? 'Lab completed successfully. Full score awarded.'
-        : 'Lab submission failed. One or more answers were incorrect. No answers are shown. Retake the full lab to complete it.'
+      message: isCorrect
+        ? (completed ? 'Lab completed successfully.' : 'Correct. Move to the next question.')
+        : 'Incorrect. Review the evidence and request a hint if needed. The answer is never shown directly.'
+    });
+  }
+
+  // ── POST /api/labs/:slug/hint ───────────────────────────
+  const hintMatch = url.match(/^\/api\/labs\/([^/]+)\/hint$/);
+  if (method === 'POST' && hintMatch) {
+    const user = requireAuth(req, res); if (!user) return;
+    const slug = hintMatch[1];
+    const lab  = db.prepare(`SELECT * FROM labs WHERE slug=?`).get(slug);
+    if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
+
+    const { question_id } = await parseBody(req);
+    const questionId = parseInt(question_id, 10);
+    if (!questionId) return jsonRes(res, 400, { error: 'question_id is required' });
+
+    const question = db.prepare(
+      `SELECT id, points, correct_answer, hint, hint_levels, alert_ref FROM questions WHERE id=? AND lab_id=?`
+    ).get(questionId, lab.id);
+    if (!question) return jsonRes(res, 404, { error: 'Question not found' });
+
+    const current = db.prepare(
+      `SELECT submitted_answer, is_correct, pts_awarded, attempt_number, hints_used FROM user_answers WHERE user_id=? AND question_id=?`
+    ).get(user.id, question.id);
+    if (current?.is_correct) {
+      return jsonRes(res, 200, {
+        already_completed: true,
+        hints_used: current.hints_used || 0,
+        remaining_points: current.pts_awarded || getHintPenalty(question.points, current.hints_used || 0),
+        message: 'Question already completed. No further hints needed.'
+      });
+    }
+
+    const plan = getHintPlan(question);
+    const currentHints = current?.hints_used || 0;
+    const nextIndex = Math.min(currentHints, plan.length - 1);
+    const nextHintsUsed = Math.min(currentHints + 1, plan.length);
+    const remainingPoints = getHintPenalty(question.points, nextHintsUsed);
+    const now = new Date().toISOString();
+
+    db.prepare(
+      `INSERT INTO user_answers (user_id, lab_id, question_id, submitted_answer, is_correct, pts_awarded, hints_used, attempt_number, submitted_at)
+       VALUES (?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(user_id, question_id) DO UPDATE SET
+         submitted_answer=excluded.submitted_answer,
+         is_correct=excluded.is_correct,
+         pts_awarded=excluded.pts_awarded,
+         hints_used=excluded.hints_used,
+         attempt_number=user_answers.attempt_number,
+         submitted_at=excluded.submitted_at`
+    ).run(
+      user.id,
+      lab.id,
+      question.id,
+      current?.submitted_answer || '',
+      0,
+      0,
+      nextHintsUsed,
+      current?.attempt_number || 0,
+      now
+    );
+
+    const existingProgress = db.prepare(`SELECT id, started_at FROM user_progress WHERE user_id=? AND lab_id=?`).get(user.id, lab.id);
+    if (existingProgress) {
+      db.prepare(`UPDATE user_progress SET status=?, started_at=? WHERE user_id=? AND lab_id=?`).run('in_progress', existingProgress.started_at || now, user.id, lab.id);
+    } else {
+      db.prepare(`INSERT INTO user_progress (user_id, lab_id, status, score, started_at, completed_at) VALUES (?,?,?,?,?,?)`).run(user.id, lab.id, 'in_progress', 0, now, null);
+    }
+
+    return jsonRes(res, 200, {
+      hint_level: nextHintsUsed,
+      max_hints: plan.length,
+      hint: plan[nextIndex],
+      remaining_points: remainingPoints,
+      message: nextHintsUsed >= plan.length
+        ? 'Maximum hint level reached. The answer is still not revealed.'
+        : 'Hint unlocked. Points for this question have been reduced.'
     });
   }
 
@@ -737,8 +881,8 @@ async function router(req, res) {
       );
       if (questionPayload.length) {
         const insertQ = db.prepare(
-          `INSERT INTO questions (lab_id, question, answer_type, options, correct_answer, hint, explanation, points, difficulty, order_index, alert_ref)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+          `INSERT INTO questions (lab_id, question, answer_type, options, correct_answer, hint, hint_levels, explanation, points, difficulty, order_index, alert_ref)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
         );
         questionPayload.forEach((q, idx) => {
           if (!q || !q.question || !q.correct_answer) return;
@@ -749,6 +893,7 @@ async function router(req, res) {
             q.options ? JSON.stringify(Array.isArray(q.options) ? q.options : []) : null,
             String(q.correct_answer).trim(),
             String(q.hint || '').trim(),
+            JSON.stringify(Array.isArray(q.hint_levels) ? q.hint_levels : []),
             String(q.explanation || '').trim(),
             parseInt(q.points) || 20,
             q.difficulty || 'medium',
@@ -806,7 +951,8 @@ async function router(req, res) {
     const labId = parseInt(labQGetMatch[1]);
     const questions = db.prepare(`SELECT * FROM questions WHERE lab_id=? ORDER BY order_index`).all(labId).map(q => ({
       ...q,
-      options: q.options ? JSON.parse(q.options) : []
+      options: q.options ? JSON.parse(q.options) : [],
+      hint_levels: q.hint_levels ? JSON.parse(q.hint_levels) : []
     }));
     return jsonRes(res, 200, questions);
   }
@@ -819,12 +965,12 @@ async function router(req, res) {
     const lab = db.prepare(`SELECT id FROM labs WHERE id=?`).get(labId);
     if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
     const body = await parseBody(req);
-    const { question, answer_type, options, correct_answer, hint, explanation, points, difficulty, alert_ref } = body;
+    const { question, answer_type, options, correct_answer, hint, hint_levels, explanation, points, difficulty, alert_ref } = body;
     if (!question || !correct_answer) return jsonRes(res, 400, { error: 'question and correct_answer are required' });
     const maxOrder = db.prepare(`SELECT COALESCE(MAX(order_index),0) as m FROM questions WHERE lab_id=?`).get(labId).m;
     const info = db.prepare(
-      `INSERT INTO questions (lab_id, question, answer_type, options, correct_answer, hint, explanation, points, difficulty, order_index, alert_ref)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO questions (lab_id, question, answer_type, options, correct_answer, hint, hint_levels, explanation, points, difficulty, order_index, alert_ref)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       labId,
       question.trim(),
@@ -832,6 +978,7 @@ async function router(req, res) {
       options ? JSON.stringify(Array.isArray(options) ? options : []) : null,
       correct_answer.trim(),
       (hint || '').trim(),
+      JSON.stringify(Array.isArray(hint_levels) ? hint_levels : []),
       (explanation || '').trim(),
       parseInt(points) || 20,
       difficulty || 'medium',
@@ -856,6 +1003,7 @@ async function router(req, res) {
     if (body.options        !== undefined) { fields.push('options=?');        vals.push(body.options ? JSON.stringify(Array.isArray(body.options) ? body.options : []) : null); }
     if (body.correct_answer !== undefined) { fields.push('correct_answer=?'); vals.push(body.correct_answer.trim()); }
     if (body.hint           !== undefined) { fields.push('hint=?');           vals.push(body.hint.trim()); }
+    if (body.hint_levels    !== undefined) { fields.push('hint_levels=?');    vals.push(JSON.stringify(Array.isArray(body.hint_levels) ? body.hint_levels : [])); }
     if (body.explanation    !== undefined) { fields.push('explanation=?');    vals.push(body.explanation.trim()); }
     if (body.points         !== undefined) { fields.push('points=?');         vals.push(parseInt(body.points) || 20); }
     if (body.difficulty     !== undefined) { fields.push('difficulty=?');     vals.push(body.difficulty); }
