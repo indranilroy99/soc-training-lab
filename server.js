@@ -172,13 +172,12 @@ const MIME = {
 };
 
 // ── Helpers ───────────────────────────────────────────────
-function jsonRes(res, status, data) {
+function jsonRes(res, status, data, extraHeaders = {}) {
   const body = JSON.stringify(data);
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    ...(res.locals?.corsHeaders || {}),
+    ...extraHeaders,
   });
   res.end(body);
 }
@@ -225,9 +224,16 @@ function requireAdmin(req, res) {
 }
 
 function serveFile(res, filePath) {
-  const ext  = path.extname(filePath).toLowerCase();
+  const resolved = path.resolve(filePath);
+  const publicRoot = path.resolve(PUBLIC);
+  if (!resolved.startsWith(publicRoot + path.sep) && resolved !== publicRoot) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    res.end('Forbidden');
+    return;
+  }
+  const ext  = path.extname(resolved).toLowerCase();
   const mime = MIME[ext] || 'application/octet-stream';
-  fs.readFile(filePath, (err, data) => {
+  fs.readFile(resolved, (err, data) => {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not found');
@@ -399,13 +405,26 @@ async function router(req, res) {
   const method = req.method.toUpperCase();
   pruneExpiredSessions();
 
+  const origin = req.headers.origin || '';
+  const sameOrigin = !origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  const corsHeaders = sameOrigin ? {
+    'Access-Control-Allow-Origin': origin || '*',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Vary': 'Origin'
+  } : {};
+  res.locals = res.locals || {};
+  res.locals.corsHeaders = corsHeaders;
+  const json = (status, obj, extraHeaders = {}) => jsonRes(res, status, obj, extraHeaders);
+
   // CORS preflight
   if (method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin':  '*',
-      'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    });
+    if (!sameOrigin) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Origin not allowed' }));
+      return;
+    }
+    res.writeHead(204, corsHeaders);
     res.end();
     return;
   }
@@ -1178,7 +1197,13 @@ async function router(req, res) {
     if (url === '/admin' || url === '/admin/') {
       return serveFile(res, path.join(PUBLIC, 'admin', 'index.html'));
     }
-    const filePath = path.join(PUBLIC, url);
+    let normalizedUrl;
+    try {
+      normalizedUrl = path.posix.normalize(decodeURIComponent(url)).replace(/^\/+/, '');
+    } catch {
+      return json(400, { error: 'Invalid request path' });
+    }
+    const filePath = path.join(PUBLIC, normalizedUrl);
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
       return serveFile(res, filePath);
     }

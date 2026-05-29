@@ -1636,15 +1636,15 @@ const SocDash = {
     tbody.innerHTML = rows.map(a => {
       const ts = a.timestamp ? a.timestamp.replace('T', ' ').replace(/\.\d+Z?$/, '') : '–';
       const statusColor = a.status === 'resolved' ? 'var(--green)' : a.status === 'investigating' ? 'var(--yellow)' : 'var(--muted)';
-      return `<tr onclick="SocDash.openDetail('${a.id}')">
-        <td class="td-mono" style="color:var(--blue)">${a.id}</td>
-        <td><span class="sev-badge sev-${a.severity}">${a.severity.toUpperCase()}</span></td>
-        <td class="td-title">${a.title}</td>
-        <td style="color:var(--muted);font-size:11.5px">${a.category||'–'}</td>
-        <td class="td-mono">${a.host||'–'}</td>
-        <td class="td-mono">${a.source||'–'}</td>
-        <td class="td-mono">${ts}</td>
-        <td style="font-size:11.5px;font-weight:600;color:${statusColor};text-transform:capitalize">${a.status||'open'}</td>
+      return `<tr onclick="SocDash.openDetail(${JSON.stringify(String(a.id || ''))})">
+        <td class="td-mono" style="color:var(--blue)">${escapeHtml(a.id)}</td>
+        <td><span class="sev-badge sev-${a.severity}">${escapeHtml(a.severity.toUpperCase())}</span></td>
+        <td class="td-title">${escapeHtml(a.title)}</td>
+        <td style="color:var(--muted);font-size:11.5px">${escapeHtml(a.category||'–')}</td>
+        <td class="td-mono">${escapeHtml(a.host||'–')}</td>
+        <td class="td-mono">${escapeHtml(a.source||'–')}</td>
+        <td class="td-mono">${escapeHtml(ts)}</td>
+        <td style="font-size:11.5px;font-weight:600;color:${statusColor};text-transform:capitalize">${escapeHtml(a.status||'open')}</td>
       </tr>`;
     }).join('');
   },
@@ -1674,62 +1674,62 @@ const SocDash = {
         <div class="alert-detail-header">
           <div>
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-              <span class="sev-badge sev-${a.severity}">${a.severity.toUpperCase()}</span>
-              <span class="td-mono" style="color:var(--blue);font-size:12px">${a.id}</span>
-              <span id="alert-detail-status-badge" style="font-size:11.5px;font-weight:600;color:var(--muted);text-transform:capitalize">${a.status||'open'}</span>
+              <span class="sev-badge sev-${a.severity}">${escapeHtml(a.severity.toUpperCase())}</span>
+              <span class="td-mono" style="color:var(--blue);font-size:12px">${escapeHtml(a.id)}</span>
+              <span id="alert-detail-status-badge" style="font-size:11.5px;font-weight:600;color:var(--muted);text-transform:capitalize">${escapeHtml(a.status||'open')}</span>
             </div>
-            <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">${a.title}</div>
-            <div style="font-size:12px;color:var(--muted)">${a.description||''}</div>
+            <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">${escapeHtml(a.title)}</div>
+            <div style="font-size:12px;color:var(--muted)">${escapeHtml(a.description||'')}</div>
           </div>
           <button class="alert-detail-close" onclick="document.getElementById('alert-detail-overlay').remove()">✕</button>
         </div>
         <div class="alert-detail-body">
           <div class="alert-kv-grid">
-            <div class="alert-kv"><div class="alert-kv-label">Category</div><div class="alert-kv-val">${a.category||'–'}</div></div>
-            <div class="alert-kv"><div class="alert-kv-label">Timestamp</div><div class="alert-kv-val">${ts}</div></div>
-            <div class="alert-kv"><div class="alert-kv-label">Host / Endpoint</div><div class="alert-kv-val">${a.host||'–'}</div></div>
-            <div class="alert-kv"><div class="alert-kv-label">Username</div><div class="alert-kv-val">${a.username||'–'}</div></div>
-            <div class="alert-kv"><div class="alert-kv-label">Source IP</div><div class="alert-kv-val">${a.src_ip||'–'}</div></div>
-            <div class="alert-kv"><div class="alert-kv-label">Destination IP</div><div class="alert-kv-val">${a.dst_ip||'–'}</div></div>
-            <div class="alert-kv"><div class="alert-kv-label">Process</div><div class="alert-kv-val">${a.process||'–'}</div></div>
-            <div class="alert-kv"><div class="alert-kv-label">Event ID</div><div class="alert-kv-val">${a.event_id||'–'}</div></div>
-            <div class="alert-kv"><div class="alert-kv-label">Data Source</div><div class="alert-kv-val">${a.source||'–'}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Category</div><div class="alert-kv-val">${escapeHtml(a.category||'–')}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Timestamp</div><div class="alert-kv-val">${escapeHtml(ts)}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Host / Endpoint</div><div class="alert-kv-val">${escapeHtml(a.host||'–')}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Username</div><div class="alert-kv-val">${escapeHtml(a.username||'–')}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Source IP</div><div class="alert-kv-val">${escapeHtml(a.src_ip||'–')}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Destination IP</div><div class="alert-kv-val">${escapeHtml(a.dst_ip||'–')}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Process</div><div class="alert-kv-val">${escapeHtml(a.process||'–')}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Event ID</div><div class="alert-kv-val">${escapeHtml(a.event_id||'–')}</div></div>
+            <div class="alert-kv"><div class="alert-kv-label">Data Source</div><div class="alert-kv-val">${escapeHtml(a.source||'–')}</div></div>
             <div class="alert-kv">
               <div class="alert-kv-label">MITRE</div>
               <div class="alert-kv-val">
-                ${a.mitre_tactic ? `<span style="color:var(--muted);font-size:11px">${a.mitre_tactic} / </span>` : ''}
-                ${a.mitre_technique ? `<span class="mitre-tag">${a.mitre_technique}</span>` : '–'}
+                ${a.mitre_tactic ? `<span style="color:var(--muted);font-size:11px">${escapeHtml(a.mitre_tactic)} / </span>` : ''}
+                ${a.mitre_technique ? `<span class="mitre-tag">${escapeHtml(a.mitre_technique)}</span>` : '–'}
               </div>
             </div>
           </div>
 
           ${a.raw_log ? `<div class="alert-section-title">Raw Log</div>
-          <pre style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap;word-break:break-all">${a.raw_log}</pre>` : ''}
+          <pre style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap;word-break:break-all">${escapeHtml(a.raw_log)}</pre>` : ''}
 
           ${iocs.length > 0 ? `<div class="alert-section-title">Indicators of Compromise</div>
-          <div style="margin-bottom:4px">${iocs.map(i => `<span class="ioc-tag">${i}</span>`).join('')}</div>` : ''}
+          <div style="margin-bottom:4px">${iocs.map(i => `<span class="ioc-tag">${escapeHtml(i)}</span>`).join('')}</div>` : ''}
 
           ${timeline.length > 0 ? `<div class="alert-section-title">Timeline</div>
           <div class="alert-timeline">${timeline.map(e => `
             <div class="tl-entry">
-              <div class="tl-time">${e.time||''}</div>
-              <div class="tl-event">${e.event||e.description||JSON.stringify(e)}</div>
+              <div class="tl-time">${escapeHtml(e.time||'')}</div>
+              <div class="tl-event">${escapeHtml(e.event||e.description||JSON.stringify(e))}</div>
             </div>`).join('')}
           </div>` : ''}
 
           ${a.network_flow ? `<div class="alert-section-title">Network Flow</div>
-          <pre style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap">${typeof a.network_flow === 'string' ? a.network_flow : JSON.stringify(a.network_flow, null, 2)}</pre>` : ''}
+          <pre style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted);overflow-x:auto;white-space:pre-wrap">${escapeHtml(typeof a.network_flow === 'string' ? a.network_flow : JSON.stringify(a.network_flow, null, 2))}</pre>` : ''}
         </div>
         <div class="alert-actions-bar">
-          <span style="font-size:11.5px;color:var(--dim)">Alert ID: ${a.id}</span>
+          <span style="font-size:11.5px;color:var(--dim)">Alert ID: ${escapeHtml(a.id)}</span>
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('alert-detail-overlay').remove()">Close</button>
-            <button class="btn btn-warn btn-sm" onclick="SocDash.openEscalate('${a.id}')">
+            <button class="btn btn-warn btn-sm" onclick="SocDash.openEscalate(${JSON.stringify(String(a.id || ''))})">
               <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='18 15 12 9 6 15'/></svg>
               Escalate
             </button>
-            <button class="btn btn-fp btn-sm" onclick="window.irOpenFP('${a.id}')">False Positive</button>
-            <button class="btn btn-resolve btn-sm" onclick="window.irOpenResolve('${a.id}')">Mark as Resolved</button>
+            <button class="btn btn-fp btn-sm" onclick="window.irOpenFP(${JSON.stringify(String(a.id || ''))})">False Positive</button>
+            <button class="btn btn-resolve btn-sm" onclick="window.irOpenResolve(${JSON.stringify(String(a.id || ''))})">Mark as Resolved</button>
           </div>
         </div>
       </div>`;
@@ -1909,7 +1909,7 @@ window.irSubmitResolve = async function() {
           <div style="font-weight:600;color:var(--text);margin-bottom:8px">Investigation Score: ${score}%</div>
           <div class="ir-score-bar"><div class="ir-score-bar-fill" style="width:${score}%"></div></div>
           <div style="color:var(--muted);margin-top:8px;margin-bottom:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Feedback</div>
-          ${feedback.map(f => `<div style="color:var(--dim);margin-bottom:4px">• ${f}</div>`).join('')}
+          ${feedback.map(f => `<div style="color:var(--dim);margin-bottom:4px">• ${escapeHtml(f)}</div>`).join('')}
           <button onclick="this.parentElement.remove()" style="margin-top:10px;font-size:11px;color:var(--dim);background:none;border:none;cursor:pointer;padding:0">Dismiss</button>
         `;
         document.body.appendChild(fb);
