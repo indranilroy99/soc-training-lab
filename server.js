@@ -1516,15 +1516,54 @@ const server = http.createServer(async (req, res) => {
 });
 
 // Clean expired sessions every hour
-setInterval(() => {
+const sessionCleanupTimer = setInterval(() => {
   const deleted = db.prepare(`DELETE FROM sessions WHERE expires_at < datetime('now')`).run();
   if (deleted.changes > 0) console.log(`[cleanup] Removed ${deleted.changes} expired sessions`);
 }, 3600 * 1000);
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  DIAAS-SEC Platform`);
-  console.log(`  Running at http://0.0.0.0:${PORT}`);
-  console.log(`  Login:   http://localhost:${PORT}`);
-  console.log(`  Analyst: http://localhost:${PORT}/analyst`);
-  console.log(`  Admin:   http://localhost:${PORT}/admin\n`);
-});
+function startServer(port = PORT, host = '0.0.0.0') {
+  return new Promise((resolve, reject) => {
+    const onError = err => {
+      server.off('listening', onListening);
+      reject(err);
+    };
+    const onListening = () => {
+      server.off('error', onError);
+      resolve(server);
+    };
+    server.once('error', onError);
+    server.once('listening', onListening);
+    server.listen(port, host);
+  });
+}
+
+function stopServer() {
+  return new Promise((resolve, reject) => {
+    if (!server.listening) return resolve();
+    server.close(err => err ? reject(err) : resolve());
+  });
+}
+
+if (require.main === module) {
+  startServer(PORT, '0.0.0.0').then(() => {
+    console.log(`\n  DIAAS-SEC Platform`);
+    console.log(`  Running at http://0.0.0.0:${PORT}`);
+    console.log(`  Login:   http://localhost:${PORT}`);
+    console.log(`  Analyst: http://localhost:${PORT}/analyst`);
+    console.log(`  Admin:   http://localhost:${PORT}/admin\n`);
+  });
+}
+
+module.exports = {
+  appServer: server,
+  startServer,
+  stopServer,
+  router,
+  db,
+  getUserTotalScore,
+  getUserAlertStatus,
+  setUserAlertStatus,
+  scoreIRAnswers,
+  loginAttempts,
+  sessionCleanupTimer,
+};
