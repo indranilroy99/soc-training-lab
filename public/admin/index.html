@@ -327,13 +327,17 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6L3 12l5 6M16 6l5 6-5 6"/></svg>
         <span class="nav-label">Leaderboard</span>
       </div>
+      <div class="nav-item" data-page="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 9.91 3H10a2 2 0 1 1 4 0h.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="nav-label">My Profile</span>
+      </div>
     </nav>
     <div class="sidebar-footer">
       <div class="admin-chip" onclick="App.navigate('settings')" style="cursor:pointer" title="Account settings">
         <div class="admin-avatar" id="sidebar-avatar">A</div>
         <div class="admin-info">
           <div class="a-name" id="sidebar-username">Admin</div>
-          <div class="a-role" style="color:var(--blue);font-size:10px">Change password ›</div>
+          <div class="a-role" style="color:var(--muted);font-size:10.5px">Administrator Profile</div>
         </div>
       </div>
       <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;justify-content:center" onclick="App.logout()">
@@ -535,13 +539,13 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
   <div class="page-hdr">
     <div class="page-hdr-left">
       <button class="btn btn-outline btn-sm" onclick="App.navigate('overview')" style="margin-bottom:6px">← Back</button>
-      <div class="page-title">Account Settings</div>
-      <p class="page-sub">Change your admin password.</p>
+      <div class="page-title">My Profile</div>
+      <p class="page-sub">Manage your admin account and password settings.</p>
     </div>
   </div>
   <div style="max-width:440px">
     <div class="card">
-      <div class="card-hdr"><span class="card-title">Change Password</span></div>
+      <div class="card-hdr"><span class="card-title">Password Settings</span></div>
       <div class="card-body">
         <div class="form-group">
           <label class="form-label">Current Password</label>
@@ -924,7 +928,7 @@ const App = {
     const navEl  = document.querySelector(`.nav-item[data-page="${page}"]`);
     if (pageEl) pageEl.classList.add('active');
     if (navEl)  navEl.classList.add('active');
-    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', leaderboard:'Leaderboard', labs:'Labs & Questions', 'analyst-profile':'Analyst Profile', settings:'Settings' };
+    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', leaderboard:'Leaderboard', labs:'Labs & Questions', 'analyst-profile':'Analyst Profile', settings:'My Profile' };
     document.getElementById('bc-cur').textContent = labels[page] || page;
     if (page === 'overview')    Pages.loadOverview();
     if (page === 'users')       Pages.loadUsers();
