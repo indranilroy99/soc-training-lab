@@ -129,6 +129,16 @@ try {
 } catch(e) { /* already exists */ }
 
 try {
+  db.prepare(`ALTER TABLE user_answers ADD COLUMN wrong_count INTEGER DEFAULT 0`).run();
+  console.log('[migrate] Added user_answers.wrong_count column');
+} catch(e) { /* already exists */ }
+
+try {
+  db.prepare(`ALTER TABLE user_answers ADD COLUMN submitted_answer TEXT`).run();
+  console.log('[migrate] Added user_answers.submitted_answer column');
+} catch(e) { /* already exists */ }
+
+try {
   db.prepare(`ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0`).run();
   console.log('[migrate] Added users.points column');
 } catch(e) { /* already exists */ }
@@ -572,7 +582,7 @@ async function router(req, res) {
     if (!question) return jsonRes(res, 404, { error: 'Question not found' });
 
     const prior = db.prepare(
-      `SELECT attempt_number, hints_used, is_correct FROM user_answers WHERE user_id=? AND question_id=?`
+      `SELECT attempt_number, hints_used, is_correct, wrong_count, pts_awarded FROM user_answers WHERE user_id=? AND question_id=?`
     ).get(user.id, question.id);
     if (prior?.is_correct) {
       return jsonRes(res, 200, {
