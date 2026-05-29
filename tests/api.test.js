@@ -283,3 +283,34 @@ test('concurrent analyst login and read flows succeed under classroom-sized burs
     assert.ok(Array.isArray(session.labs.data), `${session.username} labs payload invalid`);
   }
 });
+
+test('reseeding upgrades older questions tables missing hint_levels', async () => {
+  db.exec('DROP TABLE IF EXISTS questions');
+  db.exec(`CREATE TABLE questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lab_id INTEGER NOT NULL,
+    order_index INTEGER DEFAULT 0,
+    points INTEGER DEFAULT 20,
+    difficulty TEXT DEFAULT \'medium\',
+    answer_type TEXT DEFAULT \'choice\',
+    question TEXT NOT NULL,
+    options TEXT,
+    correct_answer TEXT NOT NULL,
+    hint TEXT,
+    explanation TEXT
+  )`);
+
+  execFileSync(process.execPath, ['database/seed.js'], { cwd: repoRoot, stdio: 'pipe' });
+
+  const columns = db.prepare('PRAGMA table_info(questions)').all();
+  assert.ok(columns.some(col => col.name === 'hint_levels'), 'expected hint_levels column after reseed');
+
+  const seededHintRow = db.prepare(`SELECT q.hint_levels
+    FROM questions q
+    JOIN labs l ON l.id = q.lab_id
+    WHERE l.slug = ?
+    ORDER BY q.order_index ASC
+    LIMIT 1`).get('soc-fundamentals');
+  assert.ok(seededHintRow, 'expected reseeded questions');
+  assert.equal(typeof seededHintRow.hint_levels, 'string');
+});
