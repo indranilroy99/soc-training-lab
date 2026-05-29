@@ -669,14 +669,13 @@ async function router(req, res) {
       pts: ptsAwarded,
       hints_used: hintsUsed,
       attempts: nextAttempt,
-      remaining_points: isCorrect ? ptsAwarded : getHintPenalty(question.points, hintsUsed),
       lab_status: completed ? 'completed' : 'in_progress',
       completed_questions: solvedQuestions,
       total_questions: totalQuestions,
       total_score: getUserTotalScore(user.id),
       message: isCorrect
         ? (completed ? 'Lab completed successfully.' : 'Correct. Move to the next question.')
-        : 'Incorrect. Review the evidence and request a hint if needed. The answer is never shown directly.'
+        : 'Incorrect. Review the evidence and try again.'
     });
   }
 
@@ -704,7 +703,6 @@ async function router(req, res) {
       return jsonRes(res, 200, {
         already_completed: true,
         hints_used: current.hints_used || 0,
-        remaining_points: current.pts_awarded || getHintPenalty(question.points, current.hints_used || 0),
         message: 'Question already completed. No further hints needed.'
       });
     }
@@ -713,7 +711,6 @@ async function router(req, res) {
     const currentHints = current?.hints_used || 0;
     const nextIndex = Math.min(currentHints, plan.length - 1);
     const nextHintsUsed = Math.min(currentHints + 1, plan.length);
-    const remainingPoints = getHintPenalty(question.points, nextHintsUsed);
     const now = new Date().toISOString();
 
     db.prepare(
@@ -749,10 +746,9 @@ async function router(req, res) {
       hint_level: nextHintsUsed,
       max_hints: plan.length,
       hint: plan[nextIndex],
-      remaining_points: remainingPoints,
       message: nextHintsUsed >= plan.length
-        ? 'Maximum hint level reached. The answer is still not revealed.'
-        : 'Hint unlocked. Points for this question have been reduced.'
+        ? 'Maximum hint level reached.'
+        : 'Hint unlocked.'
     });
   }
 

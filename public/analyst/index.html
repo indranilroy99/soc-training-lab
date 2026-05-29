@@ -1354,7 +1354,6 @@ const Pages = {
     const isLast  = idx === totalQ - 1;
     const savedAnswer = Pages._labDraftAnswers[q.id] || '';
     const hintsUsed = Number(q.hints_used || 0);
-    const remainingPoints = done ? Number(q.pts_earned || 0) : Math.max(0, Number(q.points || 0) - (hintsUsed === 1 ? 5 : hintsUsed === 2 ? 15 : hintsUsed >= 3 ? Number(q.points || 0) : 0));
     let inputHtml = '';
     if (q.answer_type === 'choice' && q.options) {
       const opts = JSON.parse(typeof q.options === 'string' ? q.options : JSON.stringify(q.options));
@@ -1374,14 +1373,14 @@ const Pages = {
       <div class="q-card-body">
         ${inputHtml}
         <div style="margin-bottom:10px">
-          <button class="q-hint-btn" onclick="Pages.requestHint('${slug}', ${q.id})" ${locked || done || hintsUsed >= 3 ? 'disabled' : ''}>${hintsUsed === 0 ? 'Hint 1 (-5 pts)' : hintsUsed === 1 ? 'Hint 2 (-10 pts)' : 'Final Hint (0 pts)'}</button>
+          <button class="q-hint-btn" onclick="Pages.requestHint('${slug}', ${q.id})" ${locked || done || hintsUsed >= 3 ? 'disabled' : ''}>${hintsUsed === 0 ? 'Request Hint' : hintsUsed === 1 ? 'Request Another Hint' : 'Final Hint Available'}</button>
           <div class="q-hint-text ${hintsUsed > 0 ? 'visible' : ''}" id="q-hint-${q.id}">${hintsUsed > 0 ? escapeHtml(q.hint_plan?.[hintsUsed - 1] || '') : ''}</div>
         </div>
         <div class="q-actions">
           ${done
             ? `<span style="color:var(--blue);font-size:12.5px;font-weight:600">✓ Solved (+${q.pts_earned} pts)</span>`
             : `<button class="btn btn-green btn-sm" onclick="Pages.submitAnswer('${slug}', ${q.id}, '${q.answer_type}')" ${locked ? 'disabled' : ''}>Submit Answer</button>
-               <span class="q-attempts">Hints used: ${hintsUsed}/3 • Score left on this question: ${remainingPoints} pts</span>`
+               <span class="q-attempts">${hintsUsed > 0 ? `Hints used: ${hintsUsed}/3` : ''}</span>`
           }
         </div>
         <div class="q-feedback" id="q-fb-${q.id}"></div>
@@ -1413,13 +1412,13 @@ const Pages = {
     }
     if (fbEl) {
       fbEl.className = 'q-feedback visible';
-      fbEl.innerHTML = `<div class="fb-title">Hint ${d.hint_level}/${d.max_hints}</div>${escapeHtml(d.message)}<div style="margin-top:6px;color:var(--muted)">Score left on this question: ${d.remaining_points} pts</div>`;
+      fbEl.innerHTML = `<div class="fb-title">Hint ${d.hint_level}/${d.max_hints}</div>${escapeHtml(d.message)}`;
     }
     const attempts = card ? card.querySelector('.q-attempts') : null;
-    if (attempts) attempts.textContent = `Hints used: ${d.hint_level}/3 • Score left on this question: ${d.remaining_points} pts`;
+    if (attempts) attempts.textContent = `Hints used: ${d.hint_level}/3`;
     const hintBtn = card ? card.querySelector('.q-hint-btn') : null;
     if (hintBtn) {
-      hintBtn.textContent = d.hint_level >= d.max_hints ? 'Maximum Hint Reached' : (d.hint_level === 1 ? 'Hint 2 (-10 pts)' : 'Final Hint (0 pts)');
+      hintBtn.textContent = d.hint_level >= d.max_hints ? 'Maximum Hints Used' : (d.hint_level === 1 ? 'Request Another Hint' : 'Final Hint Available');
       hintBtn.disabled = d.hint_level >= d.max_hints;
     }
     toast('Hint unlocked.', 'info');
@@ -1489,10 +1488,10 @@ const Pages = {
       } else {
         if (fbEl) {
           fbEl.className = 'q-feedback wrong visible';
-          fbEl.innerHTML = `<div class="fb-title">Not quite</div>${escapeHtml(d.message)}<div style="margin-top:6px;color:var(--muted)">Score left on this question: ${d.remaining_points} pts. Use a hint only if you need it.</div>`;
+          fbEl.innerHTML = `<div class="fb-title">Incorrect</div>${escapeHtml(d.message)}`;
         }
         if (btn) { btn.disabled = false; btn.textContent = 'Submit Answer'; }
-        toast('Incorrect. Check the evidence and try again.', 'error');
+        toast('Incorrect. Review the evidence and try again.', 'error');
       }
     } catch(e) {
       toast('Network error', 'error');
