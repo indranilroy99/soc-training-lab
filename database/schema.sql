@@ -6,7 +6,13 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role         TEXT NOT NULL DEFAULT 'analyst',
   is_active    INTEGER NOT NULL DEFAULT 1,
+  is_deleted   INTEGER NOT NULL DEFAULT 0,  -- Soft delete flag
+  deleted_at   TEXT,                        -- When soft-deleted
+  deleted_by   INTEGER,                     -- Admin who deleted
   points       INTEGER DEFAULT 0,
+  last_lab_slug TEXT,                       -- Last lab user was viewing
+  last_question_id INTEGER,                 -- Last question user was on
+  last_active_at TEXT,                      -- Last activity timestamp
   created_at   TEXT DEFAULT (datetime('now'))
 );
 
@@ -188,3 +194,23 @@ CREATE TABLE IF NOT EXISTS alert_rubrics (
   FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_rubrics_alert ON alert_rubrics(alert_id);
+
+-- ── Deleted Users Archive (for restoring progress if needed) ──────────────────────
+CREATE TABLE IF NOT EXISTS deleted_users_archive (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  original_user_id  INTEGER NOT NULL,
+  username          TEXT NOT NULL,
+  role              TEXT NOT NULL,
+  total_score       INTEGER DEFAULT 0,
+  labs_completed    INTEGER DEFAULT 0,
+  progress_json     TEXT,                    -- Full user_progress snapshot
+  answers_json      TEXT,                    -- Full user_answers snapshot
+  deleted_at        TEXT DEFAULT (datetime('now')),
+  deleted_by        INTEGER,
+  restored_at       TEXT,                    -- If restored, when
+  restored_to_user_id INTEGER,               -- New user ID if restored
+  notes             TEXT                     -- Admin notes on deletion
+);
+
+CREATE INDEX IF NOT EXISTS idx_deleted_archive_user ON deleted_users_archive(original_user_id);
+CREATE INDEX IF NOT EXISTS idx_deleted_archive_username ON deleted_users_archive(username);

@@ -217,6 +217,12 @@
         <input class="form-input" type="password" id="password" name="password"
                placeholder="Enter your password" autocomplete="current-password" required>
       </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:-4px">
+        <input type="checkbox" id="remember-me" style="width:16px;height:16px;cursor:pointer">
+        <label for="remember-me" style="font-size:13px;color:var(--muted);cursor:pointer">
+          Remember me (90 days)
+        </label>
+      </div>
       <button class="btn-login" type="submit" id="login-btn">
         <span class="btn-text">Sign In</span>
         <div class="spinner"></div>
@@ -260,6 +266,7 @@
     hideError();
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
+    const rememberMe = document.getElementById('remember-me').checked;
     if (!username || !password) { showError('Please enter username and password.'); return; }
 
     btn.classList.add('loading');
@@ -269,12 +276,22 @@
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password, remember_me: rememberMe })
       });
       const data = await res.json();
       if (!res.ok) { showError(data.error || 'Login failed. Check your credentials.'); return; }
       localStorage.setItem('diaas_token', data.token);
       localStorage.setItem('diaas_user',  JSON.stringify(data.user));
+      
+      // Save session info for display
+      localStorage.setItem('diaas_session_days', data.session_days);
+      
+      // Store last position for resuming
+      if (data.user.last_lab_slug) {
+        localStorage.setItem('diaas_last_page', 'lab-view');
+        localStorage.setItem('diaas_last_lab_slug', data.user.last_lab_slug);
+      }
+      
       window.location.href = data.user.role === 'admin' ? '/admin' : '/analyst';
     } catch (err) {
       showError('Cannot reach the server. Make sure DIAAS-SEC is running.');

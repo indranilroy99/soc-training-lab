@@ -1109,19 +1109,38 @@ const Pages = {
 
   renderDashboardLabs() {
     const labs = App.labsData;
+    const me = App.meData;
+    
+    // Check for resume opportunity - user has a lab from last session
+    const resumeLab = me?.last_lab_slug ? labs.find(l => l.slug === me.last_lab_slug && l.status === 'in_progress') : null;
+    
     // In-progress
     const inProgress = labs.filter(l => l.status === 'in_progress');
     const ipEl = document.getElementById('dash-inprogress');
+    
+    // Build resume banner if applicable
+    let resumeBanner = '';
+    if (resumeLab) {
+      const lastActive = me.last_active_at ? new Date(me.last_active_at).toLocaleDateString() : 'recently';
+      resumeBanner = `<div style="background:var(--blue);color:#fff;padding:12px 14px;border-radius:4px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-weight:600;font-size:13px">← Continue where you left off</div>
+          <div style="font-size:11px;opacity:0.9">${escapeHtml(resumeLab.title)} · Last active ${lastActive}</div>
+        </div>
+        <button class="btn" style="background:#fff;color:var(--blue);border:none;padding:8px 16px;font-size:12px;font-weight:600" onclick="App.openLab('${resumeLab.slug}')">Resume</button>
+      </div>`;
+    }
+    
     if (inProgress.length === 0) {
       const notStarted = labs.filter(l => l.status === 'not_started');
       if (notStarted.length > 0) {
-        ipEl.innerHTML = `<div style="font-size:13px;color:var(--muted);margin-bottom:12px">No labs in progress. Start your first lab!</div>
+        ipEl.innerHTML = `${resumeBanner}<div style="font-size:13px;color:var(--muted);margin-bottom:12px">No labs in progress. Start your first lab!</div>
           ${Pages._miniLabCard(notStarted[0])}`;
       } else {
-        ipEl.innerHTML = '<div class="empty-state"><div class="empty-title">All labs completed! 🎉</div></div>';
+        ipEl.innerHTML = `${resumeBanner}<div class="empty-state"><div class="empty-title">All labs completed! 🎉</div></div>`;
       }
     } else {
-      ipEl.innerHTML = inProgress.slice(0,2).map(Pages._miniLabCard).join('');
+      ipEl.innerHTML = resumeBanner + inProgress.slice(0,2).map(Pages._miniLabCard).join('');
     }
     // All labs quick view
     const allEl = document.getElementById('dash-all-labs');
@@ -1279,6 +1298,24 @@ const Pages = {
       return Pages._renderQuestion(q, i, lab.slug, isLocked, lab.questions.length);
     }).join('');
 
+    // Scroll to first unsolved question OR last known position
+    setTimeout(() => {
+      const me = App.meData;
+      let targetIdx = 0;
+      
+      // Check if we have a saved question position for this lab
+      if (me?.last_lab_slug === lab.slug && me?.last_question_id) {
+        const savedQ = lab.questions.findIndex(q => q.id === me.last_question_id);
+        if (savedQ >= 0) targetIdx = savedQ;
+      } else {
+        // Find first unsolved question
+        const firstUnsolved = lab.questions.findIndex(q => !q.completed);
+        if (firstUnsolved >= 0) targetIdx = firstUnsolved;
+      }
+      
+      Pages.scrollToQuestion(targetIdx);
+    }, 100);
+
     // Attach event handlers
     lab.questions.forEach(q => {
       if (q.answer_type === 'choice') {
@@ -1345,6 +1382,13 @@ const Pages = {
       scrollPanel.scrollTo({ top: cardTop - 16, behavior: 'smooth' });
     } else {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    
+    // Save position to backend for resume support
+    const qid = target.dataset.qid;
+    const currentSlug = App.currentLabSlug;
+    if (currentSlug && qid) {
+      API.post('/api/me/position', { lab_slug: currentSlug, question_id: parseInt(qid) }).catch(()=>{});
     }
   },
 

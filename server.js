@@ -16,6 +16,7 @@ const PORT    = process.env.PORT || 3000;
 const DB_PATH = path.join(__dirname, 'database', 'diaas.db');
 const PUBLIC  = path.join(__dirname, 'public');
 const SESSION_TTL_HOURS = 24;
+const LONG_SESSION_TTL_DAYS = 90;  // For "Remember Me" sessions
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 10;
 const SESSION_TOUCH_INTERVAL_MS = 30 * 60 * 1000;
@@ -210,18 +211,21 @@ function requireAuth(req, res) {
   if (!token) { jsonRes(res, 401, { error: 'No token provided' }); return null; }
   const now = new Date().toISOString();
   const row = db.prepare(
-    `SELECT u.id, u.username, u.role, u.is_active as active,
+    `SELECT u.id, u.username, u.role, u.is_active as active, u.is_deleted,
             s.expires_at as session_expires_at
      FROM sessions s JOIN users u ON u.id = s.user_id
-     WHERE s.token = ? AND s.expires_at > ? AND u.is_active = 1`
+     WHERE s.token = ? AND s.expires_at > ? AND u.is_active = 1 AND u.is_deleted = 0`
   ).get(token, now);
   if (!row) { jsonRes(res, 401, { error: 'Invalid or expired session' }); return null; }
-
+  
+  // Update last active timestamp occasionally (every touch interval)
   const expiresTs = Date.parse(row.session_expires_at || '');
   if (!Number.isNaN(expiresTs) && (expiresTs - Date.now()) < SESSION_TOUCH_INTERVAL_MS) {
     const nextExpiry = new Date(Date.now() + SESSION_TTL_HOURS * 3600 * 1000).toISOString();
     db.prepare(`UPDATE sessions SET expires_at=? WHERE token=?`).run(nextExpiry, token);
     row.session_expires_at = nextExpiry;
+    // Also update user's last_active_at
+    db.prepare(`UPDATE users SET last_active_at=? WHERE id=?`).run(new Date().toISOString(), row.id);
   }
   return row;
 }
@@ -446,9 +450,9 @@ async function router(req, res) {
     return;
   }
 
-  // ── POST /api/auth/login ──────────────────────────────
+  // ── POST /api/auth/login ────────────────────────────────────
   if (method === 'POST' && url === '/api/auth/login') {
-    const { username, password } = await parseBody(req);
+    const { username, password, remember_me } = await parseBody(req);
     if (!username || !password) {
       return jsonRes(res, 400, { error: 'Username and password required' });
     }
@@ -456,18 +460,34 @@ async function router(req, res) {
     if (isLoginThrottled(throttleKey)) {
       return jsonRes(res, 429, { error: 'Too many login attempts. Try again in 15 minutes.' });
     }
-    const user = db.prepare(`SELECT * FROM users WHERE username=? AND is_active=1`).get(username);
+    // Check for active, non-deleted users only
+    const user = db.prepare(`SELECT * FROM users WHERE username=? AND is_active=1 AND is_deleted=0`).get(username);
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
       recordLoginFailure(throttleKey);
       return jsonRes(res, 401, { error: 'Invalid username or password' });
     }
     clearLoginFailures(throttleKey);
+    
+    // Generate token with extended expiry if "Remember Me" is checked
     const token   = crypto.randomBytes(48).toString('hex');
-    const expires = new Date(Date.now() + SESSION_TTL_HOURS * 3600 * 1000).toISOString();
+    const sessionDays = remember_me ? LONG_SESSION_TTL_DAYS : SESSION_TTL_HOURS / 24;
+    const expires = new Date(Date.now() + sessionDays * 24 * 3600 * 1000).toISOString();
     db.prepare(`INSERT INTO sessions (user_id, token, expires_at) VALUES (?,?,?)`).run(user.id, token, expires);
+    
+    // Update last active timestamp
+    db.prepare(`UPDATE users SET last_active_at=? WHERE id=?`).run(new Date().toISOString(), user.id);
+    
+    // Return last position info for resuming
     return jsonRes(res, 200, {
       token,
-      user: { id: user.id, username: user.username, role: user.role }
+      user: { 
+        id: user.id, 
+        username: user.username, 
+        role: user.role,
+        last_lab_slug: user.last_lab_slug,
+        last_question_id: user.last_question_id
+      },
+      session_days: sessionDays
     });
   }
 
@@ -479,7 +499,7 @@ async function router(req, res) {
     return jsonRes(res, 200, { ok: true });
   }
 
-  // ── GET /api/me ───────────────────────────────────────
+  // ── GET /api/me ────────────────────────────────────────────────
   if (method === 'GET' && url === '/api/me') {
     const user = requireAuth(req, res); if (!user) return;
     const score = getUserTotalScore(user.id);
@@ -497,11 +517,29 @@ async function router(req, res) {
       `SELECT COUNT(*) as c FROM user_answers WHERE user_id=? AND is_correct=1`
     ).get(user.id).c;
     const accuracy = totalAnswered > 0 ? Math.round((correctAnswered / totalAnswered) * 100) : 0;
+    
+    // Get user's last position for resume
+    const userRow = db.prepare(`SELECT last_lab_slug, last_question_id, last_active_at FROM users WHERE id=?`).get(user.id);
+    
     return jsonRes(res, 200, {
       id: user.id, username: user.username, role: user.role,
       score, rank, labs_done: labsDone, labs_in_progress: labsInProgress,
-      total_answered: totalAnswered, correct_answered: correctAnswered, accuracy
+      total_answered: totalAnswered, correct_answered: correctAnswered, accuracy,
+      last_lab_slug: userRow?.last_lab_slug,
+      last_question_id: userRow?.last_question_id,
+      last_active_at: userRow?.last_active_at
     });
+  }
+
+  // ── POST /api/me/position ──────────────────────────────────────
+  if (method === 'POST' && url === '/api/me/position') {
+    const user = requireAuth(req, res); if (!user) return;
+    const { lab_slug, question_id } = await parseBody(req);
+    
+    db.prepare(`UPDATE users SET last_lab_slug=?, last_question_id=?, last_active_at=? WHERE id=?`)
+      .run(lab_slug || null, question_id || null, new Date().toISOString(), user.id);
+    
+    return jsonRes(res, 200, { saved: true });
   }
 
   // ── GET /api/labs ─────────────────────────────────────
@@ -999,8 +1037,89 @@ async function router(req, res) {
     const admin = requireAdmin(req, res); if (!admin) return;
     const userId = parseInt(userDelMatch[1]);
     if (userId === admin.id) return jsonRes(res, 400, { error: 'Cannot delete your own account' });
+    
+    const user = db.prepare(`SELECT * FROM users WHERE id=? AND is_deleted=0`).get(userId);
+    if (!user) return jsonRes(res, 404, { error: 'User not found' });
+    
+    // Archive user progress before soft-deleting
+    const progress = db.prepare(`SELECT * FROM user_progress WHERE user_id=?`).all(userId);
+    const answers = db.prepare(`SELECT * FROM user_answers WHERE user_id=?`).all(userId);
+    const totalScore = getUserTotalScore(userId);
+    const labsDone = db.prepare(`SELECT COUNT(*) as c FROM user_progress WHERE user_id=? AND status='completed'`).get(userId).c;
+    
+    // Insert into archive
+    db.prepare(`INSERT INTO deleted_users_archive 
+      (original_user_id, username, role, total_score, labs_completed, progress_json, answers_json, deleted_at, deleted_by, notes)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`)
+      .run(userId, user.username, user.role, totalScore, labsDone, 
+           JSON.stringify(progress), JSON.stringify(answers), 
+           new Date().toISOString(), admin.id, 'Soft deleted - can be restored');
+    
+    // Soft delete the user (set is_deleted=1, clear sessions)
+    db.prepare(`UPDATE users SET is_deleted=1, deleted_at=?, is_active=0 WHERE id=?`)
+      .run(new Date().toISOString(), userId);
+    db.prepare(`DELETE FROM sessions WHERE user_id=?`).run(userId);
+    
+    return jsonRes(res, 200, { 
+      ok: true, 
+      message: 'User soft-deleted. Progress archived. Use /api/admin/users/:id/restore to recover or /api/admin/users/:id/purge to permanently delete.',
+      archived_id: userId 
+    });
+  }
+
+  // ── POST /api/admin/users/:id/restore ──────────────────
+  const userRestoreMatch = url.match(/^\/api\/admin\/users\/(\d+)\/restore$/);
+  if (method === 'POST' && userRestoreMatch) {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const userId = parseInt(userRestoreMatch[1]);
+    
+    const user = db.prepare(`SELECT * FROM users WHERE id=? AND is_deleted=1`).get(userId);
+    if (!user) return jsonRes(res, 404, { error: 'Deleted user not found' });
+    
+    // Restore the user
+    db.prepare(`UPDATE users SET is_deleted=0, deleted_at=NULL, is_active=1 WHERE id=?`).run(userId);
+    
+    // Update archive record
+    db.prepare(`UPDATE deleted_users_archive SET restored_at=?, restored_to_user_id=? WHERE original_user_id=? AND restored_at IS NULL`)
+      .run(new Date().toISOString(), userId, userId);
+    
+    return jsonRes(res, 200, { ok: true, message: 'User restored successfully', user_id: userId });
+  }
+
+  // ── DELETE /api/admin/users/:id/purge ──────────────────
+  const userPurgeMatch = url.match(/^\/api\/admin\/users\/(\d+)\/purge$/);
+  if (method === 'DELETE' && userPurgeMatch) {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const userId = parseInt(userPurgeMatch[1]);
+    if (userId === admin.id) return jsonRes(res, 400, { error: 'Cannot purge your own account' });
+    
+    const user = db.prepare(`SELECT * FROM users WHERE id=? AND is_deleted=1`).get(userId);
+    if (!user) return jsonRes(res, 404, { error: 'Soft-deleted user not found. Use regular DELETE first.' });
+    
+    // Permanently delete - CASCADE will remove progress, answers, etc.
     db.prepare(`DELETE FROM users WHERE id=?`).run(userId);
-    return jsonRes(res, 200, { ok: true });
+    
+    // Update archive to note permanent deletion
+    db.prepare(`UPDATE deleted_users_archive SET notes=notes || ' [PERMANENTLY PURGED]' WHERE original_user_id=?`)
+      .run(userId);
+    
+    return jsonRes(res, 200, { ok: true, message: 'User permanently deleted. Progress data remains in archive for audit.' });
+  }
+
+  // ── GET /api/admin/users/deleted ───────────────────────
+  if (method === 'GET' && url === '/api/admin/users/deleted') {
+    const admin = requireAdmin(req, res); if (!admin) return;
+    const softDeleted = db.prepare(
+      `SELECT id, username, role, is_active, is_deleted, deleted_at, last_active_at 
+       FROM users WHERE is_deleted=1 ORDER BY deleted_at DESC`
+    ).all();
+    const archived = db.prepare(
+      `SELECT a.*, u.username as deleted_by_username 
+       FROM deleted_users_archive a 
+       LEFT JOIN users u ON u.id = a.deleted_by
+       ORDER BY a.deleted_at DESC`
+    ).all();
+    return jsonRes(res, 200, { soft_deleted: softDeleted, archived });
   }
 
   // ── GET /api/admin/progress ───────────────────────────
