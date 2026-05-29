@@ -327,6 +327,7 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6L3 12l5 6M16 6l5 6-5 6"/></svg>
         <span class="nav-label">Leaderboard</span>
       </div>
+      <button class="nav-item" data-page="settings">⚙ Settings</button>
     </nav>
     <div class="sidebar-footer">
       <div class="admin-chip">
@@ -529,6 +530,33 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
     </div><!-- /#content -->
   </div><!-- /#main -->
 </div><!-- /#app -->
+
+<!-- ═══ Settings Page ═══ -->
+<div class="page" id="page-settings">
+  <div style="max-width:480px">
+    <div class="section-label" style="margin-bottom:16px">Account Settings</div>
+    <div class="card" style="padding:20px">
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Change Admin Password</div>
+      <div style="font-size:11.5px;color:var(--dim);margin-bottom:16px">Updates your own admin account password. You will remain logged in.</div>
+      <div class="form-row">
+        <label class="form-label">Current Password</label>
+        <input class="form-input" type="password" id="sp-current-pw" placeholder="Current password">
+      </div>
+      <div class="form-row" style="margin-top:10px">
+        <label class="form-label">New Password</label>
+        <input class="form-input" type="password" id="sp-new-pw" placeholder="New password (min 8 chars)">
+      </div>
+      <div class="form-row" style="margin-top:10px">
+        <label class="form-label">Confirm New Password</label>
+        <input class="form-input" type="password" id="sp-confirm-pw" placeholder="Repeat new password">
+      </div>
+      <div style="margin-top:16px">
+        <button class="btn btn-blue" onclick="Pages.changeAdminPassword()">Update Password</button>
+      </div>
+      <div id="sp-result" style="margin-top:10px;font-size:12px"></div>
+    </div>
+  </div>
+</div>
 
 <!-- CREATE USER MODAL -->
 <div class="modal-overlay" id="modal-create-user">
@@ -875,7 +903,7 @@ const App = {
     const navEl  = document.querySelector(`.nav-item[data-page="${page}"]`);
     if (pageEl) pageEl.classList.add('active');
     if (navEl)  navEl.classList.add('active');
-    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', leaderboard:'Leaderboard', labs:'Labs & Questions', 'analyst-profile':'Analyst Profile' };
+    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', leaderboard:'Leaderboard', labs:'Labs & Questions', 'analyst-profile':'Analyst Profile', settings:'Settings' };
     document.getElementById('bc-cur').textContent = labels[page] || page;
     if (page === 'overview')    Pages.loadOverview();
     if (page === 'users')       Pages.loadUsers();
@@ -987,14 +1015,14 @@ const Pages = {
         return `<tr>
           <td class="td-main"><span style="cursor:pointer;color:var(--blue)" onclick="Pages.viewProfile(${u.id}, '${u.username}', '${u.role}')">${u.username}</span></td>
           <td><span class="chip ${u.role==='admin'?'chip-orange':'chip-blue'}">${u.role}</span></td>
-          <td><span class="chip ${u.active?'chip-blue':'chip-red'}">${u.active?'Active':'Disabled'}</span></td>
+          <td><span class="chip ${u.is_active?'chip-blue':'chip-red'}">${u.is_active?'Active':'Disabled'}</span></td>
           <td class="td-mono" style="color:var(--blue)">${u.score}</td>
           <td>${u.labs_done}</td>
           <td style="color:var(--dim);font-size:11.5px">${lastActive}</td>
           <td>
             <div style="display:flex;gap:6px;align-items:center">
               <button class="btn btn-outline btn-xs" onclick="Pages.viewProfile(${u.id}, '${u.username}', '${u.role}')">Profile</button>
-              <button class="btn btn-outline btn-xs" onclick="Pages.toggleUser(${u.id}, ${u.active})">${u.active?'Disable':'Enable'}</button>
+              <button class="btn btn-outline btn-xs" onclick="Pages.toggleUser(${u.id}, ${u.is_active})">${u.is_active?'Disable':'Enable'}</button>
               <button class="btn btn-outline btn-xs" onclick="Pages.resetPw(${u.id}, '${u.username}')">Reset PW</button>
               <button class="btn btn-red btn-xs" onclick="Pages.deleteUser(${u.id}, '${u.username}')">Delete</button>
             </div>
@@ -1184,6 +1212,25 @@ const Pages = {
       `).join('');
     } catch(e) {
       if (listEl) listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--red);font-size:13px">Failed to load activity.</div>';
+    }
+  },
+
+  async changeAdminPassword() {
+    const cur = document.getElementById('sp-current-pw').value.trim();
+    const nw  = document.getElementById('sp-new-pw').value.trim();
+    const cf  = document.getElementById('sp-confirm-pw').value.trim();
+    const res = document.getElementById('sp-result');
+    if (!cur || !nw || !cf) { res.style.color='var(--red)'; res.textContent='All fields required.'; return; }
+    if (nw.length < 8) { res.style.color='var(--red)'; res.textContent='New password must be at least 8 characters.'; return; }
+    if (nw !== cf) { res.style.color='var(--red)'; res.textContent='New passwords do not match.'; return; }
+    const r = await API.post('/api/user/password', { current_password: cur, new_password: nw });
+    if (r.ok) {
+      res.style.color='var(--blue)'; res.textContent='Password updated successfully.';
+      document.getElementById('sp-current-pw').value='';
+      document.getElementById('sp-new-pw').value='';
+      document.getElementById('sp-confirm-pw').value='';
+    } else {
+      res.style.color='var(--red)'; res.textContent = r.error || 'Failed to update password.';
     }
   },
 };
