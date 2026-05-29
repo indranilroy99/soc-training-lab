@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS labs (
   category    TEXT,
   points      INTEGER DEFAULT 100,
   alert_refs  TEXT DEFAULT '[]',
+  evidence    TEXT,
   order_index INTEGER DEFAULT 0,
   is_visible  INTEGER DEFAULT 1
 );
@@ -43,6 +44,7 @@ CREATE TABLE IF NOT EXISTS questions (
   correct_answer TEXT NOT NULL,
   hint           TEXT,
   explanation    TEXT,
+  alert_ref      TEXT,
   FOREIGN KEY(lab_id) REFERENCES labs(id) ON DELETE CASCADE
 );
 

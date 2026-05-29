@@ -681,6 +681,23 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
           </select>
         </div>
       </div>
+      <div class="form-group">
+        <label class="form-label">Alert References / Evidence IDs</label>
+        <input type="text" class="form-input" id="lf-alert-refs" placeholder="e.g. ALT-201, ALT-202">
+        <div class="form-hint">Optional comma-separated alert IDs linked to this lab.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Evidence / Investigation Material</label>
+        <div id="lf-evidence-builder"></div>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="LabBuilder.addEvidence()">Add Evidence</button>
+        <div class="form-hint">Add logs, SIEM snippets, IOC lists, or investigation notes analysts should reference.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Questions, Hints &amp; Answers</label>
+        <div id="lf-question-builder"></div>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="LabBuilder.addQuestion()">Add Question</button>
+        <div class="form-hint">Create the full lab package in one screen. Questions added here are saved automatically with the lab.</div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="LabModals.close('modal-lab-form')">Cancel</button>
@@ -1241,9 +1258,223 @@ const Pages = {
       document.getElementById('sp-new-pw').value='';
       document.getElementById('sp-confirm-pw').value='';
     } else {
-      show(r.error || 'Failed to update password.', false);
+      show(r.data?.error || 'Failed to update password.', false);
     }
   },
+};
+
+// ── LAB BUILDER ─────────────────────────────────────────
+const LabBuilder = {
+  evidence: [],
+  questions: [],
+
+  reset() {
+    this.evidence = [];
+    this.questions = [];
+    this.renderEvidence();
+    this.renderQuestions();
+  },
+
+  loadFromLab(lab) {
+    this.evidence = Array.isArray(lab.evidence) ? lab.evidence.map(item => ({
+      label: item.label || '',
+      type: item.type || 'log',
+      content: item.content || ''
+    })) : [];
+    this.questions = [];
+    this.renderEvidence();
+    this.renderQuestions();
+  },
+
+  addEvidence() {
+    this.evidence.push({ label: '', type: 'log', content: '' });
+    this.renderEvidence();
+  },
+
+  removeEvidence(idx) {
+    this.evidence.splice(idx, 1);
+    this.renderEvidence();
+  },
+
+  updateEvidence(idx, field, value) {
+    if (!this.evidence[idx]) return;
+    this.evidence[idx][field] = value;
+  },
+
+  renderEvidence() {
+    const wrap = document.getElementById('lf-evidence-builder');
+    if (!wrap) return;
+    if (!this.evidence.length) {
+      wrap.innerHTML = '<div class="form-hint">No evidence added yet.</div>';
+      return;
+    }
+    wrap.innerHTML = this.evidence.map((item, idx) => `
+      <div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px;background:rgba(255,255,255,0.02)">
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Evidence Label</label>
+            <input type="text" class="form-input" value="${esc(item.label)}" placeholder="e.g. Firewall log excerpt" oninput="LabBuilder.updateEvidence(${idx}, 'label', this.value)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <select class="form-select" onchange="LabBuilder.updateEvidence(${idx}, 'type', this.value)">
+              <option value="log" ${item.type==='log'?'selected':''}>Log</option>
+              <option value="evidence" ${item.type==='evidence'?'selected':''}>Evidence</option>
+              <option value="ioc" ${item.type==='ioc'?'selected':''}>IOC</option>
+              <option value="note" ${item.type==='note'?'selected':''}>Investigation Note</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Content</label>
+          <textarea class="form-textarea" rows="4" placeholder="Paste the raw logs, evidence, IOC list, or analyst reference material here..." oninput="LabBuilder.updateEvidence(${idx}, 'content', this.value)">${esc(item.content)}</textarea>
+        </div>
+        <button type="button" class="btn btn-red btn-xs" onclick="LabBuilder.removeEvidence(${idx})">Remove Evidence</button>
+      </div>
+    `).join('');
+  },
+
+  addQuestion() {
+    this.questions.push({
+      question: '',
+      answer_type: 'choice',
+      options: ['', ''],
+      correct_answer: '',
+      hint: '',
+      explanation: '',
+      points: 20,
+      difficulty: 'medium',
+      alert_ref: ''
+    });
+    this.renderQuestions();
+  },
+
+  removeQuestion(idx) {
+    this.questions.splice(idx, 1);
+    this.renderQuestions();
+  },
+
+  updateQuestion(idx, field, value) {
+    if (!this.questions[idx]) return;
+    this.questions[idx][field] = value;
+  },
+
+  updateQuestionOption(qIdx, optIdx, value) {
+    if (!this.questions[qIdx]) return;
+    this.questions[qIdx].options[optIdx] = value;
+  },
+
+  addQuestionOption(qIdx) {
+    if (!this.questions[qIdx]) return;
+    this.questions[qIdx].options.push('');
+    this.renderQuestions();
+  },
+
+  removeQuestionOption(qIdx, optIdx) {
+    if (!this.questions[qIdx]) return;
+    if (this.questions[qIdx].options.length <= 2) { toast('Each multiple-choice question needs at least 2 options', 'error'); return; }
+    this.questions[qIdx].options.splice(optIdx, 1);
+    this.renderQuestions();
+  },
+
+  renderQuestions() {
+    const wrap = document.getElementById('lf-question-builder');
+    if (!wrap) return;
+    if (!this.questions.length) {
+      wrap.innerHTML = '<div class="form-hint">No bundled questions yet. Add at least one if you want the full lab package created in one step.</div>';
+      return;
+    }
+    wrap.innerHTML = this.questions.map((q, idx) => `
+      <div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px;background:rgba(255,255,255,0.02)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="form-label" style="margin:0">Question ${idx + 1}</div>
+          <button type="button" class="btn btn-red btn-xs" onclick="LabBuilder.removeQuestion(${idx})">Remove</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Question Text</label>
+          <textarea class="form-textarea" rows="3" placeholder="Enter the question analysts will answer..." oninput="LabBuilder.updateQuestion(${idx}, 'question', this.value)">${esc(q.question)}</textarea>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Answer Type</label>
+            <select class="form-select" onchange="LabBuilder.updateQuestion(${idx}, 'answer_type', this.value); LabBuilder.renderQuestions();">
+              <option value="choice" ${q.answer_type==='choice'?'selected':''}>Multiple Choice</option>
+              <option value="text" ${q.answer_type==='text'?'selected':''}>Free Text</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Difficulty</label>
+            <select class="form-select" onchange="LabBuilder.updateQuestion(${idx}, 'difficulty', this.value)">
+              <option value="easy" ${q.difficulty==='easy'?'selected':''}>Easy</option>
+              <option value="medium" ${q.difficulty==='medium'?'selected':''}>Medium</option>
+              <option value="hard" ${q.difficulty==='hard'?'selected':''}>Hard</option>
+              <option value="expert" ${q.difficulty==='expert'?'selected':''}>Expert</option>
+            </select>
+          </div>
+        </div>
+        ${q.answer_type === 'choice' ? `
+          <div class="form-group">
+            <label class="form-label">Options</label>
+            ${(q.options || []).map((opt, optIdx) => `
+              <div style="display:flex;gap:8px;margin-bottom:8px">
+                <input type="text" class="form-input" value="${esc(opt)}" placeholder="Option ${optIdx + 1}" oninput="LabBuilder.updateQuestionOption(${idx}, ${optIdx}, this.value)">
+                <button type="button" class="btn btn-red btn-xs" onclick="LabBuilder.removeQuestionOption(${idx}, ${optIdx})">✕</button>
+              </div>
+            `).join('')}
+            <button type="button" class="btn btn-outline btn-xs" onclick="LabBuilder.addQuestionOption(${idx})">Add Option</button>
+          </div>
+        ` : ''}
+        <div class="form-group">
+          <label class="form-label">Correct Answer</label>
+          <input type="text" class="form-input" value="${esc(q.correct_answer)}" placeholder="Correct answer or keyword phrase" oninput="LabBuilder.updateQuestion(${idx}, 'correct_answer', this.value)">
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Hint</label>
+            <input type="text" class="form-input" value="${esc(q.hint)}" placeholder="Optional hint" oninput="LabBuilder.updateQuestion(${idx}, 'hint', this.value)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Points</label>
+            <input type="number" class="form-input" value="${Number(q.points) || 20}" min="5" max="999" oninput="LabBuilder.updateQuestion(${idx}, 'points', this.value)">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Explanation</label>
+          <textarea class="form-textarea" rows="2" placeholder="Why is this the correct answer?" oninput="LabBuilder.updateQuestion(${idx}, 'explanation', this.value)">${esc(q.explanation)}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Alert Reference</label>
+          <input type="text" class="form-input" value="${esc(q.alert_ref)}" placeholder="e.g. ALT-204" oninput="LabBuilder.updateQuestion(${idx}, 'alert_ref', this.value)">
+        </div>
+      </div>
+    `).join('');
+  },
+
+  collectEvidence() {
+    return this.evidence
+      .map(item => ({
+        label: String(item.label || '').trim(),
+        type: String(item.type || 'log').trim(),
+        content: String(item.content || '').trim()
+      }))
+      .filter(item => item.label || item.content);
+  },
+
+  collectQuestions() {
+    return this.questions
+      .map(q => ({
+        question: String(q.question || '').trim(),
+        answer_type: q.answer_type === 'text' ? 'text' : 'choice',
+        options: (Array.isArray(q.options) ? q.options : []).map(o => String(o || '').trim()).filter(Boolean),
+        correct_answer: String(q.correct_answer || '').trim(),
+        hint: String(q.hint || '').trim(),
+        explanation: String(q.explanation || '').trim(),
+        points: parseInt(q.points) || 20,
+        difficulty: q.difficulty || 'medium',
+        alert_ref: String(q.alert_ref || '').trim()
+      }))
+      .filter(q => q.question || q.correct_answer);
+  }
 };
 
 // ── LAB MODALS ──────────────────────────────────────────
@@ -1261,6 +1492,8 @@ const LabModals = {
     document.getElementById('lf-difficulty').value   = 'medium';
     document.getElementById('lf-points').value       = '100';
     document.getElementById('lf-visible').value      = '1';
+    document.getElementById('lf-alert-refs').value   = '';
+    LabBuilder.reset();
     this.open('modal-lab-form');
     setTimeout(() => document.getElementById('lf-title').focus(), 100);
   },
@@ -1275,6 +1508,8 @@ const LabModals = {
     document.getElementById('lf-difficulty').value   = lab.difficulty || 'medium';
     document.getElementById('lf-points').value       = lab.points;
     document.getElementById('lf-visible').value      = lab.is_visible ? '1' : '0';
+    document.getElementById('lf-alert-refs').value   = Array.isArray(lab.alert_refs) ? lab.alert_refs.join(', ') : '';
+    LabBuilder.loadFromLab(lab);
     this.open('modal-lab-form');
     setTimeout(() => document.getElementById('lf-title').focus(), 100);
   },
@@ -1517,17 +1752,25 @@ const LabPages = {
     const points      = parseInt(document.getElementById('lf-points').value) || 100;
     const is_visible  = document.getElementById('lf-visible').value === '1';
     const id          = document.getElementById('lf-id').value;
+    const alert_refs  = document.getElementById('lf-alert-refs').value.split(',').map(s => s.trim()).filter(Boolean);
+    const evidence    = LabBuilder.collectEvidence();
+    const questions   = LabBuilder.collectQuestions();
 
     if (!title) { toast('Title is required', 'error'); document.getElementById('lf-title').focus(); return; }
+    const invalidQuestion = questions.find(q => !q.question || !q.correct_answer || (q.answer_type === 'choice' && q.options.length < 2));
+    if (invalidQuestion) {
+      toast('Every bundled question must include question text, correct answer, and at least 2 options for multiple-choice.', 'error');
+      return;
+    }
 
     const btn = document.getElementById('btn-save-lab');
     btn.disabled = true; btn.textContent = 'Saving...';
 
     let res;
     if (id) {
-      res = await API.put('/api/admin/labs/' + id, { title, description, category, difficulty, points, is_visible });
+      res = await API.put('/api/admin/labs/' + id, { title, description, category, difficulty, points, is_visible, alert_refs, evidence });
     } else {
-      res = await API.post('/api/admin/labs', { title, description, category, difficulty, points, is_visible });
+      res = await API.post('/api/admin/labs', { title, description, category, difficulty, points, is_visible, alert_refs, evidence, questions });
     }
 
     btn.disabled = false; btn.textContent = id ? 'Save Changes' : 'Create Lab';
@@ -1744,6 +1987,7 @@ function esc(str) {
 
 window.LabPages  = LabPages;
 window.LabModals = LabModals;
+window.LabBuilder = LabBuilder;
 
 window.App    = App;
 window.Pages  = Pages;

@@ -94,6 +94,16 @@ try {
 } catch(e) { /* already exists */ }
 
 try {
+  db.prepare(`ALTER TABLE labs ADD COLUMN evidence TEXT`).run();
+  console.log('[migrate] Added labs.evidence column');
+} catch(e) { /* already exists */ }
+
+try {
+  db.prepare(`ALTER TABLE questions ADD COLUMN alert_ref TEXT`).run();
+  console.log('[migrate] Added questions.alert_ref column');
+} catch(e) { /* already exists */ }
+
+try {
   db.prepare(`ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0`).run();
   console.log('[migrate] Added users.points column');
 } catch(e) { /* already exists */ }
@@ -230,9 +240,12 @@ function getLabsWithProgress(userId) {
       `SELECT COUNT(DISTINCT question_id) as c FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
     ).get(userId, lab.id).c;
     const alertRefs = lab.alert_refs ? JSON.parse(lab.alert_refs) : [];
+    let evidence = [];
+    try { evidence = lab.evidence ? JSON.parse(lab.evidence) : []; } catch { evidence = []; }
     return {
       ...lab,
       alert_refs:      alertRefs,
+      evidence,
       status:          prog ? prog.status : 'not_started',
       score:           prog ? prog.score  : 0,
       started_at:      prog ? prog.started_at : null,
@@ -327,7 +340,7 @@ async function router(req, res) {
     const lab  = db.prepare(`SELECT * FROM labs WHERE slug=?`).get(slug);
     if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
     const questions = db.prepare(
-      `SELECT id, order_index, question, answer_type, options, points, hint FROM questions WHERE lab_id=? ORDER BY order_index`
+      `SELECT id, order_index, question, answer_type, options, points, hint, alert_ref FROM questions WHERE lab_id=? ORDER BY order_index`
     ).all(lab.id).map(q => ({
       ...q,
       options: q.options ? JSON.parse(q.options) : null
@@ -347,9 +360,12 @@ async function router(req, res) {
       `SELECT status, score, started_at, completed_at FROM user_progress WHERE user_id=? AND lab_id=?`
     ).get(user.id, lab.id);
     const alertRefs = lab.alert_refs ? JSON.parse(lab.alert_refs) : [];
+    let evidence = [];
+    try { evidence = lab.evidence ? JSON.parse(lab.evidence) : []; } catch { evidence = []; }
     return jsonRes(res, 200, {
       ...lab,
       alert_refs: alertRefs,
+      evidence,
       questions: questionsWithStatus,
       progress: prog || { status: 'not_started', score: 0 }
     });
@@ -650,7 +666,11 @@ async function router(req, res) {
          (SELECT COUNT(*) FROM questions q WHERE q.lab_id = l.id) as question_count,
          (SELECT COUNT(*) FROM user_progress p WHERE p.lab_id = l.id AND p.status='completed') as completions
        FROM labs l ORDER BY l.order_index`
-    ).all().map(l => ({ ...l, alert_refs: l.alert_refs ? JSON.parse(l.alert_refs) : [] }));
+    ).all().map(l => {
+      let evidence = [];
+      try { evidence = l.evidence ? JSON.parse(l.evidence) : []; } catch { evidence = []; }
+      return { ...l, alert_refs: l.alert_refs ? JSON.parse(l.alert_refs) : [], evidence };
+    });
     return jsonRes(res, 200, labs);
   }
 
@@ -658,24 +678,53 @@ async function router(req, res) {
   if (method === 'POST' && url === '/api/admin/labs') {
     const admin = requireAdmin(req, res); if (!admin) return;
     const body = await parseBody(req);
-    const { title, description, difficulty, category, points, alert_refs, is_visible } = body;
+    const { title, description, difficulty, category, points, alert_refs, evidence, questions, is_visible } = body;
     if (!title) return jsonRes(res, 400, { error: 'title is required' });
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '-' + Date.now().toString(36);
     const maxOrder = db.prepare(`SELECT COALESCE(MAX(order_index),0) as m FROM labs`).get().m;
-    const info = db.prepare(
-      `INSERT INTO labs (slug, title, description, difficulty, category, points, alert_refs, order_index, is_visible)
-       VALUES (?,?,?,?,?,?,?,?,?)`
-    ).run(
-      slug,
-      title.trim(),
-      (description || '').trim(),
-      difficulty || 'medium',
-      (category || '').trim(),
-      parseInt(points) || 100,
-      JSON.stringify(Array.isArray(alert_refs) ? alert_refs : []),
-      maxOrder + 1,
-      is_visible === false || is_visible === 0 ? 0 : 1
-    );
+    const evidencePayload = Array.isArray(evidence) ? evidence : [];
+    const questionPayload = Array.isArray(questions) ? questions : [];
+    const tx = db.transaction(() => {
+      const info = db.prepare(
+        `INSERT INTO labs (slug, title, description, difficulty, category, points, alert_refs, evidence, order_index, is_visible)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`
+      ).run(
+        slug,
+        title.trim(),
+        (description || '').trim(),
+        difficulty || 'medium',
+        (category || '').trim(),
+        parseInt(points) || 100,
+        JSON.stringify(Array.isArray(alert_refs) ? alert_refs : []),
+        JSON.stringify(evidencePayload),
+        maxOrder + 1,
+        is_visible === false || is_visible === 0 ? 0 : 1
+      );
+      if (questionPayload.length) {
+        const insertQ = db.prepare(
+          `INSERT INTO questions (lab_id, question, answer_type, options, correct_answer, hint, explanation, points, difficulty, order_index, alert_ref)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+        );
+        questionPayload.forEach((q, idx) => {
+          if (!q || !q.question || !q.correct_answer) return;
+          insertQ.run(
+            info.lastInsertRowid,
+            String(q.question).trim(),
+            q.answer_type === 'text' ? 'text' : 'choice',
+            q.options ? JSON.stringify(Array.isArray(q.options) ? q.options : []) : null,
+            String(q.correct_answer).trim(),
+            String(q.hint || '').trim(),
+            String(q.explanation || '').trim(),
+            parseInt(q.points) || 20,
+            q.difficulty || 'medium',
+            idx + 1,
+            String(q.alert_ref || '').trim()
+          );
+        });
+      }
+      return info;
+    });
+    const info = tx();
     return jsonRes(res, 201, { id: info.lastInsertRowid, slug });
   }
 
@@ -695,6 +744,7 @@ async function router(req, res) {
     if (body.category    !== undefined) { fields.push('category=?');    vals.push(body.category.trim()); }
     if (body.points      !== undefined) { fields.push('points=?');      vals.push(parseInt(body.points) || 100); }
     if (body.alert_refs  !== undefined) { fields.push('alert_refs=?');  vals.push(JSON.stringify(Array.isArray(body.alert_refs) ? body.alert_refs : [])); }
+    if (body.evidence    !== undefined) { fields.push('evidence=?');    vals.push(JSON.stringify(Array.isArray(body.evidence) ? body.evidence : [])); }
     if (body.is_visible  !== undefined) { fields.push('is_visible=?');  vals.push(body.is_visible ? 1 : 0); }
     if (body.order_index !== undefined) { fields.push('order_index=?'); vals.push(parseInt(body.order_index)); }
     if (fields.length === 0) return jsonRes(res, 400, { error: 'Nothing to update' });
@@ -734,12 +784,12 @@ async function router(req, res) {
     const lab = db.prepare(`SELECT id FROM labs WHERE id=?`).get(labId);
     if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
     const body = await parseBody(req);
-    const { question, answer_type, options, correct_answer, hint, explanation, points, difficulty } = body;
+    const { question, answer_type, options, correct_answer, hint, explanation, points, difficulty, alert_ref } = body;
     if (!question || !correct_answer) return jsonRes(res, 400, { error: 'question and correct_answer are required' });
     const maxOrder = db.prepare(`SELECT COALESCE(MAX(order_index),0) as m FROM questions WHERE lab_id=?`).get(labId).m;
     const info = db.prepare(
-      `INSERT INTO questions (lab_id, question, answer_type, options, correct_answer, hint, explanation, points, difficulty, order_index)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO questions (lab_id, question, answer_type, options, correct_answer, hint, explanation, points, difficulty, order_index, alert_ref)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
       labId,
       question.trim(),
@@ -750,7 +800,8 @@ async function router(req, res) {
       (explanation || '').trim(),
       parseInt(points) || 20,
       difficulty || 'medium',
-      maxOrder + 1
+      maxOrder + 1,
+      (alert_ref || '').trim()
     );
     return jsonRes(res, 201, { id: info.lastInsertRowid });
   }
@@ -773,6 +824,7 @@ async function router(req, res) {
     if (body.explanation    !== undefined) { fields.push('explanation=?');    vals.push(body.explanation.trim()); }
     if (body.points         !== undefined) { fields.push('points=?');         vals.push(parseInt(body.points) || 20); }
     if (body.difficulty     !== undefined) { fields.push('difficulty=?');     vals.push(body.difficulty); }
+    if (body.alert_ref      !== undefined) { fields.push('alert_ref=?');      vals.push(body.alert_ref.trim()); }
     if (body.order_index    !== undefined) { fields.push('order_index=?');    vals.push(parseInt(body.order_index)); }
     if (fields.length === 0) return jsonRes(res, 400, { error: 'Nothing to update' });
     vals.push(qId);
