@@ -1675,7 +1675,7 @@ const SocDash = {
     tbody.innerHTML = rows.map(a => {
       const ts = a.timestamp ? a.timestamp.replace('T', ' ').replace(/\.\d+Z?$/, '') : '–';
       const statusColor = a.status === 'resolved' ? 'var(--green)' : a.status === 'investigating' ? 'var(--yellow)' : 'var(--muted)';
-      return `<tr onclick="SocDash.openDetail(${JSON.stringify(String(a.id || ''))})">
+      return `<tr onclick='SocDash.openDetail(${JSON.stringify(String(a.id || ''))})'>
         <td class="td-mono" style="color:var(--blue)">${escapeHtml(a.id)}</td>
         <td><span class="sev-badge sev-${a.severity}">${escapeHtml(a.severity.toUpperCase())}</span></td>
         <td class="td-title">${escapeHtml(a.title)}</td>
