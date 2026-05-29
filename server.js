@@ -16,6 +16,11 @@ const PORT    = process.env.PORT || 3000;
 const DB_PATH = path.join(__dirname, 'database', 'diaas.db');
 const PUBLIC  = path.join(__dirname, 'public');
 const SESSION_TTL_HOURS = 24;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 10;
+const SESSION_TOUCH_INTERVAL_MS = 30 * 60 * 1000;
+
+const loginAttempts = new Map();
 
 // ── Database ──────────────────────────────────────────────
 const db = new Database(DB_PATH);
@@ -196,11 +201,19 @@ function requireAuth(req, res) {
   if (!token) { jsonRes(res, 401, { error: 'No token provided' }); return null; }
   const now = new Date().toISOString();
   const row = db.prepare(
-    `SELECT u.id, u.username, u.role, u.is_active as active
+    `SELECT u.id, u.username, u.role, u.is_active as active,
+            s.expires_at as session_expires_at
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token = ? AND s.expires_at > ? AND u.is_active = 1`
   ).get(token, now);
   if (!row) { jsonRes(res, 401, { error: 'Invalid or expired session' }); return null; }
+
+  const expiresTs = Date.parse(row.session_expires_at || '');
+  if (!Number.isNaN(expiresTs) && (expiresTs - Date.now()) < SESSION_TOUCH_INTERVAL_MS) {
+    const nextExpiry = new Date(Date.now() + SESSION_TTL_HOURS * 3600 * 1000).toISOString();
+    db.prepare(`UPDATE sessions SET expires_at=? WHERE token=?`).run(nextExpiry, token);
+    row.session_expires_at = nextExpiry;
+  }
   return row;
 }
 
@@ -279,6 +292,40 @@ function buildMaskedAnswer(answer) {
   }).join('');
 }
 
+function pruneExpiredSessions() {
+  const now = new Date().toISOString();
+  db.prepare(`DELETE FROM sessions WHERE expires_at <= ?`).run(now);
+}
+
+function getLoginThrottleKey(req, username) {
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  return `${String(username || '').trim().toLowerCase()}|${ip}`;
+}
+
+function isLoginThrottled(key) {
+  const entry = loginAttempts.get(key);
+  if (!entry) return false;
+  if ((Date.now() - entry.firstTs) > LOGIN_WINDOW_MS) {
+    loginAttempts.delete(key);
+    return false;
+  }
+  return entry.count >= LOGIN_MAX_ATTEMPTS;
+}
+
+function recordLoginFailure(key) {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry || (now - entry.firstTs) > LOGIN_WINDOW_MS) {
+    loginAttempts.set(key, { count: 1, firstTs: now });
+    return;
+  }
+  entry.count += 1;
+}
+
+function clearLoginFailures(key) {
+  loginAttempts.delete(key);
+}
+
 function getHintPlan(question) {
   const configured = parseHintLevels(question);
   const answer = String(question.correct_answer || '').trim();
@@ -350,6 +397,7 @@ async function router(req, res) {
   const qs     = req.url.includes('?') ? req.url.split('?')[1] : '';
   const params = new URLSearchParams(qs);
   const method = req.method.toUpperCase();
+  pruneExpiredSessions();
 
   // CORS preflight
   if (method === 'OPTIONS') {
@@ -368,10 +416,16 @@ async function router(req, res) {
     if (!username || !password) {
       return jsonRes(res, 400, { error: 'Username and password required' });
     }
+    const throttleKey = getLoginThrottleKey(req, username);
+    if (isLoginThrottled(throttleKey)) {
+      return jsonRes(res, 429, { error: 'Too many login attempts. Try again in 15 minutes.' });
+    }
     const user = db.prepare(`SELECT * FROM users WHERE username=? AND is_active=1`).get(username);
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+      recordLoginFailure(throttleKey);
       return jsonRes(res, 401, { error: 'Invalid username or password' });
     }
+    clearLoginFailures(throttleKey);
     const token   = crypto.randomBytes(48).toString('hex');
     const expires = new Date(Date.now() + SESSION_TTL_HOURS * 3600 * 1000).toISOString();
     db.prepare(`INSERT INTO sessions (user_id, token, expires_at) VALUES (?,?,?)`).run(user.id, token, expires);
