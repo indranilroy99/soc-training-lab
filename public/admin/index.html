@@ -327,14 +327,13 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6L3 12l5 6M16 6l5 6-5 6"/></svg>
         <span class="nav-label">Leaderboard</span>
       </div>
-      <button class="nav-item" data-page="settings">⚙ Settings</button>
     </nav>
     <div class="sidebar-footer">
-      <div class="admin-chip">
+      <div class="admin-chip" onclick="App.navigate('settings')" style="cursor:pointer" title="Account settings">
         <div class="admin-avatar" id="sidebar-avatar">A</div>
         <div class="admin-info">
           <div class="a-name" id="sidebar-username">Admin</div>
-          <div class="a-role">Administrator</div>
+          <div class="a-role" style="color:var(--blue);font-size:10px">Change password ›</div>
         </div>
       </div>
       <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;justify-content:center" onclick="App.logout()">
@@ -533,27 +532,32 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
 
 <!-- ═══ Settings Page ═══ -->
 <div class="page" id="page-settings">
-  <div style="max-width:480px">
-    <div class="section-label" style="margin-bottom:16px">Account Settings</div>
-    <div class="card" style="padding:20px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Change Admin Password</div>
-      <div style="font-size:11.5px;color:var(--dim);margin-bottom:16px">Updates your own admin account password. You will remain logged in.</div>
-      <div class="form-row">
-        <label class="form-label">Current Password</label>
-        <input class="form-input" type="password" id="sp-current-pw" placeholder="Current password">
+  <div class="page-hdr">
+    <div class="page-hdr-left">
+      <button class="btn btn-outline btn-sm" onclick="App.navigate('overview')" style="margin-bottom:6px">← Back</button>
+      <div class="page-title">Account Settings</div>
+      <p class="page-sub">Change your admin password.</p>
+    </div>
+  </div>
+  <div style="max-width:440px">
+    <div class="card">
+      <div class="card-hdr"><span class="card-title">Change Password</span></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Current Password</label>
+          <input class="form-input" type="password" id="sp-current-pw" placeholder="Current password">
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input class="form-input" type="password" id="sp-new-pw" placeholder="New password (min 8 chars)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input class="form-input" type="password" id="sp-confirm-pw" placeholder="Repeat new password">
+        </div>
+        <button class="btn btn-green" onclick="Pages.changeAdminPassword()">Update Password</button>
+        <div id="sp-result" style="display:none;margin-top:10px;font-size:12.5px;padding:8px 12px;border-radius:4px"></div>
       </div>
-      <div class="form-row" style="margin-top:10px">
-        <label class="form-label">New Password</label>
-        <input class="form-input" type="password" id="sp-new-pw" placeholder="New password (min 8 chars)">
-      </div>
-      <div class="form-row" style="margin-top:10px">
-        <label class="form-label">Confirm New Password</label>
-        <input class="form-input" type="password" id="sp-confirm-pw" placeholder="Repeat new password">
-      </div>
-      <div style="margin-top:16px">
-        <button class="btn btn-blue" onclick="Pages.changeAdminPassword()">Update Password</button>
-      </div>
-      <div id="sp-result" style="margin-top:10px;font-size:12px"></div>
     </div>
   </div>
 </div>
@@ -1220,17 +1224,24 @@ const Pages = {
     const nw  = document.getElementById('sp-new-pw').value.trim();
     const cf  = document.getElementById('sp-confirm-pw').value.trim();
     const res = document.getElementById('sp-result');
-    if (!cur || !nw || !cf) { res.style.color='var(--red)'; res.textContent='All fields required.'; return; }
-    if (nw.length < 8) { res.style.color='var(--red)'; res.textContent='New password must be at least 8 characters.'; return; }
-    if (nw !== cf) { res.style.color='var(--red)'; res.textContent='New passwords do not match.'; return; }
+    const show = (msg, ok) => {
+      res.style.display = 'block';
+      res.style.color = ok ? 'var(--blue)' : 'var(--red)';
+      res.style.background = ok ? 'rgba(59,130,246,0.08)' : 'rgba(239,68,68,0.08)';
+      res.style.border = ok ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(239,68,68,0.2)';
+      res.textContent = msg;
+    };
+    if (!cur || !nw || !cf) { show('All fields required.', false); return; }
+    if (nw.length < 8) { show('New password must be at least 8 characters.', false); return; }
+    if (nw !== cf) { show('New passwords do not match.', false); return; }
     const r = await API.post('/api/user/password', { current_password: cur, new_password: nw });
     if (r.ok) {
-      res.style.color='var(--blue)'; res.textContent='Password updated successfully.';
+      show('Password updated successfully.', true);
       document.getElementById('sp-current-pw').value='';
       document.getElementById('sp-new-pw').value='';
       document.getElementById('sp-confirm-pw').value='';
     } else {
-      res.style.color='var(--red)'; res.textContent = r.error || 'Failed to update password.';
+      show(r.error || 'Failed to update password.', false);
     }
   },
 };
