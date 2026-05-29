@@ -7,6 +7,8 @@ const { ok, notFound, badRequest } = require('../middleware/response');
 const { getLabsWithProgress }      = require('../services/labs');
 const { getUserTotalScore, getHintPlan, getHintPenalty, getWrongAttemptPenalty } = require('../services/users');
 const { requireInt }   = require('../middleware/validate');
+const { checkAchievements, checkLabAchievements } = require('../services/achievements');
+const { updateStreak } = require('../services/streaks');
 
 // GET /api/labs
 function listLabs(req, res) {
@@ -160,6 +162,18 @@ async function submitAnswer(req, res, slug) {
     `SELECT COUNT(*) as c FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
   ).get(user.id, lab.id).c;
 
+  // ── Award achievements + update streak on correct answer ──────────────
+  let newAchievements = [];
+  if (isCorrect) {
+    updateStreak(user.id);
+    newAchievements = checkAchievements(user.id);
+    // Lab-level quality achievements when lab completes
+    if (doneQ >= totalQ && totalQ > 0) {
+      const labAchs = checkLabAchievements(user.id, lab.id);
+      newAchievements = newAchievements.concat(labAchs);
+    }
+  }
+
   return ok(res, {
     correct: isCorrect, pts: ptsAwarded, hints_used: hintsUsed,
     attempts: nextAttempt, wrong_count: wrongCount,
@@ -167,6 +181,7 @@ async function submitAnswer(req, res, slug) {
     lab_status: doneQ >= totalQ && totalQ > 0 ? 'completed' : 'in_progress',
     completed_questions: doneQ, total_questions: totalQ,
     total_score: getUserTotalScore(user.id),
+    new_achievements: newAchievements,
     message: isCorrect
       ? (doneQ >= totalQ && totalQ > 0 ? 'Lab completed!' : 'Correct. Move to the next question.')
       : (locked ? 'Maximum attempts reached. Request a hint to continue.' : 'Incorrect. Review the evidence and try again.'),
@@ -233,4 +248,27 @@ async function requestHint(req, res, slug) {
   });
 }
 
-module.exports = { listLabs, getLab, submitAnswer, requestHint };
+// POST /api/labs/:slug/reset
+async function resetLab(req, res, slug) {
+  const user = requireAuth(req, res); if (!user) return;
+  const lab  = db.prepare(`SELECT * FROM labs WHERE slug=?`).get(slug);
+  if (!lab) return notFound(res, 'Lab not found');
+
+  db.transaction(() => {
+    // Delete all answers for questions in this lab
+    const qIds = db.prepare(`SELECT id FROM questions WHERE lab_id=?`).all(lab.id).map(q => q.id);
+    if (qIds.length) {
+      db.prepare(`DELETE FROM user_answers WHERE user_id=? AND question_id IN (${qIds.map(() => '?').join(',')})`)
+        .run(user.id, ...qIds);
+    }
+    // Delete draft answers
+    db.prepare(`DELETE FROM draft_answers WHERE user_id=? AND lab_id=?`).run(user.id, lab.id);
+    // Delete progress
+    db.prepare(`DELETE FROM user_progress WHERE user_id=? AND lab_id=?`).run(user.id, lab.id);
+    // Delete notes (keep — user may want to keep them)
+  })();
+
+  return ok(res, { reset: true, message: 'Lab progress reset. You can start fresh.' });
+}
+
+module.exports = { listLabs, getLab, submitAnswer, requestHint, resetLab };

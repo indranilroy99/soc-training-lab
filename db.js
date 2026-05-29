@@ -85,6 +85,57 @@ function runMigrations() {
     FOREIGN KEY(user_id)  REFERENCES users(id)     ON DELETE CASCADE,
     FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
   )`).run();
+
+  // ── Commercial platform tables ─────────────────────────────────────────
+  db.prepare(`CREATE TABLE IF NOT EXISTS achievements (
+    id          TEXT PRIMARY KEY,
+    title       TEXT NOT NULL,
+    description TEXT NOT NULL,
+    icon        TEXT NOT NULL,
+    points      INTEGER DEFAULT 0,
+    category    TEXT DEFAULT 'general'
+  )`).run();
+
+  db.prepare(`CREATE TABLE IF NOT EXISTS user_achievements (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id        INTEGER NOT NULL,
+    achievement_id TEXT NOT NULL,
+    earned_at      TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, achievement_id),
+    FOREIGN KEY(user_id)        REFERENCES users(id)        ON DELETE CASCADE,
+    FOREIGN KEY(achievement_id) REFERENCES achievements(id) ON DELETE CASCADE
+  )`).run();
+
+  db.prepare(`CREATE TABLE IF NOT EXISTS lab_notes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    lab_id     INTEGER NOT NULL,
+    content    TEXT NOT NULL DEFAULT '',
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, lab_id),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(lab_id)  REFERENCES labs(id)  ON DELETE CASCADE
+  )`).run();
+
+  db.prepare(`CREATE TABLE IF NOT EXISTS streaks (
+    user_id          INTEGER PRIMARY KEY,
+    current_streak   INTEGER DEFAULT 0,
+    longest_streak   INTEGER DEFAULT 0,
+    last_active_date TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`).run();
+
+  db.prepare(`CREATE TABLE IF NOT EXISTS learning_paths (
+    id               TEXT PRIMARY KEY,
+    title            TEXT NOT NULL,
+    description      TEXT NOT NULL,
+    icon             TEXT DEFAULT '📚',
+    difficulty       TEXT DEFAULT 'intermediate',
+    estimated_hours  INTEGER DEFAULT 0,
+    tags             TEXT DEFAULT '[]',
+    lab_slugs        TEXT NOT NULL DEFAULT '[]',
+    order_index      INTEGER DEFAULT 0
+  )`).run();
 }
 
 // ── Performance indexes (CREATE IF NOT EXISTS — idempotent) ───────────────
@@ -110,6 +161,12 @@ function ensureIndexes() {
     `CREATE INDEX IF NOT EXISTS idx_alerts_category      ON soc_alerts(category)`,
     // user_alert_state: per-user alert status lookups
     `CREATE INDEX IF NOT EXISTS idx_alert_state_user     ON user_alert_state(user_id)`,
+    // achievements
+    `CREATE INDEX IF NOT EXISTS idx_user_achievements    ON user_achievements(user_id)`,
+    // lab notes
+    `CREATE INDEX IF NOT EXISTS idx_lab_notes_user       ON lab_notes(user_id)`,
+    // streaks
+    `CREATE INDEX IF NOT EXISTS idx_streaks_user         ON streaks(user_id)`,
   ];
   for (const sql of indexes) db.prepare(sql).run();
   console.log(`[db:indexes] ${indexes.length} indexes ensured`);

@@ -11,6 +11,8 @@ const { securityHeaders, cors, requestId } = require('./middleware/security');
 const { requestLogger, logError }          = require('./middleware/logger');
 const { jsonRes }                          = require('./middleware/response');
 const { startSessionCleanup }              = require('./db');
+const { seedAchievements }                 = require('./services/achievements');
+const { seedLearningPaths }                = require('./services/paths');
 
 // ── Middleware chain ──────────────────────────────────────────────────────
 // Each middleware calls next() to pass to the next layer.
@@ -94,6 +96,8 @@ function startServer(port = cfg.PORT, host = cfg.HOST) {
     server.once('listening', () => {
       server.off('error', reject);
       cleanupTimer = startSessionCleanup();
+      seedAchievements();
+      seedLearningPaths();
       resolve(server);
     });
     server.listen(port, host);

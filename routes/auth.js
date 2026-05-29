@@ -9,6 +9,7 @@ const { parseBody }  = require('../middleware/security');
 const { isLoginThrottled, recordLoginFailure, clearLoginFailures, getClientIp } = require('../middleware/rateLimit');
 const { validateCredentials } = require('../middleware/validate');
 const { logger }     = require('../middleware/logger');
+const { award }      = require('../services/achievements');
 
 // POST /api/auth/login
 async function login(req, res) {
@@ -45,6 +46,8 @@ async function login(req, res) {
   db.prepare(`INSERT INTO sessions (user_id, token, expires_at) VALUES (?,?,?)`).run(user.id, token, expires);
 
   logger.info('login_success', { userId: user.id, username: user.username, ip, reqId: req.id });
+  // Award first-login achievement (ignored if already earned)
+  try { award(user.id, 'first_login'); } catch {}
   return ok(res, { token, user: { id: user.id, username: user.username, role: user.role } });
 }
 

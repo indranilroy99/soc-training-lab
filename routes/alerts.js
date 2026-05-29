@@ -6,6 +6,8 @@ const { parseBody }          = require('../middleware/security');
 const { ok, notFound, badRequest } = require('../middleware/response');
 const { getUserAlertStatus, setUserAlertStatus } = require('../services/users');
 const { scoreIRAnswers, pointsFromScore }         = require('../services/scoring');
+const { checkAchievements } = require('../services/achievements');
+const { updateStreak }       = require('../services/streaks');
 
 const TP_BLACKLIST = ['[benign]', 'false positive'];
 function isTruePositive(alert) {
@@ -135,11 +137,19 @@ async function updateAlertStatus(req, res, alertId) {
 
   setUserAlertStatus(user.id, alertId, status);
 
+  // Award achievements + update streak on any alert close action
+  let newAchievements = [];
+  if (is_correct) {
+    updateStreak(user.id);
+    newAchievements = checkAchievements(user.id);
+  }
+
   return ok(res, {
     alertId, status, is_correct, points_awarded,
     investigation_score: investigation_score || 0,
     step_scores:         step_scores || {},
     scoring_feedback:    scoring_feedback || [],
+    new_achievements:    newAchievements,
   });
 }
 

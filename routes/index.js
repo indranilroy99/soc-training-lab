@@ -18,6 +18,9 @@ const labRoutes    = require('./labs');
 const alertRoutes  = require('./alerts');
 const lbRoutes     = require('./leaderboard');
 const adminRoutes  = require('./admin');
+const achRoutes    = require('./achievements');
+const pathRoutes   = require('./paths');
+const noteRoutes   = require('./notes');
 
 // ── MIME types for static files ───────────────────────────────────────────
 const MIME = {
@@ -81,6 +84,10 @@ async function router(req, res) {
   // ── Leaderboard ───────────────────────────────────────────────────────
   if (method === 'GET'  && url === '/api/leaderboard')  return lbRoutes.getLeaderboard(req, res);
 
+  // ── Achievements & Paths ──────────────────────────────────────────────
+  if (method === 'GET'  && url === '/api/achievements') return achRoutes.listAchievements(req, res);
+  if (method === 'GET'  && url === '/api/paths')        return pathRoutes.listPaths(req, res);
+
   // ── Labs ──────────────────────────────────────────────────────────────
   if (method === 'GET'  && url === '/api/labs')         return labRoutes.listLabs(req, res);
 
@@ -98,6 +105,13 @@ async function router(req, res) {
 
   const hintMatch = url.match(/^\/api\/labs\/([^/]+)\/hint$/);
   if (method === 'POST' && hintMatch)                   return labRoutes.requestHint(req, res, hintMatch[1]);
+
+  const resetMatch = url.match(/^\/api\/labs\/([^/]+)\/reset$/);
+  if (method === 'POST' && resetMatch)                  return labRoutes.resetLab(req, res, resetMatch[1]);
+
+  const notesMatch = url.match(/^\/api\/labs\/([^/]+)\/notes$/);
+  if (method === 'GET' && notesMatch)                   return noteRoutes.getNotes(req, res, notesMatch[1]);
+  if (method === 'PUT' && notesMatch)                   return noteRoutes.saveNotes(req, res, notesMatch[1]);
 
   // ── Alerts ────────────────────────────────────────────────────────────
   if (method === 'GET' && url.startsWith('/api/alerts') && url === '/api/alerts') {
