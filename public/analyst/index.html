@@ -1421,7 +1421,15 @@ const Pages = {
       hintBtn.textContent = d.hint_level >= d.max_hints ? 'Maximum Hint Reached' : (d.hint_level === 1 ? 'Hint 2 (-10 pts)' : 'Final Hint (0 pts)');
       hintBtn.disabled = d.hint_level >= d.max_hints;
     }
-    toast('Hint unlocked.', 'info');
+    // Unlock submit button if it was locked due to wrong attempts
+    const submitBtn = card ? card.querySelector('.btn-green') : null;
+    if (submitBtn && submitBtn.textContent === 'Locked — Use Hint') {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Answer';
+      submitBtn.style.opacity = '';
+      submitBtn.style.cursor = '';
+    }
+    toast('Hint unlocked. You can now answer again.', 'info');
   },
 
   toggleHint(qid) {
@@ -1486,12 +1494,38 @@ const Pages = {
           }, 300);
         }
       } else {
+        // Wrong answer handling with attempt penalty
+        const attemptsUsed = d.wrong_count || 0;
+        const penalty = Math.min(attemptsUsed, 3) * 3;
+        const isLocked = d.locked;
+        
         if (fbEl) {
           fbEl.className = 'q-feedback wrong visible';
-          fbEl.innerHTML = `<div class="fb-title">Incorrect</div>${escapeHtml(d.message)}`;
+          let msg = escapeHtml(d.message);
+          if (!isLocked && attemptsUsed > 0) {
+            msg += `<div style="margin-top:8px;font-size:12px;color:var(--muted)">Attempt ${attemptsUsed}/3 • Penalty: -${penalty} pts</div>`;
+          }
+          fbEl.innerHTML = `<div class="fb-title">Incorrect</div>${msg}`;
         }
-        if (btn) { btn.disabled = false; btn.textContent = 'Submit Answer'; }
-        toast('Incorrect. Review the evidence and try again.', 'error');
+        
+        // Update the attempts display
+        const attemptsEl = card ? card.querySelector('.q-attempts') : null;
+        if (attemptsEl) {
+          attemptsEl.textContent = `Attempt ${attemptsUsed}/3${!isLocked && attemptsUsed > 0 ? ` • Penalty: -${penalty} pts` : ''}`;
+        }
+        
+        // Lock submit button after 3 wrong attempts (force hint usage)
+        if (isLocked && btn) {
+          btn.disabled = true;
+          btn.textContent = 'Locked — Use Hint';
+          btn.style.opacity = '0.6';
+          btn.style.cursor = 'not-allowed';
+        } else if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Submit Answer';
+        }
+        
+        toast(isLocked ? 'Maximum attempts reached. Request a hint to continue.' : 'Incorrect. Review the evidence and try again.', 'error');
       }
     } catch(e) {
       toast('Network error', 'error');

@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS user_answers (
   pts_awarded      INTEGER DEFAULT 0,
   hints_used       INTEGER DEFAULT 0,
   attempt_number   INTEGER DEFAULT 1,
+  wrong_count      INTEGER DEFAULT 0,
   submitted_at     TEXT DEFAULT (datetime('now')),
   UNIQUE(user_id, question_id),
   FOREIGN KEY(user_id)     REFERENCES users(id)     ON DELETE CASCADE,

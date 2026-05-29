@@ -346,8 +346,8 @@ function getHintPlan(question) {
   const configured = parseHintLevels(question);
   const answer = String(question.correct_answer || '').trim();
   const fallback1 = question.alert_ref
-    ? `Focus on the investigation material linked to ${question.alert_ref}. The answer is visible in the provided logs or evidence.`
-    : 'Review the evidence, logs, and investigation notes carefully. The answer is present in the lab material.';
+    ? `Focus on the investigation material linked to ${question.alert_ref}. Analyze the logs and evidence carefully.`
+    : 'Review the evidence, logs, and investigation notes carefully. Analyze all available data before answering.';
   const fallback2 = configured[0]
     ? configured[0]
     : 'Re-check the exact field, indicator, or value in the evidence. Do not guess from memory.';
@@ -361,6 +361,13 @@ function getHintPenalty(basePoints, hintCount) {
   if (hintCount === 1) return Math.max(0, pts - 5);
   if (hintCount === 2) return Math.max(0, pts - 15);
   return 0;
+}
+
+function getWrongAttemptPenalty(basePoints, wrongCount) {
+  // Deduct 3 points per wrong attempt, max 3 attempts = -9 points total
+  const pts = Math.max(0, parseInt(basePoints) || 0);
+  const penalty = Math.min(wrongCount, 3) * 3;
+  return Math.max(0, pts - penalty);
 }
 
 function getUserAlertStatus(userId, alertId, fallbackStatus = 'open') {
@@ -593,19 +600,24 @@ async function router(req, res) {
 
     const nextAttempt = (prior?.attempt_number || 0) + 1;
     const hintsUsed = prior?.hints_used || 0;
+    const wrongCount = !isCorrect && prior ? (prior.wrong_count || 0) + 1 : (prior?.wrong_count || 0);
+    // Lock after 3 wrong attempts - force hint usage
+    const locked = wrongCount >= 3 && hintsUsed === 0;
     const ptsAwarded = isCorrect ? getHintPenalty(question.points, hintsUsed) : 0;
+    const potentialPoints = getWrongAttemptPenalty(getHintPenalty(question.points, hintsUsed), wrongCount);
     const now = new Date().toISOString();
 
     const saveAnswer = db.transaction(() => {
       db.prepare(
-        `INSERT INTO user_answers (user_id, lab_id, question_id, submitted_answer, is_correct, pts_awarded, hints_used, attempt_number, submitted_at)
-         VALUES (?,?,?,?,?,?,?,?,?)
+        `INSERT INTO user_answers (user_id, lab_id, question_id, submitted_answer, is_correct, pts_awarded, hints_used, attempt_number, wrong_count, submitted_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(user_id, question_id) DO UPDATE SET
            submitted_answer=excluded.submitted_answer,
            is_correct=excluded.is_correct,
            pts_awarded=excluded.pts_awarded,
            hints_used=excluded.hints_used,
            attempt_number=excluded.attempt_number,
+           wrong_count=excluded.wrong_count,
            submitted_at=excluded.submitted_at`
       ).run(
         user.id,
@@ -616,6 +628,7 @@ async function router(req, res) {
         ptsAwarded,
         hintsUsed,
         nextAttempt,
+        wrongCount,
         now
       );
 
@@ -669,13 +682,18 @@ async function router(req, res) {
       pts: ptsAwarded,
       hints_used: hintsUsed,
       attempts: nextAttempt,
+      wrong_count: wrongCount,
+      potential_points: potentialPoints,
+      locked: locked,
       lab_status: completed ? 'completed' : 'in_progress',
       completed_questions: solvedQuestions,
       total_questions: totalQuestions,
       total_score: getUserTotalScore(user.id),
       message: isCorrect
         ? (completed ? 'Lab completed successfully.' : 'Correct. Move to the next question.')
-        : 'Incorrect. Review the evidence and try again.'
+        : (locked 
+            ? 'Maximum attempts reached. Request a hint to continue answering.' 
+            : 'Incorrect. Review the evidence and try again.')
     });
   }
 
