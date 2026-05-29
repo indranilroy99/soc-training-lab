@@ -876,16 +876,24 @@ const API = {
   }
 };
 
-function toast(msg, type = 'info', duration = 3500) {
-  const icons = { success: '✓', error: '✕', info: 'ℹ' };
-  const t = document.createElement('div');
-  t.className = 'toast ' + type;
-  t.innerHTML = `<span>${icons[type]||'ℹ'}</span><span>${msg}</span>`;
-  document.getElementById('toasts').appendChild(t);
-  setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity 0.3s'; setTimeout(()=>t.remove(),300); }, duration);
+function toast(msg, type='info', ms=3200) {
+  const icon = type==='success' ? '✓' : type==='error' ? '✕' : 'ℹ';
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = `<span>${icon}</span><span>${escapeHtml(msg)}</span>`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .25s'; setTimeout(()=>el.remove(),250); }, ms);
 }
 
-// ── MODALS ──────────────────────────────────────────────
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const Modals = {
   open(id)  { const el = document.getElementById(id); if (el) el.classList.add('open'); },
   close(id) { const el = document.getElementById(id); if (el) el.classList.remove('open'); },
@@ -1038,18 +1046,18 @@ const Pages = {
           ? new Date(u.last_session).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
           : 'Never';
         return `<tr>
-          <td class="td-main"><span style="cursor:pointer;color:var(--blue)" onclick="Pages.viewProfile(${u.id}, '${u.username}', '${u.role}')">${u.username}</span></td>
-          <td><span class="chip ${u.role==='admin'?'chip-orange':'chip-blue'}">${u.role}</span></td>
+          <td class="td-main"><span style="cursor:pointer;color:var(--blue)" onclick="Pages.viewProfile(${u.id}, ${JSON.stringify(String(u.username || ''))}, ${JSON.stringify(String(u.role || ''))})">${escapeHtml(u.username)}</span></td>
+          <td><span class="chip ${u.role==='admin'?'chip-orange':'chip-blue'}">${escapeHtml(u.role)}</span></td>
           <td><span class="chip ${u.is_active?'chip-blue':'chip-red'}">${u.is_active?'Active':'Disabled'}</span></td>
           <td class="td-mono" style="color:var(--blue)">${u.score}</td>
           <td>${u.labs_done}</td>
           <td style="color:var(--dim);font-size:11.5px">${lastActive}</td>
           <td>
             <div style="display:flex;gap:6px;align-items:center">
-              <button class="btn btn-outline btn-xs" onclick="Pages.viewProfile(${u.id}, '${u.username}', '${u.role}')">Profile</button>
+              <button class="btn btn-outline btn-xs" onclick="Pages.viewProfile(${u.id}, ${JSON.stringify(String(u.username || ''))}, ${JSON.stringify(String(u.role || ''))})">Profile</button>
               <button class="btn btn-outline btn-xs" onclick="Pages.toggleUser(${u.id}, ${u.is_active})">${u.is_active?'Disable':'Enable'}</button>
-              <button class="btn btn-outline btn-xs" onclick="Pages.resetPw(${u.id}, '${u.username}')">Reset PW</button>
-              <button class="btn btn-red btn-xs" onclick="Pages.deleteUser(${u.id}, '${u.username}')">Delete</button>
+              <button class="btn btn-outline btn-xs" onclick="Pages.resetPw(${u.id}, ${JSON.stringify(String(u.username || ''))})">Reset PW</button>
+              <button class="btn btn-red btn-xs" onclick="Pages.deleteUser(${u.id}, ${JSON.stringify(String(u.username || ''))})">Delete</button>
             </div>
           </td>
         </tr>`;
@@ -1138,7 +1146,7 @@ const Pages = {
             <th>Total Score</th>
           </tr></thead>
           <tbody>${rows.map(r => `<tr>
-            <td class="td-main">${r.username}</td>
+            <td class="td-main">${escapeHtml(r.username)}</td>
             ${labs.map(l => {
               const p = r.labs[l.slug];
               const cls = p.status==='completed'?'mc-done':p.status==='in_progress'?'mc-progress':'mc-none';

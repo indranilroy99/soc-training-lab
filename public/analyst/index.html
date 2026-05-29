@@ -953,9 +953,18 @@ function toast(msg, type = 'info', duration = 3500) {
   const icons = { success: '✓', error: '✕', info: 'ℹ' };
   const t = document.createElement('div');
   t.className = 'toast ' + type;
-  t.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+  t.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${escapeHtml(msg)}</span>`;
   document.getElementById('toasts').appendChild(t);
   setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, duration);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ── APP ─────────────────────────────────────────────────
@@ -1095,8 +1104,8 @@ const Pages = {
       const statusText  = l.status === 'completed' ? '✓ Done' : l.status === 'in_progress' ? `${pct}%` : 'Not started';
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="App.openLab('${l.slug}')">
         <div style="flex:1;min-width:0">
-          <div style="font-size:12.5px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.title}</div>
-          <div style="font-size:11px;color:var(--dim)">${l.category} · ${l.difficulty}</div>
+          <div style="font-size:12.5px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(l.title)}</div>
+          <div style="font-size:11px;color:var(--dim)">${escapeHtml(l.category)} · ${escapeHtml(l.difficulty)}</div>
         </div>
         <div style="font-size:11.5px;font-weight:600;color:${statusColor};white-space:nowrap">${statusText}</div>
       </div>`;
@@ -1109,10 +1118,10 @@ const Pages = {
     return `<div class="card" style="margin-bottom:10px;cursor:pointer" onclick="App.openLab('${lab.slug}')">
       <div style="padding:12px 14px">
         <div style="display:flex;gap:6px;margin-bottom:8px">
-          <span class="diff diff-${diff}">${lab.difficulty}</span>
-          <span class="cat">${lab.category}</span>
+          <span class="diff diff-${diff}">${escapeHtml(lab.difficulty)}</span>
+          <span class="cat">${escapeHtml(lab.category)}</span>
         </div>
-        <div style="font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:8px">${lab.title}</div>
+        <div style="font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:8px">${escapeHtml(lab.title)}</div>
         <div style="font-size:11px;color:var(--dim);margin-bottom:6px">Progress: ${lab.questions_done}/${lab.questions_total} questions</div>
         <div style="height:4px;background:var(--input-bg);border-radius:2px;overflow:hidden">
           <div style="height:100%;background:var(--orange);border-radius:2px;width:${pct}%;transition:width 0.4s"></div>
@@ -1140,12 +1149,12 @@ const Pages = {
       return `<div class="lab-card ${l.status === 'completed' ? 'completed' : ''}" onclick="App.openLab('${l.slug}')">
         <div class="lab-card-top">
           <div class="lab-card-badges">
-            <span class="diff diff-${diff}">${l.difficulty}</span>
-            <span class="cat">${l.category}</span>
+            <span class="diff diff-${diff}">${escapeHtml(l.difficulty)}</span>
+            <span class="cat">${escapeHtml(l.category)}</span>
             ${l.status === 'completed' ? '<span style="margin-left:auto;font-size:10px;color:var(--blue);font-weight:700">✓ COMPLETED</span>' : ''}
           </div>
-          <div class="lab-card-title">${l.title}</div>
-          <div class="lab-card-desc">${l.description}</div>
+          <div class="lab-card-title">${escapeHtml(l.title)}</div>
+          <div class="lab-card-desc">${escapeHtml(l.description)}</div>
         </div>
         <div class="lab-card-bottom">
           <div class="lab-progress">
@@ -1169,13 +1178,13 @@ const Pages = {
     document.getElementById('lab-view-title').textContent = lab.title;
     document.getElementById('lab-view-desc').textContent  = lab.description;
     document.getElementById('lab-badges').innerHTML = `
-      <span class="diff diff-${lab.difficulty.toLowerCase()}">${lab.difficulty}</span>
-      <span class="cat">${lab.category}</span>`;
+      <span class="diff diff-${lab.difficulty.toLowerCase()}">${escapeHtml(lab.difficulty)}</span>
+      <span class="cat">${escapeHtml(lab.category)}</span>`;
 
     const totalDone = lab.questions.filter(q => q.completed).length;
     document.getElementById('lab-meta').innerHTML = `
-      <div class="lab-meta-row"><span class="lab-meta-key">Category</span><span class="lab-meta-val">${lab.category}</span></div>
-      <div class="lab-meta-row"><span class="lab-meta-key">Difficulty</span><span class="lab-meta-val">${lab.difficulty}</span></div>
+      <div class="lab-meta-row"><span class="lab-meta-key">Category</span><span class="lab-meta-val">${escapeHtml(lab.category)}</span></div>
+      <div class="lab-meta-row"><span class="lab-meta-key">Difficulty</span><span class="lab-meta-val">${escapeHtml(lab.difficulty)}</span></div>
       <div class="lab-meta-row"><span class="lab-meta-key">Points</span><span class="lab-meta-val" style="color:var(--blue)">${lab.points} pts</span></div>
       <div class="lab-meta-row"><span class="lab-meta-key">Questions</span><span class="lab-meta-val">${lab.questions.length}</span></div>
       <div class="lab-meta-row"><span class="lab-meta-key">Status</span><span class="lab-meta-val">${totalDone}/${lab.questions.length} answered</span></div>`;
@@ -1207,7 +1216,7 @@ const Pages = {
         <div class="inv-icon">⚠</div>
         <div class="inv-text">
           <strong style="color:var(--text)">Investigation required.</strong> Before answering, review the relevant SOC alert${notViewed.length > 1 ? 's' : ''} in the SOC Dashboard.<br>
-          <span style="color:var(--dim);font-size:12px">Required: ${notViewed.map(id => `<span class="ioc-tag" style="cursor:pointer" onclick="App.navigate('soc')">${id}</span>`).join(' ')}</span>
+          <span style="color:var(--dim);font-size:12px">Required: ${notViewed.map(id => `<span class="ioc-tag" style="cursor:pointer" onclick="App.navigate('soc')">${escapeHtml(id)}</span>`).join(' ')}</span>
         </div>
         <button class="btn btn-outline btn-sm" style="flex-shrink:0" onclick="App.navigate('soc')">Go to SOC Dashboard</button>
       </div>
@@ -1322,22 +1331,22 @@ const Pages = {
       const opts = JSON.parse(typeof q.options === 'string' ? q.options : JSON.stringify(q.options));
       inputHtml = `<div class="q-choices" id="q-choices-${q.id}">
         ${opts.map(opt => `<label class="q-choice ${savedAnswer === opt ? 'selected' : ''} ${done ? 'correct' : ''}">
-          <input type="radio" name="q-${q.id}" value="${opt}" ${savedAnswer === opt ? 'checked' : ''} ${done ? 'disabled' : ''}> ${opt}
+          <input type="radio" name="q-${q.id}" value="${escapeHtml(opt)}" ${savedAnswer === opt ? 'checked' : ''} ${done ? 'disabled' : ''}> ${escapeHtml(opt)}
         </label>`).join('')}
       </div>`;
     } else {
-      inputHtml = `<input type="text" class="q-text-input" id="q-input-${q.id}" placeholder="Type your answer here..." value="${savedAnswer.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}" ${done ? 'disabled' : ''}>`;
+      inputHtml = `<input type="text" class="q-text-input" id="q-input-${q.id}" placeholder="Type your answer here..." value="${escapeHtml(savedAnswer)}" ${done ? 'disabled' : ''}>`;
     }
     return `<div class="q-card ${done ? 'done' : ''} ${locked ? 'locked' : ''}" id="q-card-${q.id}" id="question-${idx+1}" data-qidx="${idx}" data-qid="${q.id}">
       <div class="q-card-header">
         <div class="q-num">Question ${idx+1}</div>
-        <div class="q-text">${q.question}</div>
+        <div class="q-text">${escapeHtml(q.question)}</div>
       </div>
       <div class="q-card-body">
         ${inputHtml}
         <div style="margin-bottom:10px">
           <button class="q-hint-btn" onclick="Pages.requestHint('${slug}', ${q.id})" ${locked || done || hintsUsed >= 3 ? 'disabled' : ''}>${hintsUsed === 0 ? 'Hint 1 (-5 pts)' : hintsUsed === 1 ? 'Hint 2 (-10 pts)' : 'Final Hint (0 pts)'}</button>
-          <div class="q-hint-text ${hintsUsed > 0 ? 'visible' : ''}" id="q-hint-${q.id}">${hintsUsed > 0 ? (q.hint_plan?.[hintsUsed - 1] || '') : ''}</div>
+          <div class="q-hint-text ${hintsUsed > 0 ? 'visible' : ''}" id="q-hint-${q.id}">${hintsUsed > 0 ? escapeHtml(q.hint_plan?.[hintsUsed - 1] || '') : ''}</div>
         </div>
         <div class="q-actions">
           ${done
@@ -1364,7 +1373,7 @@ const Pages = {
       toast(res.data?.error || 'Failed to load hint.', 'error');
       if (fbEl && res.data?.error) {
         fbEl.className = 'q-feedback wrong visible';
-        fbEl.innerHTML = `<div class="fb-title">Hint unavailable</div>${res.data.error}`;
+        fbEl.innerHTML = `<div class="fb-title">Hint unavailable</div>${escapeHtml(res.data.error)}`;
       }
       return;
     }
@@ -1375,7 +1384,7 @@ const Pages = {
     }
     if (fbEl) {
       fbEl.className = 'q-feedback visible';
-      fbEl.innerHTML = `<div class="fb-title">Hint ${d.hint_level}/${d.max_hints}</div>${d.message}<div style="margin-top:6px;color:var(--muted)">Score left on this question: ${d.remaining_points} pts</div>`;
+      fbEl.innerHTML = `<div class="fb-title">Hint ${d.hint_level}/${d.max_hints}</div>${escapeHtml(d.message)}<div style="margin-top:6px;color:var(--muted)">Score left on this question: ${d.remaining_points} pts</div>`;
     }
     const attempts = card ? card.querySelector('.q-attempts') : null;
     if (attempts) attempts.textContent = `Hints used: ${d.hint_level}/3 • Score left on this question: ${d.remaining_points} pts`;
