@@ -378,81 +378,116 @@ async function router(req, res) {
     const slug = submitMatch[1];
     const lab  = db.prepare(`SELECT * FROM labs WHERE slug=?`).get(slug);
     if (!lab) return jsonRes(res, 404, { error: 'Lab not found' });
-    const { question_id, answer } = await parseBody(req);
-    if (!question_id || answer === undefined) {
-      return jsonRes(res, 400, { error: 'question_id and answer required' });
-    }
-    const question = db.prepare(`SELECT * FROM questions WHERE id=? AND lab_id=?`).get(question_id, lab.id);
-    if (!question) return jsonRes(res, 404, { error: 'Question not found' });
 
-    // Already correctly answered?
-    const alreadyCorrect = db.prepare(
-      `SELECT id FROM user_answers WHERE user_id=? AND question_id=? AND is_correct=1`
-    ).get(user.id, question_id);
-    if (alreadyCorrect) {
-      return jsonRes(res, 200, {
-        correct: true, already_answered: true,
-        pts: 0, explanation: question.explanation,
-        total_score: getUserTotalScore(user.id)
+    const { answers } = await parseBody(req);
+    if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
+      return jsonRes(res, 400, { error: 'answers object required' });
+    }
+
+    const questions = db.prepare(
+      `SELECT id, answer_type, correct_answer, points FROM questions WHERE lab_id=? ORDER BY order_index`
+    ).all(lab.id);
+    if (!questions.length) {
+      return jsonRes(res, 400, { error: 'This lab has no questions configured' });
+    }
+
+    const missing = questions.filter(q => {
+      const raw = answers[q.id] ?? answers[String(q.id)];
+      return raw === undefined || String(raw).trim() === '';
+    });
+    if (missing.length) {
+      return jsonRes(res, 400, {
+        error: 'All questions must be answered before submission.',
+        missing_question_ids: missing.map(q => q.id)
       });
     }
 
-    const priorRow = db.prepare(
-      `SELECT attempt_number FROM user_answers WHERE user_id=? AND question_id=? ORDER BY submitted_at DESC LIMIT 1`
-    ).get(user.id, question_id);
-    const priorAttempts = priorRow ? priorRow.attempt_number : 0;
-    const MAX_ATTEMPTS = 3;
-
-    const submitted = String(answer).trim().toLowerCase();
-    const correct_a = question.correct_answer.trim().toLowerCase();
-    let correct = false;
-    if (question.answer_type === 'choice') {
-      correct = submitted === correct_a;
-    } else {
+    const evaluateAnswer = (question, rawAnswer) => {
+      const submitted = String(rawAnswer).trim().toLowerCase();
+      const correct_a = String(question.correct_answer || '').trim().toLowerCase();
+      if (question.answer_type === 'choice') return submitted === correct_a;
       const keywords = correct_a.split(/\s+/).filter(w => w.length > 4);
+      if (!keywords.length) return submitted === correct_a;
       const matchCount = keywords.filter(k => submitted.includes(k)).length;
-      correct = matchCount >= Math.ceil(keywords.length * 0.35);
-    }
+      return matchCount >= Math.ceil(keywords.length * 0.35);
+    };
 
-    const ptsAwarded = correct ? (priorAttempts === 0 ? question.points : Math.floor(question.points * 0.5)) : 0;
+    const evaluated = questions.map(q => {
+      const submittedAnswer = answers[q.id] ?? answers[String(q.id)] ?? '';
+      const isCorrect = evaluateAnswer(q, submittedAnswer);
+      return {
+        question_id: q.id,
+        submitted_answer: String(submittedAnswer),
+        is_correct: isCorrect,
+        points: q.points || 0
+      };
+    });
 
-    db.prepare(
-      `INSERT OR REPLACE INTO user_answers (user_id, lab_id, question_id, submitted_answer, is_correct, pts_awarded, attempt_number)
-       VALUES (?,?,?,?,?,?,?)`
-    ).run(user.id, lab.id, question_id, answer, correct ? 1 : 0, ptsAwarded, priorAttempts + 1);
+    const wrongQuestions = evaluated.filter(q => !q.is_correct).map(q => q.question_id);
+    const passed = wrongQuestions.length === 0;
+    const labScore = passed ? evaluated.reduce((sum, q) => sum + (q.points || 0), 0) : 0;
+    const now = new Date().toISOString();
+    const priorProgress = db.prepare(`SELECT id, started_at FROM user_progress WHERE user_id=? AND lab_id=?`).get(user.id, lab.id);
+    const startedAt = priorProgress?.started_at || now;
 
-    const totalQ = db.prepare(`SELECT COUNT(*) as c FROM questions WHERE lab_id=?`).get(lab.id).c;
-    const doneQ  = db.prepare(
-      `SELECT COUNT(DISTINCT question_id) as c FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
-    ).get(user.id, lab.id).c;
-    const labScore = db.prepare(
-      `SELECT COALESCE(SUM(pts_awarded),0) as s FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
-    ).get(user.id, lab.id).s;
-    const newStatus = doneQ >= totalQ ? 'completed' : 'in_progress';
-    const existing  = db.prepare(`SELECT id FROM user_progress WHERE user_id=? AND lab_id=?`).get(user.id, lab.id);
-    if (existing) {
-      db.prepare(
-        `UPDATE user_progress SET status=?, score=?, completed_at=? WHERE user_id=? AND lab_id=?`
-      ).run(newStatus, labScore, newStatus === 'completed' ? new Date().toISOString() : null, user.id, lab.id);
-    } else {
-      db.prepare(
-        `INSERT INTO user_progress (user_id, lab_id, status, score, started_at, completed_at)
-         VALUES (?,?,?,?,?,?)`
-      ).run(user.id, lab.id, newStatus, labScore, new Date().toISOString(),
-        newStatus === 'completed' ? new Date().toISOString() : null);
-    }
+    const saveSubmission = db.transaction(() => {
+      db.prepare(`DELETE FROM user_answers WHERE user_id=? AND lab_id=?`).run(user.id, lab.id);
 
-    const attemptsLeft = correct ? 0 : Math.max(0, MAX_ATTEMPTS - (priorAttempts + 1));
-    const reveal = !correct && (priorAttempts + 1) >= MAX_ATTEMPTS;
+      const insertAnswer = db.prepare(
+        `INSERT INTO user_answers (user_id, lab_id, question_id, submitted_answer, is_correct, pts_awarded, attempt_number)
+         VALUES (?,?,?,?,?,?,?)`
+      );
+
+      evaluated.forEach(item => {
+        insertAnswer.run(
+          user.id,
+          lab.id,
+          item.question_id,
+          item.submitted_answer,
+          item.is_correct ? 1 : 0,
+          passed ? item.points : 0,
+          1
+        );
+      });
+
+      if (priorProgress) {
+        db.prepare(
+          `UPDATE user_progress SET status=?, score=?, started_at=?, completed_at=? WHERE user_id=? AND lab_id=?`
+        ).run(
+          passed ? 'completed' : 'not_started',
+          labScore,
+          startedAt,
+          passed ? now : null,
+          user.id,
+          lab.id
+        );
+      } else {
+        db.prepare(
+          `INSERT INTO user_progress (user_id, lab_id, status, score, started_at, completed_at)
+           VALUES (?,?,?,?,?,?)`
+        ).run(
+          user.id,
+          lab.id,
+          passed ? 'completed' : 'not_started',
+          labScore,
+          startedAt,
+          passed ? now : null
+        );
+      }
+    });
+
+    saveSubmission();
 
     return jsonRes(res, 200, {
-      correct,
-      pts: ptsAwarded,
-      explanation: (correct || reveal) ? question.explanation : null,
-      correct_answer: reveal ? question.correct_answer : null,
-      attempts_left: attemptsLeft,
-      lab_status: newStatus,
-      total_score: getUserTotalScore(user.id)
+      passed,
+      lab_status: passed ? 'completed' : 'not_started',
+      score_awarded: labScore,
+      wrong_question_ids: wrongQuestions,
+      total_questions: questions.length,
+      total_score: getUserTotalScore(user.id),
+      message: passed
+        ? 'Lab completed successfully. Full score awarded.'
+        : 'Lab submission failed. One or more answers were incorrect. No answers are shown. Retake the full lab to complete it.'
     });
   }
 
