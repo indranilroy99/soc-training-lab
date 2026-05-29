@@ -478,6 +478,10 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
               <span class="card-title" id="qpanel-title">Questions</span>
               <span id="qpanel-count" style="font-size:11px;color:var(--dim);margin-left:4px"></span>
               <div style="margin-left:auto;display:flex;gap:8px">
+                <button class="btn btn-outline btn-sm" onclick="LabPages.showTemplate()" title="Copy JSON template for bulk import">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  JSON Template
+                </button>
                 <button class="btn btn-primary btn-sm" onclick="LabPages.openAddQuestion()">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                   Add Question
@@ -715,10 +719,38 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
         <label class="form-label">Explanation <span style="color:var(--dim)">(shown after completion)</span></label>
         <textarea class="form-textarea" id="qf-explanation" placeholder="Why is this the correct answer?" rows="2"></textarea>
       </div>
+      <div class="form-group">
+        <label class="form-label">Alert Reference <span style="color:var(--dim)">(optional)</span></label>
+        <input type="text" class="form-input" id="qf-alert-ref" placeholder="e.g. ALT-085 — the alert this question tests">
+        <div class="form-hint">Leave blank if not tied to a specific alert. Used for rubric scoring.</div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="LabModals.close('modal-question-form')">Cancel</button>
       <button class="btn btn-primary" id="btn-save-question" onclick="LabPages.saveQuestion()">Add Question</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK IMPORT MODAL -->
+<div class="modal-overlay" id="modal-bulk-import">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <span class="modal-title">Bulk Import — Questions &amp; Alerts</span>
+      <button class="modal-close" onclick="LabModals.close('modal-bulk-import')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Paste JSON below</label>
+        <div class="form-hint" style="margin-bottom:10px">Paste a JSON array of question objects. Each question needs: question, answer_type (mcq/text), correct_answer, options (array, for mcq), hint, explanation, points, difficulty, alert_ref (optional).</div>
+        <textarea class="form-textarea" id="bulk-json" placeholder='[\n  {\n    &quot;question&quot;: &quot;What does CVE-2023-34362 affect?&quot;,\n    &quot;answer_type&quot;: &quot;mcq&quot;,\n    &quot;options&quot;: [&quot;Option A&quot;, &quot;Option B&quot;, &quot;Option C&quot;, &quot;Option D&quot;],\n    &quot;correct_answer&quot;: &quot;Option A&quot;,\n    &quot;hint&quot;: &quot;Think MOVEit Transfer&quot;,\n    &quot;explanation&quot;: &quot;CVE-2023-34362 is a SQLi in MOVEit Transfer&quot;,\n    &quot;points&quot;: 20,\n    &quot;difficulty&quot;: &quot;medium&quot;,\n    &quot;alert_ref&quot;: &quot;ALT-204&quot;\n  }\n]' rows="14" style="font-family: JetBrains Mono, monospace; font-size: 12px;"></textarea>
+      </div>
+      <div id="bulk-parse-result" style="margin-top:8px;font-size:12px;color:var(--dim)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="LabModals.close('modal-bulk-import')">Cancel</button>
+      <button class="btn btn-outline" onclick="LabPages.parseTemplate()" style="margin-right:auto">Validate JSON</button>
+      <button class="btn btn-primary" onclick="LabPages.bulkImport()">Import Questions</button>
     </div>
   </div>
 </div>
@@ -1250,6 +1282,7 @@ const LabModals = {
     document.getElementById('qf-points').value     = '20';
     document.getElementById('qf-hint').value       = '';
     document.getElementById('qf-explanation').value= '';
+    document.getElementById('qf-alert-ref').value   = '';
     this.initOptions(['', '']);
     this.onTypeChange();
     this.open('modal-question-form');
@@ -1267,6 +1300,7 @@ const LabModals = {
     document.getElementById('qf-points').value     = q.points;
     document.getElementById('qf-hint').value       = q.hint || '';
     document.getElementById('qf-explanation').value= q.explanation || '';
+    document.getElementById('qf-alert-ref').value   = q.alert_ref || '';
     this.initOptions(q.options && q.options.length ? q.options : ['', '']);
     this.onTypeChange();
     this.open('modal-question-form');
@@ -1275,7 +1309,7 @@ const LabModals = {
 };
 
 // Close new modals on overlay click
-['modal-lab-form','modal-question-form','modal-delete-lab','modal-delete-question'].forEach(id => {
+['modal-lab-form','modal-question-form','modal-delete-lab','modal-delete-question','modal-bulk-import'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
@@ -1500,6 +1534,7 @@ const LabPages = {
     const points     = parseInt(document.getElementById('qf-points').value) || 20;
     const hint       = document.getElementById('qf-hint').value.trim();
     const explanation= document.getElementById('qf-explanation').value.trim();
+    const alertRef   = document.getElementById('qf-alert-ref').value.trim();
 
     if (!question) { toast('Question text is required', 'error'); document.getElementById('qf-question').focus(); return; }
     if (!answer)   { toast('Correct answer is required', 'error'); document.getElementById('qf-answer').focus(); return; }
@@ -1518,7 +1553,7 @@ const LabPages = {
     const btn = document.getElementById('btn-save-question');
     btn.disabled = true; btn.textContent = 'Saving...';
 
-    const payload = { question, answer_type: type, options, correct_answer: answer, hint, explanation, points, difficulty };
+    const payload = { question, answer_type: type, options, correct_answer: answer, hint, explanation, points, difficulty, alert_ref: alertRef };
     let res;
     if (id) {
       res = await API.put('/api/admin/questions/' + id, payload);
@@ -1568,7 +1603,80 @@ const LabPages = {
     } else {
       toast(res.data.error || 'Failed to delete question', 'error');
     }
-  }
+  },
+
+  showTemplate() {
+    const template = JSON.stringify([
+      {
+        question: 'What type of vulnerability is CVE-2023-34362 in MOVEit Transfer?',
+        answer_type: 'mcq',
+        options: ['Buffer overflow', 'SQL injection', 'XSS reflected', 'Path traversal'],
+        correct_answer: 'SQL injection',
+        hint: 'The exploit uses crafted HTTP requests to manipulate the database',
+        explanation: 'CVE-2023-34362 is an SQL injection vulnerability in MOVEit Transfer that allows unauthenticated attackers to gain access to MOVEit Transfer database.',
+        points: 20,
+        difficulty: 'medium',
+        alert_ref: 'ALT-204'
+      }
+    ], null, 2);
+    document.getElementById('bulk-json').value = template;
+    document.getElementById('bulk-parse-result').textContent = 'Template loaded. Edit and click Import Questions.';
+    document.getElementById('bulk-parse-result').style.color = 'var(--accent)';
+    LabModals.open('modal-bulk-import');
+  },
+  parseTemplate() {
+    const raw = document.getElementById('bulk-json').value.trim();
+    const el = document.getElementById('bulk-parse-result');
+    try {
+      const data = JSON.parse(raw);
+      if (!Array.isArray(data)) throw new Error('Must be a JSON array');
+      el.textContent = `✓ Valid JSON — ${data.length} question(s) ready to import.`;
+      el.style.color = '#22c55e';
+    } catch(e) {
+      el.textContent = `✗ Invalid JSON: ${e.message}`;
+      el.style.color = 'var(--red)';
+    }
+  },
+  async bulkImport() {
+    const raw = document.getElementById('bulk-json').value.trim();
+    const el = document.getElementById('bulk-parse-result');
+    let data;
+    try {
+      data = JSON.parse(raw);
+      if (!Array.isArray(data)) throw new Error('Must be a JSON array');
+    } catch(e) {
+      el.textContent = `✗ Invalid JSON: ${e.message}`;
+      el.style.color = 'var(--red)';
+      return;
+    }
+    if (!this._activeLab) { toast('No lab selected', 'error'); return; }
+    el.textContent = `Importing ${data.length} question(s)...`;
+    el.style.color = 'var(--dim)';
+    let ok = 0, fail = 0;
+    for (const q of data) {
+      const payload = {
+        question: q.question || '',
+        answer_type: q.answer_type || 'mcq',
+        options: Array.isArray(q.options) ? q.options : [],
+        correct_answer: q.correct_answer || '',
+        hint: q.hint || '',
+        explanation: q.explanation || '',
+        points: parseInt(q.points) || 20,
+        difficulty: q.difficulty || 'medium',
+        alert_ref: q.alert_ref || ''
+      };
+      if (!payload.question || !payload.correct_answer) { fail++; continue; }
+      const res = await API.post('/api/admin/labs/' + this._activeLab.id + '/questions', payload);
+      if (res.ok) ok++; else fail++;
+    }
+    el.textContent = `Done — ${ok} imported, ${fail} failed.`;
+    el.style.color = ok > 0 ? '#22c55e' : 'var(--red)';
+    if (ok > 0) {
+      await this._loadQuestions(this._activeLab.id);
+      const qs = await API.get('/api/admin/labs/' + this._activeLab.id + '/questions');
+      document.getElementById('qpanel-count').textContent = `${qs.length} question${qs.length !== 1 ? 's' : ''}`;
+    }
+  },
 };
 
 function esc(str) {
