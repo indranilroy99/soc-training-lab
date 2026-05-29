@@ -1373,7 +1373,7 @@ const Pages = {
       <div class="q-card-body">
         ${inputHtml}
         <div style="margin-bottom:10px">
-          <button class="q-hint-btn" onclick="Pages.requestHint('${slug}', ${q.id})" ${locked || done || hintsUsed >= 3 ? 'disabled' : ''}>${hintsUsed === 0 ? 'Request Hint' : hintsUsed === 1 ? 'Request Another Hint' : 'Final Hint Available'}</button>
+          <button class="q-hint-btn" onclick="Pages.requestHint('${slug}', ${q.id})" ${locked || done || hintsUsed >= 3 ? 'disabled' : ''}>${hintsUsed === 0 ? 'Hint 1 (-5 pts)' : hintsUsed === 1 ? 'Hint 2 (-10 pts)' : 'Final Hint (0 pts)'}</button>
           <div class="q-hint-text ${hintsUsed > 0 ? 'visible' : ''}" id="q-hint-${q.id}">${hintsUsed > 0 ? escapeHtml(q.hint_plan?.[hintsUsed - 1] || '') : ''}</div>
         </div>
         <div class="q-actions">
@@ -1418,7 +1418,7 @@ const Pages = {
     if (attempts) attempts.textContent = `Hints used: ${d.hint_level}/3`;
     const hintBtn = card ? card.querySelector('.q-hint-btn') : null;
     if (hintBtn) {
-      hintBtn.textContent = d.hint_level >= d.max_hints ? 'Maximum Hints Used' : (d.hint_level === 1 ? 'Request Another Hint' : 'Final Hint Available');
+      hintBtn.textContent = d.hint_level >= d.max_hints ? 'Maximum Hint Reached' : (d.hint_level === 1 ? 'Hint 2 (-10 pts)' : 'Final Hint (0 pts)');
       hintBtn.disabled = d.hint_level >= d.max_hints;
     }
     toast('Hint unlocked.', 'info');
