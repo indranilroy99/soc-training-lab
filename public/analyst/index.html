@@ -1502,7 +1502,17 @@ const Pages = {
 
   _unlockNext(questionId) {
     const cards = Array.from(document.querySelectorAll('.q-card.locked'));
-    if (cards.length > 0) cards[0].classList.remove('locked');
+    if (cards.length > 0) {
+      const cardToUnlock = cards[0];
+      cardToUnlock.classList.remove('locked');
+      // Enable the submit and hint buttons inside the unlocked card
+      const submitBtn = cardToUnlock.querySelector('.btn-green');
+      const hintBtn = cardToUnlock.querySelector('.q-hint-btn');
+      const textInput = cardToUnlock.querySelector('.q-text-input');
+      if (submitBtn) submitBtn.disabled = false;
+      if (hintBtn) hintBtn.disabled = false;
+      if (textInput) textInput.disabled = false;
+    }
   },
 
   async leaderboard() {
