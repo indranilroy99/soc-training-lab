@@ -6731,15 +6731,30 @@ const labMap  = Object.fromEntries(labRows.map(r => [r.slug, r.id]));
 
 const insertQ = db.prepare(`
   INSERT OR REPLACE INTO questions
-  (lab_id,order_index,points,difficulty,answer_type,question,options,correct_answer,hint,explanation)
-  VALUES (?,?,?,?,?,?,?,?,?,?)`);
+  (lab_id,order_index,points,difficulty,answer_type,question,options,correct_answer,hint,hint_levels,explanation)
+  VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
 
 let qCount = 0;
 for (const q of questions) {
   const labId = labMap[q.lab_slug];
   if (!labId) { console.warn('Unknown lab slug:', q.lab_slug); continue; }
+  const derivedHintLevels = Array.isArray(q.hint_levels) && q.hint_levels.length
+    ? q.hint_levels
+    : ((q.hint && q.correct_answer)
+      ? [
+          q.hint,
+          `The correct answer matches this pattern: ${String(q.correct_answer).trim().split(/(\\s+)/).map(token => {
+            if (/^\\s+$/.test(token)) return token;
+            if (token.length <= 1) return token;
+            if (token.length === 2) return token[0] + '_';
+            return token[0] + ' ' + Array.from({ length: token.length - 1 }, () => '_').join(' ');
+          }).join('')}`
+        ]
+      : []);
   insertQ.run(labId, q.order_index, q.points, q.difficulty, q.answer_type,
-              q.question, q.options || null, q.correct_answer, q.hint || null, q.explanation || null);
+              q.question, q.options || null, q.correct_answer, q.hint || null,
+              JSON.stringify(derivedHintLevels),
+              q.explanation || null);
   qCount++;
 }
 console.log(`✓ ${qCount} questions seeded`);
