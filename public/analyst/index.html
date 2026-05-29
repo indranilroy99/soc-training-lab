@@ -180,7 +180,9 @@ input, textarea, select { font-family: var(--font); }
 .lab-card.completed { border-left: 2px solid var(--blue); }
 .lab-card-top { padding: 14px 16px; border-bottom: 1px solid var(--border); }
 .lab-card-badges { display: flex; gap: 6px; margin-bottom: 10px; align-items: center; }
+.lab-card-labid { font-size: 10.5px; color: var(--muted); font-family: var(--mono); margin-bottom: 6px; letter-spacing: 0.02em; }
 .lab-card-title { font-size: 13.5px; font-weight: 600; color: var(--text); margin-bottom: 6px; line-height: 1.3; }
+.lab-card-session-tag { font-size: 11px; color: var(--dim); margin-bottom: 10px; }
 .lab-card-desc { font-size: 11.5px; color: var(--dim); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .lab-card-bottom { padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .lab-progress { flex: 1; }
@@ -1153,7 +1155,9 @@ const Pages = {
             <span class="cat">${escapeHtml(l.category)}</span>
             ${l.status === 'completed' ? '<span style="margin-left:auto;font-size:10px;color:var(--blue);font-weight:700">✓ COMPLETED</span>' : ''}
           </div>
+          ${l.lab_id ? `<div class="lab-card-labid">[${escapeHtml(l.lab_id)}]</div>` : ''}
           <div class="lab-card-title">${escapeHtml(l.title)}</div>
+          ${l.session_tag ? `<div class="lab-card-session-tag">${escapeHtml(l.session_tag)}</div>` : ''}
           <div class="lab-card-desc">${escapeHtml(l.description)}</div>
         </div>
         <div class="lab-card-bottom">

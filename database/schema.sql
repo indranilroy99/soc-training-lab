@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS labs (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   slug        TEXT UNIQUE NOT NULL,
   title       TEXT NOT NULL,
+  lab_id      TEXT,
+  session_tag TEXT,
   description TEXT,
   difficulty  TEXT,
   category    TEXT,

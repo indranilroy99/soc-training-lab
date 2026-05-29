@@ -104,6 +104,16 @@ try {
 } catch(e) { /* already exists */ }
 
 try {
+  db.prepare(`ALTER TABLE labs ADD COLUMN lab_id TEXT`).run();
+  console.log('[migrate] Added labs.lab_id column');
+} catch(e) { /* already exists */ }
+
+try {
+  db.prepare(`ALTER TABLE labs ADD COLUMN session_tag TEXT`).run();
+  console.log('[migrate] Added labs.session_tag column');
+} catch(e) { /* already exists */ }
+
+try {
   db.prepare(`ALTER TABLE questions ADD COLUMN alert_ref TEXT`).run();
   console.log('[migrate] Added questions.alert_ref column');
 } catch(e) { /* already exists */ }
