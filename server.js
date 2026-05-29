@@ -4,6 +4,27 @@
 
 'use strict';
 
+// ── Cluster: use all CPU cores ────────────────────────────────────────────
+// On a Mac mini M1/M2/M3 (8 cores), this spawns 6 worker processes.
+// Each worker handles requests independently. SQLite WAL mode supports
+// concurrent reads from multiple processes; writes are serialised by SQLite
+// itself and take < 1ms, so contention is negligible at classroom scale.
+const cluster = require('cluster');
+const os      = require('os');
+
+if (cluster.isPrimary && require.main === module) {
+  const numWorkers = Math.max(2, Math.min(os.cpus().length - 2, 6)); // leave 2 cores for OS
+  console.log(`\n  DIAAS-SEC — starting ${numWorkers} workers on ${os.cpus().length}-core CPU`);
+  for (let i = 0; i < numWorkers; i++) cluster.fork();
+  cluster.on('exit', (worker, code) => {
+    if (code !== 0) {
+      console.log(`[cluster] Worker ${worker.process.pid} crashed (code ${code}) — restarting`);
+      cluster.fork();
+    }
+  });
+  // Primary process does nothing else — workers handle all traffic
+} else {
+
 const http     = require('http');
 const fs       = require('fs');
 const path     = require('path');
@@ -177,6 +198,20 @@ try {
     FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
   )`).run();
 } catch(e) { /* already exists */ }
+
+// ── Performance indexes (idempotent — CREATE IF NOT EXISTS) ────────────────
+// sessions.token: looked up on EVERY authenticated API request
+db.prepare(`CREATE INDEX IF NOT EXISTS idx_sessions_token     ON sessions(token)`).run();
+// user_answers: hot path for getLabsWithProgress, submit, leaderboard
+db.prepare(`CREATE INDEX IF NOT EXISTS idx_answers_user_correct ON user_answers(user_id, is_correct)`).run();
+db.prepare(`CREATE INDEX IF NOT EXISTS idx_answers_user_lab    ON user_answers(user_id, lab_id, is_correct)`).run();
+// user_progress: batch-loaded in getLabsWithProgress
+db.prepare(`CREATE INDEX IF NOT EXISTS idx_progress_user       ON user_progress(user_id)`).run();
+// questions: batch-counted in getLabsWithProgress
+db.prepare(`CREATE INDEX IF NOT EXISTS idx_questions_lab       ON questions(lab_id)`).run();
+// alert_closures: leaderboard and admin activity views
+db.prepare(`CREATE INDEX IF NOT EXISTS idx_closures_user       ON alert_closures(user_id)`).run();
+console.log('[indexes] Performance indexes ensured');
 
 // ── MIME types ────────────────────────────────────────────
 const MIME = {
@@ -402,15 +437,34 @@ function setUserAlertStatus(userId, alertId, status) {
 }
 
 function getLabsWithProgress(userId) {
-  const labs = db.prepare(`SELECT * FROM labs WHERE is_visible=1 OR is_visible IS NULL ORDER BY order_index`).all();
+  // ── 4 queries total instead of 1 + (N_labs × 3) ─────────────────────────
+  // Query 1: all visible labs
+  const labs = db.prepare(
+    `SELECT * FROM labs WHERE is_visible=1 OR is_visible IS NULL ORDER BY order_index`
+  ).all();
+
+  // Query 2: user's progress across all labs in one shot
+  const progressRows = db.prepare(
+    `SELECT lab_id, status, score, started_at, completed_at
+     FROM user_progress WHERE user_id=?`
+  ).all(userId);
+  const progressMap = Object.fromEntries(progressRows.map(r => [r.lab_id, r]));
+
+  // Query 3: total question count per lab in one shot
+  const totalQRows = db.prepare(
+    `SELECT lab_id, COUNT(*) as c FROM questions GROUP BY lab_id`
+  ).all();
+  const totalQMap = Object.fromEntries(totalQRows.map(r => [r.lab_id, r.c]));
+
+  // Query 4: how many questions this user answered correctly per lab in one shot
+  const doneQRows = db.prepare(
+    `SELECT lab_id, COUNT(DISTINCT question_id) as c
+     FROM user_answers WHERE user_id=? AND is_correct=1 GROUP BY lab_id`
+  ).all(userId);
+  const doneQMap = Object.fromEntries(doneQRows.map(r => [r.lab_id, r.c]));
+
   return labs.map(lab => {
-    const prog = db.prepare(
-      `SELECT status, score, started_at, completed_at FROM user_progress WHERE user_id=? AND lab_id=?`
-    ).get(userId, lab.id);
-    const totalQ = db.prepare(`SELECT COUNT(*) as c FROM questions WHERE lab_id=?`).get(lab.id).c;
-    const doneQ  = db.prepare(
-      `SELECT COUNT(DISTINCT question_id) as c FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
-    ).get(userId, lab.id).c;
+    const prog = progressMap[lab.id];
     const alertRefs = lab.alert_refs ? JSON.parse(lab.alert_refs) : [];
     let evidence = [];
     try { evidence = lab.evidence ? JSON.parse(lab.evidence) : []; } catch { evidence = []; }
@@ -422,8 +476,8 @@ function getLabsWithProgress(userId) {
       score:           prog ? prog.score  : 0,
       started_at:      prog ? prog.started_at : null,
       completed_at:    prog ? prog.completed_at : null,
-      questions_total: totalQ,
-      questions_done:  doneQ,
+      questions_total: totalQMap[lab.id] || 0,
+      questions_done:  doneQMap[lab.id]  || 0,
     };
   });
 }
@@ -893,40 +947,47 @@ async function router(req, res) {
   }
 
   // ── GET /api/leaderboard ──────────────────────────────
+  // 10-second cache: all 60 students refreshing the leaderboard
+  // at once runs 1 query instead of 60 identical heavy JOINs.
   if (method === 'GET' && url === '/api/leaderboard') {
     const user = requireAuth(req, res); if (!user) return;
-    const rows = db.prepare(
-      `SELECT u.id, u.username,
-         COALESCE(lab.score, 0) + COALESCE(closure.score, 0) as score,
-         COALESCE(lab.correct_answers, 0) as correct_answers,
-         COALESCE(progress.labs_done, 0) as labs_done,
-         COALESCE(lab.total_answers, 0) as total_answers
-       FROM users u
-       LEFT JOIN (
-         SELECT user_id,
-                SUM(CASE WHEN is_correct=1 THEN pts_awarded ELSE 0 END) as score,
-                COUNT(DISTINCT CASE WHEN is_correct=1 THEN question_id END) as correct_answers,
-                COUNT(DISTINCT question_id) as total_answers
-         FROM user_answers
-         GROUP BY user_id
-       ) lab ON lab.user_id = u.id
-       LEFT JOIN (
-         SELECT user_id, SUM(points_awarded) as score
-         FROM alert_closures
-         WHERE is_correct=1
-         GROUP BY user_id
-       ) closure ON closure.user_id = u.id
-       LEFT JOIN (
-         SELECT user_id, COUNT(DISTINCT lab_id) as labs_done
-         FROM user_progress
-         WHERE status='completed'
-         GROUP BY user_id
-       ) progress ON progress.user_id = u.id
-       WHERE u.role='analyst' AND u.is_active=1
-       ORDER BY score DESC, u.username ASC
-       LIMIT 50`
-    ).all();
-    const board = rows.map((r, i) => ({
+    const now = Date.now();
+    if (!router._lbCache || (now - router._lbCacheTs) > 10000) {
+      const rows = db.prepare(
+        `SELECT u.id, u.username,
+           COALESCE(lab.score, 0) + COALESCE(closure.score, 0) as score,
+           COALESCE(lab.correct_answers, 0) as correct_answers,
+           COALESCE(progress.labs_done, 0) as labs_done,
+           COALESCE(lab.total_answers, 0) as total_answers
+         FROM users u
+         LEFT JOIN (
+           SELECT user_id,
+                  SUM(CASE WHEN is_correct=1 THEN pts_awarded ELSE 0 END) as score,
+                  COUNT(DISTINCT CASE WHEN is_correct=1 THEN question_id END) as correct_answers,
+                  COUNT(DISTINCT question_id) as total_answers
+           FROM user_answers
+           GROUP BY user_id
+         ) lab ON lab.user_id = u.id
+         LEFT JOIN (
+           SELECT user_id, SUM(points_awarded) as score
+           FROM alert_closures
+           WHERE is_correct=1
+           GROUP BY user_id
+         ) closure ON closure.user_id = u.id
+         LEFT JOIN (
+           SELECT user_id, COUNT(DISTINCT lab_id) as labs_done
+           FROM user_progress
+           WHERE status='completed'
+           GROUP BY user_id
+         ) progress ON progress.user_id = u.id
+         WHERE u.role='analyst' AND u.is_active=1
+         ORDER BY score DESC, u.username ASC
+         LIMIT 50`
+      ).all();
+      router._lbCache   = rows;
+      router._lbCacheTs = now;
+    }
+    const board = router._lbCache.map((r, i) => ({
       rank: r.score > 0 ? i + 1 : 0,
       id: r.id,
       username: r.username,
@@ -1753,7 +1814,7 @@ function stopServer() {
 
 if (require.main === module) {
   startServer(PORT, '0.0.0.0').then(() => {
-    console.log(`\n  DIAAS-SEC Platform`);
+    console.log(`\n  DIAAS-SEC Platform — worker ${process.pid}`);
     console.log(`  Running at http://0.0.0.0:${PORT}`);
     console.log(`  Login:   http://localhost:${PORT}`);
     console.log(`  Analyst: http://localhost:${PORT}/analyst`);
@@ -1774,3 +1835,5 @@ module.exports = {
   loginAttempts,
   sessionCleanupTimer,
 };
+
+} // end cluster worker block
