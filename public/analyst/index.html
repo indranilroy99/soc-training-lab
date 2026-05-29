@@ -1336,14 +1336,14 @@ const Pages = {
       <div class="q-card-body">
         ${inputHtml}
         <div style="margin-bottom:10px">
-          <button class="q-hint-btn" onclick="Pages.requestHint('${slug}', ${q.id})" ${locked || done || hintsUsed >= 3 ? 'disabled' : ''}>💡 ${hintsUsed === 0 ? 'Get Hint' : `Hint ${Math.min(hintsUsed + 1, 3)}`}</button>
+          <button class="q-hint-btn" onclick="Pages.requestHint('${slug}', ${q.id})" ${locked || done || hintsUsed >= 3 ? 'disabled' : ''}>${hintsUsed === 0 ? 'Hint 1 (-5 pts)' : hintsUsed === 1 ? 'Hint 2 (-10 pts)' : 'Final Hint (0 pts)'}</button>
           <div class="q-hint-text ${hintsUsed > 0 ? 'visible' : ''}" id="q-hint-${q.id}">${hintsUsed > 0 ? (q.hint_plan?.[hintsUsed - 1] || '') : ''}</div>
         </div>
         <div class="q-actions">
           ${done
             ? `<span style="color:var(--blue);font-size:12.5px;font-weight:600">✓ Solved (+${q.pts_earned} pts)</span>`
             : `<button class="btn btn-green btn-sm" onclick="Pages.submitAnswer('${slug}', ${q.id}, '${q.answer_type}')" ${locked ? 'disabled' : ''}>Submit Answer</button>
-               <span class="q-attempts">Hints used: ${hintsUsed}/3 • Remaining points: ${remainingPoints}</span>`
+               <span class="q-attempts">Hints used: ${hintsUsed}/3 • Score left on this question: ${remainingPoints} pts</span>`
           }
         </div>
         <div class="q-feedback" id="q-fb-${q.id}"></div>
@@ -1375,13 +1375,13 @@ const Pages = {
     }
     if (fbEl) {
       fbEl.className = 'q-feedback visible';
-      fbEl.innerHTML = `<div class="fb-title">Hint ${d.hint_level}/${d.max_hints}</div>${d.message}<div style="margin-top:6px;color:var(--muted)">Remaining points for this question: ${d.remaining_points}</div>`;
+      fbEl.innerHTML = `<div class="fb-title">Hint ${d.hint_level}/${d.max_hints}</div>${d.message}<div style="margin-top:6px;color:var(--muted)">Score left on this question: ${d.remaining_points} pts</div>`;
     }
     const attempts = card ? card.querySelector('.q-attempts') : null;
-    if (attempts) attempts.textContent = `Hints used: ${d.hint_level}/3 • Remaining points: ${d.remaining_points}`;
+    if (attempts) attempts.textContent = `Hints used: ${d.hint_level}/3 • Score left on this question: ${d.remaining_points} pts`;
     const hintBtn = card ? card.querySelector('.q-hint-btn') : null;
     if (hintBtn) {
-      hintBtn.textContent = d.hint_level >= d.max_hints ? 'Max Hints Used' : `💡 Hint ${Math.min(d.hint_level + 1, d.max_hints)}`;
+      hintBtn.textContent = d.hint_level >= d.max_hints ? 'Maximum Hint Reached' : (d.hint_level === 1 ? 'Hint 2 (-10 pts)' : 'Final Hint (0 pts)');
       hintBtn.disabled = d.hint_level >= d.max_hints;
     }
     toast('Hint unlocked.', 'info');
@@ -1441,7 +1441,7 @@ const Pages = {
           setTimeout(() => {
             document.getElementById('lab-completion-banner').innerHTML = `<div class="completion-banner">
               <div class="completion-icon">🎉</div>
-              <div class="completion-text"><h3>Lab Complete!</h3><p>You solved every question. Final score reflects hint usage.</p></div>
+              <div class="completion-text"><h3>Lab Complete!</h3><p>You solved every question. Final score depends on how many hints you used.</p></div>
               <div class="completion-score"><div class="completion-pts">${d.total_score}</div><div class="completion-pts-label">total pts</div></div>
             </div>`;
             App.loadMe();
@@ -1451,7 +1451,7 @@ const Pages = {
       } else {
         if (fbEl) {
           fbEl.className = 'q-feedback wrong visible';
-          fbEl.innerHTML = `<div class="fb-title">Not quite</div>${d.message}<div style="margin-top:6px;color:var(--muted)">Remaining points: ${d.remaining_points}. Use a hint if you need guidance.</div>`;
+          fbEl.innerHTML = `<div class="fb-title">Not quite</div>${d.message}<div style="margin-top:6px;color:var(--muted)">Score left on this question: ${d.remaining_points} pts. Use a hint only if you need it.</div>`;
         }
         if (btn) { btn.disabled = false; btn.textContent = 'Submit Answer'; }
         toast('Incorrect. Check the evidence and try again.', 'error');

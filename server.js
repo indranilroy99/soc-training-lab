@@ -140,11 +140,14 @@ try { db.prepare('ALTER TABLE alert_closures ADD COLUMN scoring_feedback TEXT DE
 try { db.prepare('ALTER TABLE alert_rubrics ADD COLUMN created_at TEXT DEFAULT (datetime(\'now\'))').run(); } catch(e) {}
 
 try {
-  db.prepare(`CREATE TABLE IF NOT EXISTS alert_rubrics (
+  db.prepare(`CREATE TABLE IF NOT EXISTS user_alert_state (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    alert_id TEXT NOT NULL UNIQUE,
-    rubric_json TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
+    user_id INTEGER NOT NULL,
+    alert_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, alert_id),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
   )`).run();
 } catch(e) { /* already exists */ }
@@ -223,18 +226,36 @@ function serveFile(res, filePath) {
 }
 
 function getUserTotalScore(userId) {
-  const row = db.prepare(
+  const labRow = db.prepare(
     `SELECT COALESCE(SUM(pts_awarded),0) as total FROM user_answers WHERE user_id=? AND is_correct=1`
   ).get(userId);
-  return row ? row.total : 0;
+  const closureRow = db.prepare(
+    `SELECT COALESCE(SUM(points_awarded),0) as total FROM alert_closures WHERE user_id=? AND is_correct=1`
+  ).get(userId);
+  return (labRow ? labRow.total : 0) + (closureRow ? closureRow.total : 0);
 }
 
 function getUserRank(userId) {
   const scores = db.prepare(
-    `SELECT user_id, SUM(pts_awarded) as total FROM user_answers WHERE is_correct=1 GROUP BY user_id ORDER BY total DESC`
+    `SELECT u.id as user_id,
+            COALESCE(lab.total, 0) + COALESCE(closure.total, 0) as total
+     FROM users u
+     LEFT JOIN (
+       SELECT user_id, SUM(pts_awarded) as total
+       FROM user_answers
+       WHERE is_correct=1
+       GROUP BY user_id
+     ) lab ON lab.user_id = u.id
+     LEFT JOIN (
+       SELECT user_id, SUM(points_awarded) as total
+       FROM alert_closures
+       WHERE is_correct=1
+       GROUP BY user_id
+     ) closure ON closure.user_id = u.id
+     WHERE u.role='analyst' AND u.is_active=1
+     ORDER BY total DESC, u.username ASC`
   ).all();
-  const idx = scores.findIndex(r => r.user_id === userId);
-  // return 0 if analyst has no score yet — frontend renders "–"
+  const idx = scores.findIndex(r => r.user_id === userId && r.total > 0);
   if (idx === -1) return 0;
   return idx + 1;
 }
@@ -277,6 +298,23 @@ function getHintPenalty(basePoints, hintCount) {
   if (hintCount === 1) return Math.max(0, pts - 5);
   if (hintCount === 2) return Math.max(0, pts - 15);
   return 0;
+}
+
+function getUserAlertStatus(userId, alertId, fallbackStatus = 'open') {
+  const row = db.prepare(
+    `SELECT status FROM user_alert_state WHERE user_id=? AND alert_id=?`
+  ).get(userId, alertId);
+  return row?.status || fallbackStatus || 'open';
+}
+
+function setUserAlertStatus(userId, alertId, status) {
+  db.prepare(
+    `INSERT INTO user_alert_state (user_id, alert_id, status, updated_at)
+     VALUES (?,?,?,?)
+     ON CONFLICT(user_id, alert_id) DO UPDATE SET
+       status=excluded.status,
+       updated_at=excluded.updated_at`
+  ).run(userId, alertId, status, new Date().toISOString());
 }
 
 function getLabsWithProgress(userId) {
@@ -660,15 +698,34 @@ async function router(req, res) {
     const user = requireAuth(req, res); if (!user) return;
     const rows = db.prepare(
       `SELECT u.id, u.username,
-         COALESCE(SUM(CASE WHEN a.is_correct=1 THEN a.pts_awarded ELSE 0 END),0) as score,
-         COUNT(DISTINCT CASE WHEN a.is_correct=1 THEN a.question_id END) as correct_answers,
-         COUNT(DISTINCT CASE WHEN p.status='completed' THEN p.lab_id END) as labs_done,
-         COUNT(DISTINCT a.question_id) as total_answers
+         COALESCE(lab.score, 0) + COALESCE(closure.score, 0) as score,
+         COALESCE(lab.correct_answers, 0) as correct_answers,
+         COALESCE(progress.labs_done, 0) as labs_done,
+         COALESCE(lab.total_answers, 0) as total_answers
        FROM users u
-       LEFT JOIN user_answers a ON a.user_id = u.id
-       LEFT JOIN user_progress p ON p.user_id = u.id
+       LEFT JOIN (
+         SELECT user_id,
+                SUM(CASE WHEN is_correct=1 THEN pts_awarded ELSE 0 END) as score,
+                COUNT(DISTINCT CASE WHEN is_correct=1 THEN question_id END) as correct_answers,
+                COUNT(DISTINCT question_id) as total_answers
+         FROM user_answers
+         GROUP BY user_id
+       ) lab ON lab.user_id = u.id
+       LEFT JOIN (
+         SELECT user_id, SUM(points_awarded) as score
+         FROM alert_closures
+         WHERE is_correct=1
+         GROUP BY user_id
+       ) closure ON closure.user_id = u.id
+       LEFT JOIN (
+         SELECT user_id, COUNT(DISTINCT lab_id) as labs_done
+         FROM user_progress
+         WHERE status='completed'
+         GROUP BY user_id
+       ) progress ON progress.user_id = u.id
        WHERE u.role='analyst' AND u.is_active=1
-       GROUP BY u.id ORDER BY score DESC LIMIT 50`
+       ORDER BY score DESC, u.username ASC
+       LIMIT 50`
     ).all();
     const board = rows.map((r, i) => ({
       rank: r.score > 0 ? i + 1 : 0,
@@ -697,7 +754,6 @@ async function router(req, res) {
     let args  = [];
     if (severity) { where.push('severity=?'); args.push(severity); }
     if (category) { where.push('category=?'); args.push(category); }
-    if (status)   { where.push('status=?');   args.push(status); }
     if (search)   {
       where.push(`(title LIKE ? OR description LIKE ? OR host LIKE ? OR src_ip LIKE ? OR mitre_technique LIKE ?)`);
       const q = `%${search}%`;
@@ -705,7 +761,7 @@ async function router(req, res) {
     }
 
     const whereStr = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const alerts = db.prepare(
+    let alerts = db.prepare(
       `SELECT id, severity, category, title, source, host, src_ip, dst_ip, username,
               process, event_id, mitre_tactic, mitre_technique, status, timestamp
        FROM soc_alerts ${whereStr}
@@ -714,7 +770,18 @@ async function router(req, res) {
        LIMIT ? OFFSET ?`
     ).all(...args, limit, offset);
 
-    const total = db.prepare(`SELECT COUNT(*) as c FROM soc_alerts ${whereStr}`).get(...args).c;
+    alerts = alerts.map(alert => ({
+      ...alert,
+      status: user.role === 'admin' ? alert.status : getUserAlertStatus(user.id, alert.id, alert.status)
+    }));
+
+    if (status) {
+      alerts = alerts.filter(alert => alert.status === status);
+    }
+
+    const total = status
+      ? alerts.length
+      : db.prepare(`SELECT COUNT(*) as c FROM soc_alerts ${whereStr}`).get(...args).c;
 
     // summary counts
     const counts = db.prepare(
@@ -734,6 +801,9 @@ async function router(req, res) {
     ['iocs','timeline','network_flow'].forEach(f => {
       try { alert[f] = JSON.parse(alert[f] || 'null'); } catch { alert[f] = null; }
     });
+    if (user.role !== 'admin') {
+      alert.status = getUserAlertStatus(user.id, alert.id, alert.status);
+    }
     return jsonRes(res, 200, alert);
   }
 
@@ -761,14 +831,33 @@ async function router(req, res) {
     const admin = requireAdmin(req, res); if (!admin) return;
     const users = db.prepare(
       `SELECT u.id, u.username, u.role, u.is_active, u.created_at,
-         COALESCE(SUM(CASE WHEN a.is_correct=1 THEN a.pts_awarded ELSE 0 END),0) as score,
-         COUNT(DISTINCT CASE WHEN p.status='completed' THEN p.lab_id END) as labs_done,
-         MAX(s.expires_at) as last_session
+         COALESCE(lab.score, 0) + COALESCE(closure.score, 0) as score,
+         COALESCE(progress.labs_done, 0) as labs_done,
+         session.last_session as last_session
        FROM users u
-       LEFT JOIN user_answers a ON a.user_id = u.id
-       LEFT JOIN user_progress p ON p.user_id = u.id
-       LEFT JOIN sessions s ON s.user_id = u.id
-       GROUP BY u.id ORDER BY u.username`
+       LEFT JOIN (
+         SELECT user_id, SUM(CASE WHEN is_correct=1 THEN pts_awarded ELSE 0 END) as score
+         FROM user_answers
+         GROUP BY user_id
+       ) lab ON lab.user_id = u.id
+       LEFT JOIN (
+         SELECT user_id, SUM(points_awarded) as score
+         FROM alert_closures
+         WHERE is_correct=1
+         GROUP BY user_id
+       ) closure ON closure.user_id = u.id
+       LEFT JOIN (
+         SELECT user_id, COUNT(DISTINCT lab_id) as labs_done
+         FROM user_progress
+         WHERE status='completed'
+         GROUP BY user_id
+       ) progress ON progress.user_id = u.id
+       LEFT JOIN (
+         SELECT user_id, MAX(expires_at) as last_session
+         FROM sessions
+         GROUP BY user_id
+       ) session ON session.user_id = u.id
+       ORDER BY u.username`
     ).all();
     return jsonRes(res, 200, users);
   }
@@ -1124,7 +1213,7 @@ async function router(req, res) {
       }
     }
 
-    db.prepare('UPDATE soc_alerts SET status=? WHERE id=?').run(status, alertId);
+    setUserAlertStatus(user.id, alertId, status);
     return jsonRes(res, 200, { ok: true, alertId, status, is_correct, points_awarded,
       investigation_score: investigation_score || 0,
       step_scores: step_scores || {},
@@ -1150,7 +1239,7 @@ async function router(req, res) {
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
     )`).run();
-    const inc = db.prepare('SELECT * FROM incidents WHERE alert_id=?').get(alertId);
+    const inc = db.prepare('SELECT * FROM incidents WHERE alert_id=? AND user_id=?').get(alertId, user.id);
     return jsonRes(res, 200, inc || null);
   }
 
@@ -1177,7 +1266,7 @@ async function router(req, res) {
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
     )`).run();
-    const existing = db.prepare('SELECT * FROM incidents WHERE alert_id=?').get(alertId);
+    const existing = db.prepare('SELECT * FROM incidents WHERE alert_id=? AND user_id=?').get(alertId, user.id);
     const now = new Date().toISOString();
     const stageCol = { containment: 'containment_at', eradication: 'eradication_at', recovery: 'recovery_at', rca: 'rca_at', closed: 'closed_at' }[stage];
     if (!existing) {
@@ -1194,13 +1283,13 @@ async function router(req, res) {
       const updates = [`stage=?`, `notes=?`, `updated_at=?`];
       const vals = [stage, JSON.stringify(parsedNotes), now];
       if (stageCol && !existing[stageCol]) { updates.push(`${stageCol}=?`); vals.push(now); }
-      vals.push(alertId);
-      db.prepare(`UPDATE incidents SET ${updates.join(', ')} WHERE alert_id=?`).run(...vals);
+      vals.push(alertId, user.id);
+      db.prepare(`UPDATE incidents SET ${updates.join(', ')} WHERE alert_id=? AND user_id=?`).run(...vals);
     }
     // also update alert status
     const alertStatus = stage === 'closed' ? 'closed' : 'investigating';
-    db.prepare('UPDATE soc_alerts SET status=? WHERE id=?').run(alertStatus, alertId);
-    const result = db.prepare('SELECT * FROM incidents WHERE alert_id=?').get(alertId);
+    setUserAlertStatus(user.id, alertId, alertStatus);
+    const result = db.prepare('SELECT * FROM incidents WHERE alert_id=? AND user_id=?').get(alertId, user.id);
     return jsonRes(res, 200, { ok: true, incident: result });
   }
 
@@ -1216,7 +1305,7 @@ async function router(req, res) {
     const info = db.prepare(
       `INSERT INTO escalations (alert_id, user_id, level, justification) VALUES (?,?,?,?)`
     ).run(alertId, user.id, validLevel, justification || null);
-    db.prepare(`UPDATE soc_alerts SET status='investigating' WHERE id=?`).run(alertId);
+    setUserAlertStatus(user.id, alertId, 'investigating');
     return jsonRes(res, 200, { ok: true, escalation_id: info.lastInsertRowid });
   }
 

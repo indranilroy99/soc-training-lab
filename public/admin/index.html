@@ -1435,7 +1435,7 @@ const LabBuilder = {
         </div>
         <div class="form-row-2">
           <div class="form-group">
-            <label class="form-label">Hint 1: Where to look</label>
+            <label class="form-label">Hint 1: Where to look (-5 pts)</label>
             <input type="text" class="form-input" value="${esc(q.hint || '')}" placeholder="Guide the analyst to the right logs, evidence, or alert" oninput="LabBuilder.updateQuestion(${idx}, 'hint', this.value)">
           </div>
           <div class="form-group">
@@ -1445,11 +1445,11 @@ const LabBuilder = {
         </div>
         <div class="form-row-2">
           <div class="form-group">
-            <label class="form-label">Hint 2: Narrow it down</label>
+            <label class="form-label">Hint 2: Narrow it down (-10 pts total)</label>
             <input type="text" class="form-input" value="${esc((q.hint_levels && q.hint_levels[0]) || '')}" placeholder="Make the student re-check the exact field or value" oninput="LabBuilder.questions[${idx}].hint_levels[0] = this.value">
           </div>
           <div class="form-group">
-            <label class="form-label">Hint 3</label>
+            <label class="form-label">Hint 3: Final clue (0 pts)</label>
             <input type="text" class="form-input" value="${esc((q.hint_levels && q.hint_levels[1]) || '')}" placeholder="Optional final clue. If blank, the system will show a masked answer pattern." oninput="LabBuilder.questions[${idx}].hint_levels[1] = this.value">
           </div>
         </div>
