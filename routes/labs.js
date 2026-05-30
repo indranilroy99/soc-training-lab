@@ -7,6 +7,7 @@ const { ok, notFound, badRequest } = require('../middleware/response');
 const { getLabsWithProgress }      = require('../services/labs');
 const { getUserTotalScore, getHintPlan, getHintPenalty, getWrongAttemptPenalty } = require('../services/users');
 const { requireInt }   = require('../middleware/validate');
+const { getPrerequisiteStatus, GRADUATION_LAB_SLUG } = require('../services/graduation');
 const { checkAchievements, checkLabAchievements } = require('../services/achievements');
 const { updateStreak } = require('../services/streaks');
 
@@ -21,6 +22,17 @@ function getLab(req, res, slug) {
   const user = requireAuth(req, res); if (!user) return;
   const lab  = db.prepare(`SELECT * FROM labs WHERE slug=?`).get(slug);
   if (!lab) return notFound(res, 'Lab not found');
+
+  // Graduation lab: check prerequisites
+  if (lab.slug === GRADUATION_LAB_SLUG) {
+    const prereq = getPrerequisiteStatus(user.id);
+    if (!prereq.unlocked) {
+      return ok(res, {
+        ...lab, locked: true, prereq,
+        message: `Complete ${prereq.completed_count}/${prereq.required_count} required labs to unlock this assessment.`,
+      });
+    }
+  }
 
   const questions = db.prepare(
     `SELECT id, order_index, question, answer_type, options, points,

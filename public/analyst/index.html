@@ -549,6 +549,77 @@ input, textarea, select { font-family: var(--font); }
 .xp-bar-outer { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
 .xp-bar-inner { height:100%; background:linear-gradient(90deg,var(--blue),#6366F1); border-radius:4px; transition:width .8s; }
 
+
+/* ── Graduation / Final Assessment ──────────────────────────────────────── */
+.lab-card.graduation {
+  border-color: var(--purple);
+  background: linear-gradient(180deg, var(--card) 0%, rgba(168,85,247,.04) 100%);
+  position: relative;
+}
+.lab-card.graduation::before {
+  content: 'FINAL ASSESSMENT';
+  position: absolute; top: 0; left: 0; right: 0;
+  background: var(--purple); color: #fff;
+  font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+  text-align: center; padding: 3px;
+}
+.lab-card.graduation.locked {
+  opacity: .85; cursor: default;
+}
+.lab-card.graduation .prereq-bar {
+  margin-top: 8px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.lab-card.graduation .prereq-fill {
+  height: 100%; background: var(--purple); border-radius: 3px; transition: width .5s;
+}
+.lab-locked-overlay {
+  position: absolute; inset: 0; border-radius: 4px;
+  background: rgba(0,0,0,.5);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; text-align: center; padding: 20px;
+}
+.lab-locked-icon {
+  width: 36px; height: 36px; background: var(--card);
+  border: 2px solid var(--purple); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: var(--purple);
+}
+.lab-locked-text { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.lab-locked-sub  { font-size: 11px; color: var(--muted); }
+/* Scorecard modal */
+.scorecard-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 9000;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.scorecard-modal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; width: 100%; max-width: 640px; max-height: 88vh;
+  overflow-y: auto; padding: 28px;
+}
+.scorecard-header {
+  text-align: center; padding-bottom: 20px;
+  border-bottom: 1px solid var(--border); margin-bottom: 20px;
+}
+.scorecard-verdict {
+  display: inline-block; padding: 4px 16px; border-radius: 4px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.scorecard-verdict.Distinction { background:rgba(168,85,247,.15); color:var(--purple); border:1px solid var(--purple); }
+.scorecard-verdict.Merit        { background:rgba(34,197,94,.12);  color:var(--green);  border:1px solid var(--green);  }
+.scorecard-verdict.Pass         { background:rgba(59,130,246,.12); color:var(--blue);   border:1px solid var(--blue);   }
+.scorecard-verdict.Refer        { background:rgba(239,68,68,.12);  color:var(--red);    border:1px solid var(--red);    }
+.sc-dps  { font-size: 52px; font-weight: 800; font-family: var(--mono); color: var(--blue); line-height: 1; }
+.sc-name { font-size: 16px; font-weight: 600; color: var(--text); margin-top: 6px; }
+.sc-row  { display: flex; justify-content: space-between; padding: 9px 0;
+           border-bottom: 1px solid rgba(30,33,40,.5); font-size: 13px; }
+.sc-label { color: var(--dim); }
+.sc-value { font-family: var(--mono); font-weight: 600; color: var(--text); }
+.sc-section-title {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .8px; color: var(--dim); margin: 16px 0 8px;
+}
+
 /* ── Lab notes tab ──────────────────────────────────────────────────────── */
 .notes-tab-content { padding:16px; }
 .notes-textarea { width:100%; height:220px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:var(--mono); font-size:12.5px; padding:12px; resize:vertical; outline:none; transition:border-color .15s; }
@@ -1249,6 +1320,19 @@ const App = {
     try {
       const raw = await API.get('/api/labs');
       App.labsData = Array.isArray(raw) ? raw : [];
+
+      // Check graduation status - mark lab as locked if prereqs not met
+      API.get('/api/graduation/status').then(grad => {
+        if (!grad) return;
+        if (!grad.unlocked) {
+          // Mark graduation lab as locked in the local data
+          App.labsData = App.labsData.map(l =>
+            l.slug === 'graduation-capstone' ? { ...l, locked: true, prereq: grad } : l
+          );
+          Pages.renderLabsGrid(Pages._currentCat || 'all');
+          Pages.renderDashboardLabs();
+        }
+      }).catch(() => {});
       const badge = App.labsData.filter(l => l.status !== 'completed').length;
       document.getElementById('badge-labs').textContent = badge;
       Pages.renderDashboardLabs();
@@ -1409,11 +1493,28 @@ const Pages = {
       return;
     }
     grid.innerHTML = labs.map(l => {
+      // Locked graduation lab
+      if (l.locked) {
+        const lockPct = l.prereq ? Math.round((l.prereq.completed_count / l.prereq.required_count) * 100) : 0;
+        return `<div class="lab-card graduation locked" style="padding-top:18px;position:relative;overflow:hidden" title="Complete required labs to unlock">
+          <div style="position:absolute;top:0;left:0;right:0;background:var(--purple);color:#fff;font-size:9px;font-weight:700;letter-spacing:1.5px;text-align:center;padding:3px">FINAL ASSESSMENT</div>
+          <div style="padding:14px">
+            <div style="font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:6px">${escapeHtml(l.title)}</div>
+            <div style="font-size:11.5px;color:var(--dim);margin-bottom:10px">Unlock by completing all Stack 2 &amp; Stack 3 labs</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${l.prereq ? (l.prereq.completed_count + '/' + l.prereq.required_count + ' required labs done') : 'Prerequisites required'}</div>
+            <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div style="height:100%;background:var(--purple);width:${lockPct}%;border-radius:3px;transition:width .5s"></div>
+            </div>
+          </div>
+        </div>`;
+      }
       const diff = l.difficulty.toLowerCase();
       const pct  = l.questions_total > 0 ? Math.round(l.questions_done / l.questions_total * 100) : 0;
       const btnText = l.status === 'completed' ? 'Review' : l.status === 'in_progress' ? 'Continue' : 'Start Lab';
       const btnClass = l.status === 'completed' ? 'btn-outline' : 'btn-green';
-      return `<div class="lab-card ${l.status === 'completed' ? 'completed' : ''}" onclick="App.openLab('${l.slug}')">
+      const isGrad = l.slug === 'graduation-capstone';
+      return `<div class="lab-card ${l.status === 'completed' ? 'completed' : ''} ${isGrad ? 'graduation' : ''}" style="${isGrad ? 'padding-top:18px;position:relative' : ''}" onclick="App.openLab('${l.slug}')">
+        ${isGrad ? '<div style=\'position:absolute;top:0;left:0;right:0;background:var(--purple);color:#fff;font-size:9px;font-weight:700;letter-spacing:1.5px;text-align:center;padding:3px\'>FINAL ASSESSMENT</div>' : ''}
         <div class="lab-card-top">
           <div class="lab-card-badges">
             <span class="diff diff-${diff}">${escapeHtml(l.difficulty)}</span>

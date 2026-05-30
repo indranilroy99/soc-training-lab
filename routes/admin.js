@@ -79,8 +79,26 @@ function deleteUser(req, res, userId) {
   const admin = requireAdmin(req, res); if (!admin) return;
   const uid   = parseInt(userId, 10);
   if (uid === admin.id) return badRequest(res, 'Cannot delete your own account');
-  db.prepare(`DELETE FROM users WHERE id=?`).run(uid);
-  return ok(res);
+  const target = db.prepare(`SELECT id, username FROM users WHERE id=?`).get(uid);
+  if (!target) return notFound(res, 'User not found');
+
+  // Explicitly delete from all related tables before deleting the user.
+  // This handles any FK constraint gaps and is safer than relying on CASCADE alone.
+  const relatedTables = [
+    'sessions', 'user_progress', 'user_answers', 'draft_answers',
+    'alert_closures', 'user_alert_state', 'incidents', 'escalations',
+    'user_achievements', 'lab_notes', 'streaks',
+  ];
+  db.transaction(() => {
+    for (const tbl of relatedTables) {
+      try {
+        db.prepare(`DELETE FROM ${tbl} WHERE user_id=?`).run(uid);
+      } catch { /* table may not exist in all installs — skip */ }
+    }
+    db.prepare(`DELETE FROM users WHERE id=?`).run(uid);
+  })();
+
+  return ok(res, { deleted: target.username });
 }
 
 // ── GET /api/admin/progress ──────────────────────────────────────────────
