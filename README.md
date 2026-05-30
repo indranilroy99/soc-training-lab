@@ -1,30 +1,30 @@
-# DIAAS-SEC — Security Operations Training Platform
+# DIAAS-SEC — Security Operations Centre Training Platform
 
-A self-hosted SOC training platform. Analysts log in, work through labs, answer investigation questions, and close real-world alerts using a structured 5-step Incident Response workflow. Every IR answer is scored against a rubric built from actual alert evidence — filler text does not earn points. Admins manage users, track progress, and view full analyst profiles.
+A self-hosted SOC analyst training platform built for classroom deployment. Analysts complete hands-on labs, answer investigation questions tied to real alert evidence, and close alerts through a structured 5-step Incident Response workflow. Every answer is scored — filler text earns nothing. Admins see a full per-student profiling dashboard.
 
-No cloud. No Docker. No external dependencies.
+No cloud. No Docker. No external dependencies beyond Node.js.
 
 ---
 
-## What's inside
+## Platform Overview
 
-- **16 hands-on labs** — Alert Triage, SOC Fundamentals, Credential Attacks, Windows Event Logs, Malware Analysis, Network Traffic Analysis, Lateral Movement, Network Forensics, Threat Hunting, IR Playbooks, Exfiltration Detection, APT Hunting, Ransomware IR, Cloud Security Incidents, Red Team Detection, Operation Blackout IR
-- **200+ training alerts** — each with raw log, IOCs, timeline, MITRE ATT&CK mapping
-- **5-step IR workflow** — analysts close alerts by walking through Triage (5W+H) → Containment → Eradication → Recovery → Root Cause Analysis
-- **Rubric-based scoring** — every IR answer scored against keyword-concept rubrics built from actual alert fields. 15-word minimum per step. 1–5 pts based on investigation score.
-- **False Positive workflow** — analysts can classify an alert as FP with a written justification
-- **Real auth** — bcrypt-hashed passwords, session tokens, 24h expiry
-- **Analyst dashboard** — lab progress, leaderboard, SOC alerts feed, IR modal
-- **Admin panel** — create/disable/delete users, track progress, full analyst profile with all IR step text + scores
-- **SQLite** — zero config, single file database
-- **No Docker, no YAML** — one script installs everything
+- **85+ hands-on labs** across 4 stacks — Stack 2 (Technology Foundations), Stack 3 (Core SOC Skills), Stack 4 (Advanced), Stack Plus (Elite)
+- **200+ training alerts** — raw logs, IOCs, timelines, MITRE ATT&CK mappings, per-severity triage
+- **5-step IR workflow** — Triage (5W+H) → Containment → Eradication → Recovery → Root Cause Analysis
+- **Rubric-based scoring** — IR answers scored against keyword-concept rubrics built from actual alert fields
+- **25-badge achievement system** — 7 categories: First Steps, Lab Completion, Score, Skill, SOC Workflow, Specialist, Consistency
+- **Daily streak tracking** — +5 attendance bonus points per new streak day
+- **Weighted Performance Score (0–100)** — 4-pillar evaluation: Lab Accuracy 40% + Alert Quality 30% + Efficiency 20% + Coverage 10%
+- **Admin analyst profiling** — per-student drill-down: every question result, time per lab, stuck points, category weaknesses, full activity feed
+- **Cluster mode** — multi-worker Node.js, auto-restart on crash
+- **Security hardened** — 8 HTTP security headers, rate limiting, input validation, constant-time auth
 
 ---
 
 ## Requirements
 
 | Requirement | Version |
-|------------|---------|
+|-------------|---------|
 | Node.js | 18 or higher |
 | npm | comes with Node |
 | git | any recent version |
@@ -32,15 +32,13 @@ No cloud. No Docker. No external dependencies.
 
 ---
 
-## Install — One Command
+## Install
 
 ```bash
+# One-command installer
 curl -fsSL https://raw.githubusercontent.com/indranilroy99/soc-training-lab/main/install.sh | bash
-```
 
-Or clone and run manually:
-
-```bash
+# Or manually
 git clone https://github.com/indranilroy99/soc-training-lab ~/diaas-sec
 cd ~/diaas-sec
 npm install
@@ -48,12 +46,7 @@ node database/seed.js
 node server.js
 ```
 
-The installer will:
-1. Install Node.js if missing
-2. Clone the repo to `~/diaas-sec`
-3. Install npm dependencies
-4. Seed the database (11 users, 16 labs, 200+ alerts, 10 rubrics)
-5. Install a background service (launchd on Mac, systemd on Linux)
+The installer: checks for Node.js, clones the repo, runs `npm install`, seeds the database, registers a background service (launchd on Mac, systemd on Linux).
 
 ---
 
@@ -62,25 +55,22 @@ The installer will:
 | Role | Username | Password |
 |------|----------|----------|
 | Admin | `admin` | `Admin@2024` |
-| Analyst | `analyst_01` through `analyst_10` | `Analyst@2024` |
+| Analyst | `analyst_01` to `analyst_10` | `Analyst@2024` |
 
-**Change all passwords before sharing with users.** Use Admin panel → Manage Users → Reset PW.
+**Change all passwords before sharing with students.** Admin → Manage Users → Reset PW.
 
 ---
 
 ## Access
 
-After install, open a browser and go to:
-
 ```
 http://<server-ip>:3000          ← login page
+http://<server-ip>:3000/analyst  ← analyst dashboard
 http://<server-ip>:3000/admin    ← admin panel
-http://<server-ip>:3000/analyst  ← analyst view
+http://<server-ip>:3000/health   ← health check (returns JSON)
 ```
 
-To find your Mac mini's IP: `System Settings → Wi-Fi → Details` or run `ipconfig getifaddr en0`.
-
-Analysts on the same network open `http://<your-mac-mini-ip>:3000` and log in with the credentials you give them.
+To find your server's IP: `ipconfig getifaddr en0` (macOS) or `hostname -I` (Linux).
 
 ---
 
@@ -88,29 +78,24 @@ Analysts on the same network open `http://<your-mac-mini-ip>:3000` and log in wi
 
 **macOS (launchd)**
 ```bash
-# Start
-launchctl load ~/Library/LaunchAgents/com.diaas-sec.plist
-
-# Stop
+launchctl load   ~/Library/LaunchAgents/com.diaas-sec.plist
 launchctl unload ~/Library/LaunchAgents/com.diaas-sec.plist
-
-# Check logs
 tail -f ~/diaas-sec/logs/server.log
 ```
 
 **Linux (systemd)**
 ```bash
-sudo systemctl start diaas-sec
-sudo systemctl stop diaas-sec
+sudo systemctl start  diaas-sec
+sudo systemctl stop   diaas-sec
 sudo systemctl status diaas-sec
 journalctl -u diaas-sec -f
 ```
 
-**Manual (no service)**
+**Manual**
 ```bash
 cd ~/diaas-sec
-node server.js
-# Ctrl+C to stop
+nohup node server.js >> logs/server.log 2>&1 &
+tail -f logs/server.log
 ```
 
 **Update to latest**
@@ -118,44 +103,9 @@ node server.js
 cd ~/diaas-sec
 git pull origin main
 npm install
-# Restart service or node server.js
-```
-
----
-
-## Deploy to a Live Server (Ubuntu + Apache)
-
-If you are deploying on a Ubuntu server with Apache proxying port 80 → 3000:
-
-```bash
-# SSH into your server, then:
-cd /path/to/diaas-sec
-
-# Pull the latest code
-git pull origin main
-
-# Install/update dependencies
-npm install
-
-# Seed the database (safe to re-run — uses INSERT OR REPLACE)
-node database/seed.js
-
-# Stop any running instance and restart
 kill $(lsof -ti:3000) 2>/dev/null; sleep 1
-nohup node server.js > /tmp/diaas.log 2>&1 &
-
-# Check the log to confirm it started
-tail -20 /tmp/diaas.log
+nohup node server.js >> logs/server.log 2>&1 &
 ```
-
-**When you MUST reseed** (run `node database/seed.js` again):
-- Any time labs, alerts, questions, or rubrics change in seed.js
-- First deploy on a new machine
-- If you delete diaas.db and want a fresh start
-
-**When you do NOT need to reseed:**
-- Bug fixes, styling changes, server-side logic changes
-- Just `git pull` and restart the server
 
 ---
 
@@ -163,41 +113,10 @@ tail -20 /tmp/diaas.log
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `3000` | Port to listen on |
-
-To run on a different port:
-```bash
-PORT=8080 node server.js
-```
-
----
-
-## Re-seed the Database
-
-If you want to reset all progress and start fresh:
-
-```bash
-cd ~/diaas-sec
-rm database/diaas.db
-node database/seed.js
-```
-
-This recreates all 11 default users, 16 labs, 200+ alerts, questions, and rubrics. Any analyst progress will be wiped.
-
----
-
-## Add Users Without the Admin Panel
-
-```bash
-cd ~/diaas-sec
-node -e "
-const db = require('better-sqlite3')('database/diaas.db');
-const bcrypt = require('bcryptjs');
-const hash = bcrypt.hashSync('YourPassword@123', 10);
-db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?,?,?)').run('analyst_11', hash, 'analyst');
-console.log('Done');
-"
-```
+| `PORT` | `3000` | HTTP port |
+| `HOST` | `0.0.0.0` | Bind address |
+| `DB_PATH` | `database/diaas.db` | SQLite database path |
+| `NODE_ENV` | — | Set to `production` to suppress stack traces in logs |
 
 ---
 
@@ -206,262 +125,360 @@ console.log('Done');
 ```
 diaas-sec/
 │
-├── server.js                  ← The entire backend. One file, no framework.
-│                                All routes, auth, DB queries, rubric scoring engine.
+├── server.js           ← Cluster entry point only (41 lines). Forks workers.
+├── app.js              ← HTTP server, middleware chain, graceful shutdown
+├── config.js           ← All constants (ports, TTLs, rate limits, security headers)
+├── db.js               ← DB connection, all migrations, 13 performance indexes
 │
-├── package.json               ← Dependencies: better-sqlite3, bcryptjs
+├── middleware/
+│   ├── auth.js         ← requireAuth(), requireAdmin()
+│   ├── logger.js       ← Structured JSON request + error logging
+│   ├── rateLimit.js    ← Per-IP sliding window (API routes + submit endpoint)
+│   ├── response.js     ← ok(), created(), notFound(), badRequest() helpers
+│   ├── security.js     ← 8 security headers, CORS, body size limit, request ID
+│   └── validate.js     ← Input validation and sanitisation
 │
-├── install.sh                 ← One-command installer (Node check, clone, seed, service)
+├── routes/
+│   ├── index.js        ← Central URL dispatcher — all routes in one place
+│   ├── auth.js         ← POST /api/auth/login|logout
+│   ├── user.js         ← GET /api/me, /api/me/closures, POST /api/user/password
+│   ├── labs.js         ← Labs, submit, hint, reset
+│   ├── alerts.js       ← SOC alerts, IR workflow, escalation
+│   ├── leaderboard.js  ← Leaderboard with 10-second cache
+│   ├── achievements.js ← GET /api/achievements
+│   ├── notes.js        ← GET/PUT /api/labs/:slug/notes
+│   ├── performance.js  ← GET /api/me/performance, /api/admin/performance/all
+│   └── admin.js        ← All /api/admin/* routes
+│
+├── services/
+│   ├── scoring.js          ← Rubric IR scoring engine
+│   ├── scoring_weighted.js ← Weighted Performance Score (0–100, 4 pillars)
+│   ├── analyst_profile.js  ← Full per-student profiling (all activity, weak areas)
+│   ├── labs.js             ← getLabsWithProgress() — 4 batch queries
+│   ├── users.js            ← Scores, ranks, hint helpers, alert state
+│   ├── achievements.js     ← 25 achievement definitions + award engine
+│   └── streaks.js          ← Daily streak tracking + attendance bonus
 │
 ├── database/
-│   ├── schema.sql             ← All table definitions. Source of truth for DB structure.
-│   ├── seed.js                ← Populates DB: users, alerts, labs, questions, rubrics.
-│   └── diaas.db               ← The SQLite database file. Created by seed.js.
+│   ├── schema.sql      ← All table definitions
+│   ├── seed.js         ← Populates DB: users, labs, questions, alerts, rubrics
+│   └── diaas.db        ← SQLite file (created by seed.js, gitignored)
 │
 └── public/
-    ├── login.html             ← Login page. Served at /
-    ├── analyst/
-    │   └── index.html         ← Analyst dashboard. Everything an analyst sees.
-    └── admin/
-        └── index.html         ← Admin dashboard. User management, progress, stats.
+    ├── login.html           ← Login page
+    ├── analyst/index.html   ← Analyst dashboard (single-page app)
+    └── admin/index.html     ← Admin dashboard (single-page app)
 ```
 
-**The three files you will edit most often:**
-- `database/seed.js` — add alerts, labs, questions, rubrics
-- `server.js` — add or fix API routes, scoring logic, auth
-- `public/analyst/index.html` — change what analysts see and interact with
+**Files you will edit most often:**
+- `database/seed.js` — add labs, alerts, questions, rubrics
+- `routes/` — add or modify API endpoints
+- `public/analyst/index.html` — analyst-facing UI
+- `public/admin/index.html` — admin-facing UI
 
 ---
 
-## How the App Works — Full Workflow
+## How It Works
 
 ### Analyst workflow
 
 ```
 Login → Analyst Dashboard
-         │
-         ├── Labs tab
-         │     └── Pick a lab → Read the linked alert(s) → Answer MCQ questions
-         │           └── Each question is tied to a specific ALT-XXX alert's raw log
-         │
-         └── SOC Alerts tab
-               └── Browse all alerts → Click alert → Read raw log, IOCs, timeline
-                     │
-                     ├── [Mark as Resolved] → 5-step IR modal opens
-                     │     Step 1: 5W+H triage (Who / What / When / Where / Why / How)
-                     │     Step 2: Containment steps
-                     │     Step 3: Eradication steps
-                     │     Step 4: Recovery steps
-                     │     Step 5: Root Cause Analysis
-                     │     → Submit → scored against rubric → points awarded (1–5)
-                     │     → Score feedback panel shows for 15s with improvement tips
-                     │
-                     └── [False Positive] → Justification modal
-                           → Submit → 3 pts if classification is correct
+   │
+   ├── My Labs
+   │     └── Select lab → view description + evidence
+   │           → Answer questions (MCQ or text)
+   │           → Request hints (−5 pts / −10 pts per hint)
+   │           → Wrong attempt penalty (−3 pts per retry, up to 3 retries)
+   │           → Lab Notes — autosaved per-lab notepad
+   │
+   ├── SOC Dashboard
+   │     └── Browse alerts → filter by severity / category / status
+   │           → Click alert → raw log, IOCs, timeline, MITRE mapping
+   │           │
+   │           ├── [Close as Resolved] → 5-step IR modal
+   │           │     Step 1: Triage (5W+H — Who/What/When/Where/Why/How)
+   │           │     Step 2: Containment steps
+   │           │     Step 3: Eradication steps
+   │           │     Step 4: Recovery steps
+   │           │     Step 5: Root Cause Analysis
+   │           │     15 words minimum per step. Scored against rubric. 1–5 pts.
+   │           │
+   │           └── [False Positive] → written justification required. 3 pts if correct.
+   │
+   ├── Achievements  — 25 badges across 7 categories, unlocked automatically
+   ├── Leaderboard   — live rankings by raw score
+   └── My Profile    — stats + weighted performance breakdown (DPS 0–100)
 ```
 
 ### Admin workflow
 
 ```
 Login → Admin Dashboard
-         │
-         ├── Overview — total users, labs completed, avg score, alert stats
-         ├── Users — create / disable / delete analyst accounts
-         ├── Progress — see every analyst's lab completion status
-         └── Analysts — click any analyst → full profile page
-               Shows: total points, classification accuracy, investigation score,
-                      per-alert closure history, all IR step text submitted,
-                      scoring feedback per step
+   │
+   ├── Overview      — class stats, top performers, lab completion rates
+   ├── Manage Users  — create / enable / disable / reset analyst accounts
+   ├── Progress      — completion matrix: every analyst × every lab
+   ├── Performance   — weighted DPS table: all students with 4-pillar breakdown
+   ├── Labs          — view, create, edit, delete labs and questions
+   ├── Leaderboard   — ranked scores
+   └── Click any analyst → Full Profile
+         ├── Overview tab: grade, DPS, performance pillars, category weaknesses,
+         │                 stuck questions (repeated wrong attempts)
+         ├── Labs tab:     every lab attempted — score, time spent, per-question
+         │                 result (correct/wrong count/hints/pts earned)
+         ├── Alert Triage: every alert closed — severity, classification, IR score
+         └── Activity Feed: chronological last-50 events with timestamps
 ```
 
 ---
 
 ## Points System
 
-| Action | Points |
-|---|---|
-| Correct alert close (TP), investigation score 90–100% | 5 pts |
-| Correct alert close (TP), investigation score 75–89% | 4 pts |
-| Correct alert close (TP), investigation score 60–74% | 3 pts |
-| Correct alert close (TP), investigation score 40–59% | 2 pts |
-| Correct alert close (TP), investigation score 0–39% | 1 pt |
-| Correct FP classification with written justification | 3 pts |
-| Wrong classification (TP closed as FP or vice versa) | 0 pts |
-| Correct MCQ answer — first attempt | full points (default 20) |
-| Correct MCQ answer — second attempt | 50% points |
-| Correct MCQ answer — third attempt | 50% points + answer revealed |
-| 3 failed MCQ attempts | answer + explanation revealed, 0 pts |
+### Lab questions
+
+| Outcome | Points |
+|---------|--------|
+| Correct, first attempt, no hints | Full points |
+| Hint 1 used | −5 pts |
+| Hint 2 used | −10 pts (cumulative) |
+| Wrong attempt penalty | −3 pts per wrong attempt (max 3 retries) |
+| After 3 wrong attempts | Submit locked until a hint is used |
+
+### Alert triage
+
+| Outcome | Points |
+|---------|--------|
+| Correct TP closure, IR score 90–100% | 5 pts |
+| Correct TP closure, IR score 75–89% | 4 pts |
+| Correct TP closure, IR score 60–74% | 3 pts |
+| Correct TP closure, IR score 40–59% | 2 pts |
+| Correct TP closure, IR score 0–39% | 1 pt |
+| Correct FP classification | 3 pts |
+| Wrong classification | 0 pts |
+
+### Attendance streak
+
+| Outcome | Points |
+|---------|--------|
+| First activity of a new consecutive day | +5 pts attendance bonus |
+
+The streak counter increments on any activity (right or wrong answers, alert work). Miss a day and it resets to 1 on your next session.
 
 ---
 
-## Scoring Engine — How Rubrics Work
+## Weighted Performance Score (DPS)
 
-The rubric scoring engine lives in `server.js` in the `scoreIRAnswers()` function (around line 25).
+Every analyst has a **DPS (0–100)** alongside their raw points. It rewards quality over quantity — a student who answers 5 labs perfectly outscores one who does 50 sloppily.
 
-**How a score is calculated:**
+| Pillar | Weight | How it's calculated |
+|--------|--------|---------------------|
+| Lab Accuracy | 40% | Points earned / points possible on all attempted questions |
+| Alert Quality | 30% | Correct closures (60%) + average IR report depth score (40%) |
+| Efficiency | 20% | Questions answered correctly with zero hints and zero retries |
+| Coverage | 10% | % of labs completed + % of alerts engaged with |
 
-1. Each of the 5 IR steps has a max of 10 points
-2. Each step has 3–4 "concept buckets" — a set of keywords and a point value
+**Letter grade:** A+ ≥ 90, A ≥ 80, B ≥ 70, C ≥ 60, D ≥ 50, F below 50.
+
+Visible to analysts on their Profile page. Visible to admins on the Performance page and per-analyst profile.
+
+---
+
+## IR Scoring Engine
+
+The rubric engine lives in `services/scoring.js`.
+
+1. Each of the 5 IR steps has a maximum of 10 points
+2. Each step has concept buckets — a set of keywords and a point value
 3. If any keyword in a bucket is found in the analyst's answer, those points are awarded
-4. A step must have at least **15 words** to score anything — shorter answers get 0 for that step
-5. The investigation score = (total points earned / total possible) × 100
+4. A step needs at least **15 words** to score anything
+5. Investigation score = (earned / possible) × 100
 6. If no rubric exists for an alert, scoring falls back to total word count depth
 
-**Example — ALT-085 (ransomware, vssadmin):**
-
-| Step | Concept bucket | Keywords that score points |
-|---|---|---|
-| Triage | Shadow copy deletion | `vssadmin`, `shadow cop` — 3 pts |
-| Triage | Suspicious parent process | `svch0st`, `parent` — 3 pts |
-| Triage | Ransomware intent | `ransomware`, `precursor` — 2 pts |
-| Containment | Network isolation | `isolat`, `network`, `disconnect` — 3 pts |
-| Containment | Kill process | `kill`, `svch0st`, `pid` — 3 pts |
-| ... | ... | ... |
-
-**Where rubrics are stored:** `database/alert_rubrics` table. Seeded in `database/seed.js` at the bottom of the file in the `rubrics` array.
-
-**Current alerts with rubrics:** ALT-085, ALT-121, ALT-123, ALT-011, ALT-048, ALT-050, ALT-005, ALT-033, ALT-034, ALT-041
-
-**To add a rubric for a new alert**, find the `rubrics` array at the bottom of `database/seed.js`, copy an existing entry, update the `alert_id`, `required_keywords`, and `steps` concept buckets, then reseed.
+Points awarded: 5 pts for score ≥ 90%, 4 pts for ≥ 75%, 3 pts for ≥ 60%, 2 pts for ≥ 40%, 1 pt otherwise.
 
 ---
 
 ## Database Tables
 
-All table definitions are in `database/schema.sql`. The server also runs idempotent `ALTER TABLE` migrations at startup for any new columns added since the DB was created.
+Base tables are in `database/schema.sql`. Additional tables and columns are added automatically via idempotent migrations in `db.js` on every server start.
 
 | Table | What it stores |
-|---|---|
-| `users` | All accounts — analysts and admins. Has `points` and `triage_score` columns. |
-| `sessions` | Auth tokens. 24-hour TTL. |
-| `labs` | Training lab metadata — title, slug, difficulty, which alerts it references. |
-| `questions` | MCQ questions linked to a lab. Each has `correct_answer` and `explanation`. |
-| `user_progress` | One row per user per lab — tracks started/completed status and score. |
-| `user_answers` | Every MCQ answer submitted. Records whether it was correct and points awarded. |
-| `leaderboard` | Aggregate score view per user. Rebuilt from `user_answers` on query. |
-| `soc_alerts` | All training alerts. Each has `raw_log`, `iocs`, `timeline`, MITRE fields, severity. |
-| `escalations` | When an analyst escalates an alert to L2. |
-| `incidents` | Full incident record when an alert enters the IR workflow. |
-| `alert_closures` | Every alert close decision — all 5 IR step answers, classification, `investigation_score`, `step_scores` (JSON), `scoring_feedback` (JSON), points awarded. |
-| `alert_rubrics` | Per-alert scoring rubrics. JSON blob per alert, queried by `scoreIRAnswers()`. |
+|-------|----------------|
+| `users` | All accounts (analysts + admins). Includes `points`, `is_active`. |
+| `sessions` | Auth tokens. 24-hour TTL. Includes `created_at` for login history. |
+| `labs` | Lab metadata — title, slug, category, difficulty, alert references, evidence. |
+| `questions` | Questions linked to a lab. Includes `correct_answer`, `options`, `hint`, `points`. |
+| `user_progress` | One row per user per lab — status, score, `started_at`, `completed_at`. |
+| `user_answers` | Every answer submitted — correct, pts_awarded, hints_used, wrong_count, submitted_at. |
+| `draft_answers` | Autosaved in-progress answers before submission. |
+| `soc_alerts` | All training alerts — raw_log, iocs, timeline, MITRE fields, severity. |
+| `alert_closures` | Every IR close — all 5 step answers, classification, investigation_score, step_scores (JSON), scoring_feedback (JSON), points. |
+| `alert_rubrics` | Per-alert scoring rubrics. JSON blob, queried by `scoreIRAnswers()`. |
+| `user_alert_state` | Per-user alert status (open / investigating / closed / false_positive). |
+| `incidents` | Incident records tracking IR stage progression. |
+| `escalations` | Alert escalation history (L2/L3). |
+| `achievements` | Achievement definitions (25 rows, seeded at startup). |
+| `user_achievements` | Which analysts have earned which badges, with timestamps. |
+| `lab_notes` | Per-user per-lab investigation notes. Autosaved from the analyst UI. |
+| `streaks` | Daily streak tracking per user — current, longest, last_active_date. |
+
+---
+
+## Security
+
+The following headers are set on every response:
+
+| Header | Value |
+|--------|-------|
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `X-XSS-Protection` | `1; mode=block` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | camera, mic, geolocation, payment all disabled |
+| `Content-Security-Policy` | scripts/styles/fonts restricted to same origin + Google Fonts |
+| `Cache-Control` | `no-store` on all API responses |
+
+Additional measures:
+- CORS restricted to localhost and RFC1918 private IPs (LAN deployment only)
+- Per-IP rate limiting: 300 req/min on all API routes, 30/min on answer submission
+- Input validation and null-byte sanitisation on all routes
+- Constant-time password comparison (prevents timing attacks)
+- Structured JSON error logging (stack traces never sent to clients in production)
+- Graceful shutdown on SIGTERM/SIGINT — no DB corruption on restart
+- Workers auto-restart on crash (cluster mode)
 
 ---
 
 ## API Routes
 
-All routes are in `server.js`. Every route except `/`, `/login`, `/analyst`, `/admin` requires a valid session token in the `Authorization: Bearer <token>` header.
+Every route except `/health`, `/`, `/login`, `/analyst`, `/admin` requires `Authorization: Bearer <token>`.
 
 ### Auth
-| Method | Route | What it does |
-|---|---|---|
-| POST | `/api/auth/login` | Login. Returns session token. |
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | `/api/auth/login` | Login. Returns session token + user object. |
 | POST | `/api/auth/logout` | Invalidates session token. |
 
 ### Analyst
-| Method | Route | What it does |
-|---|---|---|
-| GET | `/api/me` | Current analyst's profile, score, accuracy, rank. |
-| GET | `/api/me/closures` | All alert closes this analyst has submitted. |
-| GET | `/api/labs` | All visible labs with progress for current user. |
-| GET | `/api/labs/:slug` | Lab detail — questions, linked alerts, current progress. |
-| POST | `/api/labs/:slug/submit` | Submit an MCQ answer. Returns correct/incorrect + explanation. |
-| GET | `/api/leaderboard` | All analysts ranked by score. |
-| GET | `/api/alerts` | All SOC alerts (with filter support). |
-| GET | `/api/alerts/:id` | Single alert — raw log, IOCs, timeline, MITRE, etc. |
-| POST | `/api/alerts/:id/status` | Close an alert as TP or FP. Triggers rubric scoring. |
-| GET | `/api/alerts/:id/incident` | Fetch the incident record for an alert. |
-| POST | `/api/alerts/:id/incident` | Create or update an incident record. |
-| POST | `/api/alerts/:id/escalate` | Escalate an alert to L2. |
-| GET | `/api/alerts/:id/escalations` | Get escalation history for an alert. |
-| POST | `/api/user/password` | Self-service password change. |
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/me` | Current user's stats, score, rank, streak. |
+| GET | `/api/me/closures` | All alert closes submitted by this user. |
+| GET | `/api/me/performance` | Weighted DPS score + 4-pillar breakdown. |
+| GET | `/api/labs` | All visible labs with user progress (batch queries). |
+| GET | `/api/labs/:slug` | Lab detail — questions, evidence, progress. |
+| POST | `/api/labs/:slug/submit` | Submit an answer. Returns correct/wrong + achievements. |
+| POST | `/api/labs/:slug/hint` | Request a hint. Deducts from potential points. |
+| POST | `/api/labs/:slug/reset` | Reset progress on a lab. |
+| GET | `/api/labs/:slug/notes` | Get autosaved lab notes. |
+| PUT | `/api/labs/:slug/notes` | Save lab notes (max 10,000 chars). |
+| GET | `/api/achievements` | All 25 achievements with earned status + streak info. |
+| GET | `/api/leaderboard` | All analysts ranked by score (10-second cache). |
+| GET | `/api/alerts` | All alerts — filter by severity, category, status, search. |
+| GET | `/api/alerts/:id` | Single alert — raw log, IOCs, timeline, MITRE. |
+| POST | `/api/alerts/:id/status` | Close as TP (resolved) or FP. Triggers rubric scoring. |
+| GET | `/api/alerts/:id/incident` | Fetch incident record. |
+| POST | `/api/alerts/:id/incident` | Create or update incident record. |
+| POST | `/api/alerts/:id/escalate` | Escalate to L2/L3. |
+| GET | `/api/alerts/:id/escalations` | Escalation history. |
+| POST | `/api/user/password` | Change own password. Invalidates all sessions. |
 
 ### Admin (admin role required)
-| Method | Route | What it does |
-|---|---|---|
-| GET | `/api/admin/stats` | Platform-wide stats — users, labs completed, avg score. |
-| GET | `/api/admin/users` | All analyst accounts with score and lab progress. |
-| POST | `/api/admin/users` | Create a new analyst account. |
-| PUT | `/api/admin/users/:id` | Update account (username, role, active status). |
-| DELETE | `/api/admin/users/:id` | Delete an analyst account. |
-| GET | `/api/admin/progress` | All user_progress rows. |
-| GET | `/api/admin/labs` | All labs. |
-| POST | `/api/admin/labs` | Create a new lab. |
-| PUT | `/api/admin/labs/:id` | Update a lab. |
-| DELETE | `/api/admin/labs/:id` | Delete a lab. |
-| GET | `/api/admin/labs/:id/questions` | Get all questions for a lab. |
-| POST | `/api/admin/labs/:id/questions` | Add a question to a lab. |
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/admin/stats` | Platform-wide stats. |
+| GET | `/api/admin/users` | All analysts with score + labs + last session. |
+| POST | `/api/admin/users` | Create analyst account. |
+| PUT | `/api/admin/users/:id` | Update account (active status, password reset). |
+| DELETE | `/api/admin/users/:id` | Delete account. |
+| GET | `/api/admin/progress` | Lab completion matrix — all users × all labs. |
+| GET | `/api/admin/performance/all` | Weighted DPS scores for all students. |
+| GET | `/api/admin/labs` | All labs with question count + completion stats. |
+| POST | `/api/admin/labs` | Create a lab. |
+| PUT | `/api/admin/labs/:id` | Update lab metadata. |
+| DELETE | `/api/admin/labs/:id` | Delete lab. |
+| GET | `/api/admin/labs/:id/questions` | All questions for a lab. |
+| POST | `/api/admin/labs/:id/questions` | Add a question. |
 | PUT | `/api/admin/questions/:id` | Edit a question. |
 | DELETE | `/api/admin/questions/:id` | Delete a question. |
-| GET | `/api/admin/analysts/:id/activity` | Full closure history for one analyst — all IR steps, scores, feedback. |
+| GET | `/api/admin/analysts/:id/activity` | Alert triage history for one analyst. |
+| GET | `/api/admin/analysts/:id/profile` | Full analyst profile — labs, questions, weak areas, activity. |
 
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Backend | Node.js 18+, built-in `http` module (no Express) |
-| Database | SQLite via `better-sqlite3` |
-| Auth | bcryptjs password hashing, crypto random session tokens |
-| Frontend | Vanilla HTML/CSS/JS, no frameworks, no build step |
-| Service | launchd (macOS) / systemd (Linux) |
-
-All dependencies are free and open source. Zero paid services.
-
----
-
-## Labs — Full List
-
-| Slug | Title | Difficulty |
-|---|---|---|
-| `alert-triage-basics` | Alert Triage Basics | Beginner |
-| `soc-fundamentals` | SOC Fundamentals | Beginner |
-| `credential-attacks` | Credential Attacks | Beginner |
-| `windows-event-logs` | Windows Event Logs | Beginner |
-| `malware-analysis` | Malware Analysis | Intermediate |
-| `network-traffic-analysis` | Network Traffic Analysis | Intermediate |
-| `lateral-movement` | Lateral Movement | Intermediate |
-| `network-forensics` | Network Forensics | Intermediate |
-| `threat-hunting` | Threat Hunting | Intermediate |
-| `incident-response-playbooks` | Incident Response Playbooks | Intermediate |
-| `exfiltration-detection` | Exfiltration Detection | Advanced |
-| `advanced-persistent-threats` | Advanced Persistent Threats | Advanced |
-| `ransomware-ir` | Ransomware IR | Advanced |
-| `cloud-security-incidents` | Cloud Security Incidents | Advanced |
-| `red-team-detection` | Red Team Detection | Advanced |
-| `incident-response` | Operation Blackout IR | Advanced |
+### Monitoring
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/health` | Returns `{"ok":true,"pid":...}`. No auth required. |
 
 ---
 
 ## Making Changes
 
-### Add a new alert
-Edit `database/seed.js` — find the `soc_alerts` insert block and add your alert. Each alert needs: `id` (ALT-XXX format), `severity`, `category`, `title`, `source`, `host`, `raw_log`, `iocs`, `mitre_tactic`, `mitre_technique`. Then reseed.
-
 ### Add a new lab or question
-Edit `database/seed.js` — find the labs array and questions array. Every question must have an `alert_refs` field pointing to real ALT-XXX ids that actually exist in `soc_alerts`.
-
-### Add a rubric for an alert
-Edit the `rubrics` array at the bottom of `database/seed.js`. Copy an existing entry, update `alert_id`, `required_keywords`, and `steps` concept buckets. Run `node database/seed.js` to apply.
+Edit `database/seed.js`. Add to the labs array (title, slug, category, difficulty, points, description, evidence, alert_refs) and to the questions array. Then reseed:
+```bash
+node database/seed.js
+```
 
 ### Add a new API route
-Edit `server.js`. All routes follow this pattern:
+Create or edit a file in `routes/`. Then register it in `routes/index.js`:
 ```javascript
-if (method === 'POST' && url === '/api/your-route') {
-  const user = requireAuth(req, res); if (!user) return;
-  const body = await parseBody(req);
-  // your logic
-  return jsonRes(res, 200, { ok: true });
+// In routes/index.js
+if (method === 'GET' && url === '/api/your-route') {
+  return yourRouteHandler(req, res);
 }
 ```
-Add yours before the final `server.listen()` call.
+Route handlers follow this pattern:
+```javascript
+// In routes/something.js
+const { requireAuth } = require('../middleware/auth');
+const { ok, badRequest } = require('../middleware/response');
+const { parseBody } = require('../middleware/security');
+
+async function myHandler(req, res) {
+  const user = requireAuth(req, res); if (!user) return;
+  const body = await parseBody(req);
+  return ok(res, { result: 'done' });
+}
+module.exports = { myHandler };
+```
 
 ### Change the UI
-- Analyst-facing → `public/analyst/index.html`
-- Admin-facing → `public/admin/index.html`
+- Analyst view → `public/analyst/index.html`
+- Admin view → `public/admin/index.html`
 - Login page → `public/login.html`
 
-All three are self-contained single-page apps. CSS in `<style>` at the top, JavaScript in `<script>` at the bottom. No build step, no bundler — edit and reload.
+All three are self-contained single-page apps — CSS in `<style>`, JS in `<script>`. No build step, no bundler.
+
+### Add a rubric for an alert
+Edit the rubrics array in `database/seed.js`. Copy an existing entry, update `alert_id`, `required_keywords`, and `steps` concept buckets. Reseed with `node database/seed.js`.
+
+---
+
+## Re-seed the Database
+
+To reset all progress and start fresh:
+```bash
+cd ~/diaas-sec
+rm database/diaas.db
+node database/seed.js
+```
+
+This recreates all default users, labs, questions, alerts, and rubrics. All analyst progress is wiped.
+
+---
+
+## Add Users Without the Admin Panel
+
+```bash
+node -e "
+const db = require('better-sqlite3')('database/diaas.db');
+const bcrypt = require('bcryptjs');
+const hash = bcrypt.hashSync('Password@123', 10);
+db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?,?,?)').run('analyst_11', hash, 'analyst');
+console.log('Done');
+"
+```
 
 ---
 
@@ -470,70 +487,69 @@ All three are self-contained single-page apps. CSS in `<style>` at the top, Java
 ### Server won't start
 
 ```bash
-# Check what is on port 3000
+# Check what's on port 3000
 lsof -i :3000
 
 # Kill it
 kill $(lsof -ti:3000)
 
-# Check the log for errors
-tail -50 /tmp/diaas.log
+# Check logs
+tail -50 logs/server.log
 ```
 
 Common causes:
 - `Cannot find module 'better-sqlite3'` → run `npm install`
-- `SQLITE_CANTOPEN` → run `node database/seed.js` first to create the DB
-- `port already in use` → kill the existing process first
+- `SQLITE_CANTOPEN` → run `node database/seed.js` first
+- Port already in use → kill the existing process
 
-### Database errors after a code update
+### Database errors after update
 
-If you see `table X has no column named Y`, the DB schema is out of date. The server runs idempotent `ALTER TABLE` migrations on startup — a plain restart usually fixes it. If not:
-
-```bash
-# Nuclear option — wipe and reseed (loses all analyst progress)
-rm database/diaas.db
-node database/seed.js
-```
-
-### Analyst scores not updating
-
-Check `alert_closures` has the `investigation_score` column:
+If you see `table X has no column named Y`, the DB is out of date. The server runs idempotent `ALTER TABLE` migrations automatically on startup — restart usually fixes it. If not:
 
 ```bash
-sqlite3 database/diaas.db ".schema alert_closures"
+rm database/diaas.db && node database/seed.js
 ```
 
-If missing, restart the server — the migration adds it automatically.
+### Analyst scores not showing
 
-### Alert closes with "investigation_score is not defined"
-
-Fixed in commit `e2a6ffb`. Pull and restart:
-
+Check that the `streaks` and `user_achievements` tables exist:
 ```bash
-git pull origin main
-kill $(lsof -ti:3000) 2>/dev/null; sleep 1
-nohup node server.js > /tmp/diaas.log 2>&1 &
+sqlite3 database/diaas.db ".tables"
 ```
 
-### Questions not matching alerts
+If missing, the migrations in `db.js` create them on next startup. Just restart the server.
 
-Every question in `seed.js` has an `alert_refs` field. If it references an ALT-XXX that doesn't exist in `soc_alerts`, answers won't work. Check with:
+### Performance score shows 0
 
-```bash
-sqlite3 database/diaas.db \
-  "SELECT id, title FROM soc_alerts WHERE id = 'ALT-085';"
-```
+The DPS requires at least one lab answer or alert closure. It returns 0 if no activity exists — this is correct. Once the student submits their first answer, the score populates.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Runtime | Node.js 18+, built-in `http` module (no Express) |
+| Database | SQLite via `better-sqlite3` (WAL mode, 32MB cache) |
+| Auth | bcryptjs hashing, crypto.randomBytes session tokens |
+| Frontend | Vanilla HTML/CSS/JS — no frameworks, no build step |
+| Concurrency | Node.js `cluster` — (CPUs − 2) workers, min 2, max 6 |
+| Service manager | launchd (macOS) / systemd (Linux) |
 
 ---
 
 ## Changelog
 
 | Commit | What changed |
-|---|---|
-| `e6de6e6` | Full README rewrite — merged old install commands + new architecture docs. |
-| `e2a6ffb` | Fixed ReferenceError crash on alert resolve (`investigation_score` scope bug). Step 1 triage now asks for 5W+H. |
-| `a10a867` | Rubric-based IR scoring engine. 10 rubrics seeded. Live 15-word counter per step. Tiered 1–5 pts. Score feedback panel after close. |
-| `76fb934` | Fixed 500 on alert resolve (missing `users.points` column). Removed heatmap. Rebuilt analyst profile as full page. |
-| `9487878` | Space Grotesk font. 5-step IR modal. FP justification modal. Analyst profile page. |
-| `b7b7673` | Full IR workflow. False positive workflow. Fixed 19 broken question-to-alert mappings. 4 Operation Blackout IR labs. |
-| `b19ac36` | v2.0.0 — full stack rebuild: Node.js + SQLite auth, analyst SPA, admin panel, 6 labs, 30 questions. |
+|--------|--------------|
+| `b3e8ef5` | Admin analyst profiling: full profile with 4 tabs (overview, labs per-question, alert triage, activity feed). Category weakness detection. Stuck question tracking. Time-per-lab. |
+| `620fa69` | Fixed sequential question locking (all questions now accessible). Streaks now award +5 pts attendance bonus per new day. Streak updates on any attempt (not just correct). |
+| `fc53840` | Weighted Performance Score (DPS 0–100). Letter grades. Admin Performance page with breakdown per student. Emojis removed from UI. Learning Paths removed. |
+| `69311df` | Fixed lab view left-gap bug. `position:fixed` layout for lab view. Removed `height:100vh` conflict. |
+| `b9033f5` | Fixed `ok()` response helper spreading arrays. Fixed 7 missing admin routes (404s). Fixed `/api/me/drafts` stub. |
+| `475b1bb` | Achievements page, XP/level system, streak widget, lab notes autosave, achievement popups live in analyst UI. |
+| `4a5433d` | Achievements backend (25 badges, 7 categories). Streak service. Lab notes API. Lab reset endpoint. |
+| `a8b89e2` | Full modular refactor: server.js 1785 → 41 lines. 8 security headers. Rate limiting all routes. Input validation. Structured logging. Graceful shutdown. Cluster mode. |
+| `0bccf04` | Performance: 697 queries → 4 on lab load (174× faster). 13 DB indexes. Leaderboard cache. |
+| `8151367` | 100 new questions across 19 Stack 2 labs. |
+| `b19ac36` | v2.0.0 — full platform rebuild: Node.js + SQLite, analyst SPA, admin panel, labs, alerts, IR workflow. |
