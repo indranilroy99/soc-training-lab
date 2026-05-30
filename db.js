@@ -19,6 +19,41 @@ function runMigrations() {
   const sessionSQL = `ALTER TABLE sessions ADD COLUMN created_at TEXT DEFAULT (datetime('now'))`;
   try { db.prepare(sessionSQL).run(); } catch (e) { /* already exists */ }
 
+  // Extended user profile fields
+  const profileCols = [
+    `ALTER TABLE users ADD COLUMN display_name    TEXT`,
+    `ALTER TABLE users ADD COLUMN dob             TEXT`,
+    `ALTER TABLE users ADD COLUMN institution     TEXT`,
+    `ALTER TABLE users ADD COLUMN bio             TEXT`,
+    `ALTER TABLE users ADD COLUMN profile_image   TEXT`,
+    `ALTER TABLE users ADD COLUMN force_pw_change INTEGER DEFAULT 1`,
+    `ALTER TABLE users ADD COLUMN email           TEXT`,
+    `ALTER TABLE users ADD COLUMN extra_labs_bonus INTEGER DEFAULT 0`,
+  ];
+  for (const sql of profileCols) {
+    try { db.prepare(sql).run(); } catch { /* already exists */ }
+  }
+
+  // Batch management
+  db.prepare(`CREATE TABLE IF NOT EXISTS batch_resets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reset_by INTEGER NOT NULL,
+    reset_at TEXT DEFAULT (datetime('now')),
+    note     TEXT,
+    users_affected INTEGER DEFAULT 0
+  )`).run();
+
+  // Bonus lab tracking
+  db.prepare(`CREATE TABLE IF NOT EXISTS bonus_lab_completions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    lab_id  INTEGER NOT NULL,
+    bonus_pts INTEGER DEFAULT 0,
+    awarded_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, lab_id),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`).run();
+
   const cols = [
     [`ALTER TABLE labs ADD COLUMN is_visible INTEGER DEFAULT 1`,             'labs.is_visible'],
     [`ALTER TABLE labs ADD COLUMN evidence TEXT`,                             'labs.evidence'],

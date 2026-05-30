@@ -69,12 +69,19 @@ async function router(req, res) {
   if (method === 'GET'  && url === '/api/me')            return userRoutes.getMe(req, res);
   if (method === 'GET'  && url === '/api/me/closures')   return userRoutes.getMyClosures(req, res);
   if (method === 'POST' && url === '/api/user/password') return userRoutes.changePassword(req, res);
+  if (method === 'PUT'  && url === '/api/me/profile')       return userRoutes.updateProfile(req, res);
   if (method === 'GET'  && url === '/api/me/performance') return perfRoutes.myPerformance(req, res);
   if (method === 'GET'  && url === '/api/admin/performance/all') return perfRoutes.allPerformance(req, res);
 
   // ── Graduation ──────────────────────────────────────────────────────
   if (method === 'GET'  && url === '/api/graduation/status') return gradRoutes.getGraduationStatus(req, res);
   if (method === 'GET'  && url === '/api/graduation/report') return gradRoutes.getMyReport(req, res);
+
+  // ── Admin batch + CSV ──────────────────────────────────────────────────
+  if (method === 'POST' && url === '/api/admin/batch/reset')   return adminRoutes.batchReset(req, res);
+  if (method === 'GET'  && url === '/api/admin/batch/history') return adminRoutes.batchHistory(req, res);
+  if (method === 'GET'  && url === '/api/admin/users/export')  return adminRoutes.exportUsers(req, res);
+  if (method === 'POST' && url === '/api/admin/users/import')  return adminRoutes.importUsers(req, res);
 
   const gradReportMatch = url.match(/^\/api\/admin\/graduation\/report\/(\d+)$/);
   if (method === 'GET' && gradReportMatch) return gradRoutes.getStudentReport(req, res, gradReportMatch[1]);

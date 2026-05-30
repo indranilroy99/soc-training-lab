@@ -18,8 +18,8 @@ module.exports = {
   PUBLIC:  path.join(__dirname, 'public'),
 
   // ── Auth & Sessions ───────────────────────────────────────────────────────
-  SESSION_TTL_HOURS:         24,
-  SESSION_TOUCH_INTERVAL_MS: 30 * 60 * 1000,
+  SESSION_TTL_HOURS:         168,   // 7 days — sessions persist across the week
+  SESSION_TOUCH_INTERVAL_MS: 168 * 60 * 60 * 1000, // always touch — extends on every request
   SESSION_BYTES:             48,            // token entropy bytes
 
   // ── Login rate limiting ───────────────────────────────────────────────────

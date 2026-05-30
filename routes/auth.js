@@ -25,7 +25,7 @@ async function login(req, res) {
   }
 
   const user = db.prepare(
-    `SELECT id, username, role, password_hash, is_active FROM users WHERE username=? AND is_active=1`
+    `SELECT id, username, role, password_hash, is_active, force_pw_change FROM users WHERE username=? AND is_active=1`
   ).get(username.trim());
 
   // Use constant-time comparison to prevent timing attacks even on missing user
@@ -48,7 +48,7 @@ async function login(req, res) {
   logger.info('login_success', { userId: user.id, username: user.username, ip, reqId: req.id });
   // Award first-login achievement (ignored if already earned)
   try { award(user.id, 'first_login'); } catch {}
-  return ok(res, { token, user: { id: user.id, username: user.username, role: user.role } });
+  return ok(res, { token, user: { id: user.id, username: user.username, role: user.role, force_pw_change: !!user.force_pw_change } });
 }
 
 // POST /api/auth/logout

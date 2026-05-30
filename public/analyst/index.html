@@ -1239,6 +1239,9 @@ const App = {
     });
 
     await App.loadMe();
+    const needsPwChange = await App.checkForcePwChange();
+    if (needsPwChange) return; // wait for password change before proceeding
+
     await App.loadLabs();
 
     // Restore last page/lab state from localStorage
@@ -1314,6 +1317,43 @@ const App = {
         }
       }
     } catch(e) { console.error(e); }
+  },
+
+  async checkForcePwChange() {
+    const user = (() => { try { return JSON.parse(localStorage.getItem('diaas_user') || 'null'); } catch { return null; } })();
+    if (user?.force_pw_change) {
+      document.getElementById('force-pw-modal').style.display = 'flex';
+      return true;
+    }
+    // Double-check from server
+    const me = await API.get('/api/me').catch(() => null);
+    if (me?.force_pw_change) {
+      document.getElementById('force-pw-modal').style.display = 'flex';
+      return true;
+    }
+    return false;
+  },
+
+  async submitForcedPwChange() {
+    const pw1 = document.getElementById('fpw-new').value;
+    const pw2 = document.getElementById('fpw-confirm').value;
+    const err = document.getElementById('fpw-error');
+    if (pw1.length < 8) { err.textContent = 'Password must be at least 8 characters'; err.style.display=''; return; }
+    if (pw1 !== pw2)    { err.textContent = 'Passwords do not match'; err.style.display=''; return; }
+    err.style.display = 'none';
+
+    const r = await API.post('/api/user/password', { new_password: pw1 });
+    if (!r.ok) { err.textContent = r.data?.error || 'Failed to update password'; err.style.display=''; return; }
+
+    // Update stored user object
+    try {
+      const u = JSON.parse(localStorage.getItem('diaas_user') || '{}');
+      u.force_pw_change = false;
+      localStorage.setItem('diaas_user', JSON.stringify(u));
+    } catch {}
+
+    document.getElementById('force-pw-modal').style.display = 'none';
+    toast('Password updated. Welcome!', 'success');
   },
 
   async loadLabs() {
@@ -2015,6 +2055,27 @@ const Pages = {
   },
 
   profile() {
+    // Load and populate profile fields from /api/me
+    const me = App.meData;
+    if (me) {
+      const setInput = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+      setInput('prof-display-name', me.display_name);
+      setInput('prof-dob',          me.dob);
+      setInput('prof-email',        me.email);
+      setInput('prof-institution',  me.institution);
+      setInput('prof-bio',          me.bio);
+      // Avatar
+      const initials = (me.display_name || me.username || 'A').charAt(0).toUpperCase();
+      const avatarEl  = document.getElementById('profile-avatar-initials');
+      const previewEl = document.getElementById('profile-avatar-preview');
+      if (avatarEl) avatarEl.textContent = initials;
+      if (previewEl && me.profile_image) {
+        previewEl.style.backgroundImage = `url(${me.profile_image})`;
+        previewEl.style.backgroundSize  = 'cover';
+        previewEl.style.backgroundPosition = 'center';
+        if (avatarEl) avatarEl.style.display = 'none';
+      }
+    }
     // Load performance score
     API.get('/api/me/performance').then(p => {
       if (!p || typeof p.dps === 'undefined') return;
@@ -2164,6 +2225,47 @@ const Pages = {
       const filterBtn = document.querySelector(`.filter-tab[data-cat="path-${pathId}"]`);
       if (filterBtn) filterBtn.click();
     }, 100);
+  },
+
+  handleAvatarUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 500_000) { toast('Image too large. Max 500KB.', 'warn'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      const previewEl = document.getElementById('profile-avatar-preview');
+      const initialsEl = document.getElementById('profile-avatar-initials');
+      if (previewEl) {
+        previewEl.style.backgroundImage = `url(${dataUrl})`;
+        previewEl.style.backgroundSize  = 'cover';
+        previewEl.style.backgroundPosition = 'center';
+        if (initialsEl) initialsEl.style.display = 'none';
+      }
+      Pages._pendingAvatar = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  },
+
+  _pendingAvatar: null,
+
+  async saveProfile() {
+    const btn = document.getElementById('save-profile-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    const body = {
+      display_name: document.getElementById('prof-display-name')?.value || null,
+      dob:          document.getElementById('prof-dob')?.value          || null,
+      email:        document.getElementById('prof-email')?.value        || null,
+      institution:  document.getElementById('prof-institution')?.value  || null,
+      bio:          document.getElementById('prof-bio')?.value          || null,
+    };
+    if (this._pendingAvatar) body.profile_image = this._pendingAvatar;
+    const r = await API.put('/api/me/profile', body);
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+    if (!r.ok) { toast(r.data?.error || 'Failed to save profile', 'error'); return; }
+    this._pendingAvatar = null;
+    toast('Profile saved.', 'success');
+    App.loadMe(); // refresh sidebar
   },
 
   async changePassword() {
@@ -2694,5 +2796,26 @@ window.irUpdateStatusBadge = function(newStatus) {
   if (badge) badge.textContent = newStatus;
 };
 </script>
+
+<!-- FORCE PASSWORD CHANGE MODAL -->
+<div id="force-pw-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99999;display:flex;align-items:center;justify-content:center" id="force-pw-modal">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:28px;width:100%;max-width:400px">
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">Set Your Password</div>
+    <div style="font-size:13px;color:var(--dim);margin-bottom:20px">Your account requires a password change before you can continue.</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:5px">New Password</div>
+        <input type="password" id="fpw-new" placeholder="Minimum 8 characters" style="width:100%;height:36px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;padding:0 12px;font-size:13px;color:var(--text);outline:none;font-family:var(--font)">
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:5px">Confirm Password</div>
+        <input type="password" id="fpw-confirm" placeholder="Repeat new password" style="width:100%;height:36px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;padding:0 12px;font-size:13px;color:var(--text);outline:none;font-family:var(--font)">
+      </div>
+      <div id="fpw-error" style="color:var(--red);font-size:12px;display:none"></div>
+      <button class="btn btn-primary" onclick="App.submitForcedPwChange()" style="margin-top:4px">Set Password &amp; Continue</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

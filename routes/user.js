@@ -3,11 +3,13 @@
 const bcrypt   = require('bcryptjs');
 const { db }   = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { ok, badRequest, unauthorized } = require('../middleware/response');
+const { ok, badRequest, unauthorized, notFound } = require('../middleware/response');
 const { parseBody } = require('../middleware/security');
-const { validateNewPassword } = require('../middleware/validate');
+const { validateNewPassword, requireString, sanitize } = require('../middleware/validate');
 const { getUserTotalScore, getUserRank } = require('../services/users');
-const { getStreak } = require('../services/streaks');
+const { getStreak }                      = require('../services/streaks');
+
+const MAX_IMAGE_BYTES = 500_000; // 500KB base64 limit for profile pictures
 
 // GET /api/me
 function getMe(req, res) {
@@ -16,27 +18,33 @@ function getMe(req, res) {
   const rank  = getUserRank(user.id);
 
   const stats = db.prepare(
-    `SELECT
-       COUNT(*) as total_answered,
-       SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END) as correct_answered
+    `SELECT COUNT(*) AS total_answered,
+            SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END) AS correct_answered
      FROM user_answers WHERE user_id=?`
   ).get(user.id);
 
-  const labsDone = db.prepare(
-    `SELECT COUNT(*) as c FROM user_progress WHERE user_id=? AND status='completed'`
-  ).get(user.id).c;
-
-  const labsInProgress = db.prepare(
-    `SELECT COUNT(*) as c FROM user_progress WHERE user_id=? AND status='in_progress'`
-  ).get(user.id).c;
+  const labsDone       = db.prepare(`SELECT COUNT(*) AS c FROM user_progress WHERE user_id=? AND status='completed'`).get(user.id).c;
+  const labsInProgress = db.prepare(`SELECT COUNT(*) AS c FROM user_progress WHERE user_id=? AND status='in_progress'`).get(user.id).c;
 
   const totalAnswered   = stats?.total_answered   || 0;
   const correctAnswered = stats?.correct_answered || 0;
   const accuracy = totalAnswered > 0 ? Math.round((correctAnswered / totalAnswered) * 100) : 0;
 
   const streak = getStreak(user.id);
+
+  const profile = db.prepare(
+    `SELECT display_name, dob, institution, bio, profile_image, email, force_pw_change FROM users WHERE id=?`
+  ).get(user.id);
+
   return ok(res, {
     id: user.id, username: user.username, role: user.role,
+    display_name: profile?.display_name || null,
+    email: profile?.email || null,
+    dob: profile?.dob || null,
+    institution: profile?.institution || null,
+    bio: profile?.bio || null,
+    profile_image: profile?.profile_image || null,
+    force_pw_change: !!profile?.force_pw_change,
     score, rank, labs_done: labsDone, labs_in_progress: labsInProgress,
     total_answered: totalAnswered, correct_answered: correctAnswered, accuracy,
     streak,
@@ -47,7 +55,7 @@ function getMe(req, res) {
 function getMyClosures(req, res) {
   const user = requireAuth(req, res); if (!user) return;
   const closures = db.prepare(
-    `SELECT ac.alert_id, sa.title as alert_title, sa.severity,
+    `SELECT ac.alert_id, sa.title AS alert_title, sa.severity,
             ac.classification, ac.is_correct, ac.points_awarded,
             ac.investigation_score, ac.step_scores, ac.scoring_feedback,
             ac.triage_reason, ac.fp_reason, ac.closed_at
@@ -57,21 +65,52 @@ function getMyClosures(req, res) {
      ORDER BY ac.closed_at DESC LIMIT 50`
   ).all(user.id);
 
-  const records = closures.map(c => ({
-    alert_id:            c.alert_id,
-    alert_title:         c.alert_title,
-    severity:            c.severity,
-    classification:      c.classification,
-    is_correct:          !!c.is_correct,
-    points:              c.points_awarded,
-    investigation_score: c.investigation_score || 0,
-    step_scores:         c.step_scores     ? JSON.parse(c.step_scores)     : {},
-    scoring_feedback:    c.scoring_feedback ? JSON.parse(c.scoring_feedback) : [],
-    triage_reason:       c.triage_reason,
-    fp_reason:           c.fp_reason,
-    closed_at:           c.closed_at,
-  }));
-  return ok(res, { records });
+  return ok(res, {
+    records: closures.map(c => ({
+      alert_id: c.alert_id, alert_title: c.alert_title, severity: c.severity,
+      classification: c.classification, is_correct: !!c.is_correct,
+      points: c.points_awarded, investigation_score: c.investigation_score || 0,
+      step_scores:      c.step_scores      ? JSON.parse(c.step_scores)      : {},
+      scoring_feedback: c.scoring_feedback ? JSON.parse(c.scoring_feedback) : [],
+      triage_reason: c.triage_reason, fp_reason: c.fp_reason, closed_at: c.closed_at,
+    })),
+  });
+}
+
+// PUT /api/me/profile  — update optional profile fields
+async function updateProfile(req, res) {
+  const user = requireAuth(req, res); if (!user) return;
+  const body = await parseBody(req);
+
+  const allowed = ['display_name', 'dob', 'institution', 'bio', 'email'];
+  const setClauses = []; const vals = [];
+
+  for (const field of allowed) {
+    if (body[field] !== undefined) {
+      const v = body[field] ? sanitize(String(body[field])).slice(0, 256) : null;
+      setClauses.push(`${field}=?`);
+      vals.push(v);
+    }
+  }
+
+  // Profile image: base64 data URL
+  if (body.profile_image !== undefined) {
+    if (body.profile_image && body.profile_image.length > MAX_IMAGE_BYTES) {
+      return badRequest(res, `Profile image too large. Maximum ${Math.round(MAX_IMAGE_BYTES / 1024)}KB.`);
+    }
+    if (body.profile_image && !body.profile_image.startsWith('data:image/')) {
+      return badRequest(res, 'Profile image must be a base64 data URL (data:image/...)');
+    }
+    setClauses.push('profile_image=?');
+    vals.push(body.profile_image || null);
+  }
+
+  if (setClauses.length > 0) {
+    vals.push(user.id);
+    db.prepare(`UPDATE users SET ${setClauses.join(', ')} WHERE id=?`).run(...vals);
+  }
+
+  return ok(res, { updated: setClauses.length });
 }
 
 // POST /api/user/password
@@ -79,20 +118,28 @@ async function changePassword(req, res) {
   const user = requireAuth(req, res); if (!user) return;
   const { current_password, new_password } = await parseBody(req);
 
-  if (!current_password) return badRequest(res, 'current_password is required');
+  // force_pw_change users: skip current password check on FIRST change
+  const profile = db.prepare(`SELECT password_hash, force_pw_change FROM users WHERE id=?`).get(user.id);
+  const isForced = !!profile?.force_pw_change;
+
+  if (!isForced) {
+    if (!current_password) return badRequest(res, 'current_password is required');
+    if (!bcrypt.compareSync(current_password, profile.password_hash)) {
+      return unauthorized(res, 'Current password is incorrect');
+    }
+  }
+
   const err = validateNewPassword(new_password);
   if (err) return badRequest(res, err);
 
-  const row = db.prepare(`SELECT password_hash FROM users WHERE id=?`).get(user.id);
-  if (!bcrypt.compareSync(current_password, row.password_hash)) {
-    return unauthorized(res, 'Current password is incorrect');
-  }
-
   const hash = bcrypt.hashSync(new_password, 10);
-  db.prepare(`UPDATE users SET password_hash=? WHERE id=?`).run(hash, user.id);
-  // Invalidate all other sessions for this user
-  db.prepare(`DELETE FROM sessions WHERE user_id=?`).run(user.id);
-  return ok(res, { message: 'Password changed. Please log in again.' });
+  db.prepare(`UPDATE users SET password_hash=?, force_pw_change=0 WHERE id=?`).run(hash, user.id);
+  // Invalidate all OTHER sessions, keep current one alive
+  const auth  = (req.headers['authorization'] || '').trim();
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (token) db.prepare(`DELETE FROM sessions WHERE user_id=? AND token!=?`).run(user.id, token);
+
+  return ok(res, { message: 'Password updated successfully.' });
 }
 
-module.exports = { getMe, getMyClosures, changePassword };
+module.exports = { getMe, getMyClosures, updateProfile, changePassword };

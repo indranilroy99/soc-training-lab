@@ -296,6 +296,42 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
 .form-row-2 { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
 
 @media (max-width: 1100px) { .stats-row { grid-template-columns: repeat(2,1fr); } }
+/* ── Report Card (print-optimised) ────────────────────────────────────── */
+.rc-overlay { position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:24px; }
+.rc-modal   { background:var(--card);border:1px solid var(--border);border-radius:8px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto; }
+.rc-header  { padding:24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between; }
+.rc-body    { padding:24px; }
+.rc-verdict { display:inline-block;padding:3px 14px;border-radius:3px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px; }
+.rc-verdict.Distinction { background:rgba(168,85,247,.15);color:var(--purple);border:1px solid var(--purple); }
+.rc-verdict.Merit       { background:var(--green-dim);color:var(--green);border:1px solid var(--green); }
+.rc-verdict.Pass        { background:var(--blue-muted);color:var(--blue);border:1px solid rgba(59,130,246,.4); }
+.rc-verdict.Refer       { background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.4); }
+.rc-dps     { font-size:48px;font-weight:800;font-family:var(--mono);color:var(--blue);line-height:1;margin:8px 0 4px; }
+.rc-name    { font-size:15px;font-weight:600;color:var(--text); }
+.rc-row     { display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(30,33,40,.5);font-size:13px; }
+.rc-label   { color:var(--dim); }
+.rc-value   { font-family:var(--mono);font-weight:600;color:var(--text); }
+.rc-section { font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin:16px 0 8px; }
+.rc-pillar  { margin-bottom:10px; }
+.rc-pillar-label { display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px; }
+.rc-pillar-bar   { height:5px;background:var(--border);border-radius:3px;overflow:hidden; }
+.rc-pillar-fill  { height:100%;border-radius:3px;transition:width .5s; }
+@media print {
+  body * { visibility:hidden; }
+  .rc-modal, .rc-modal * { visibility:visible; }
+  .rc-modal { position:fixed;inset:0;border:none;border-radius:0;max-height:none;background:#fff;color:#000; }
+  .rc-header .btn { display:none; }
+  --bg:#fff; --text:#000; --dim:#555; --border:#ddd; --card:#fff;
+}
+/* ── CSV import drag area ─────────────────────────────────────────────── */
+.csv-drop-area { border:2px dashed var(--border);border-radius:6px;padding:24px;text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:14px; }
+.csv-drop-area:hover,.csv-drop-area.drag-over { border-color:var(--blue);background:var(--blue-muted); }
+.csv-preview-table { width:100%;border-collapse:collapse;font-size:11.5px;margin-top:10px;max-height:200px;overflow-y:auto;display:block; }
+.csv-preview-table th { padding:6px 10px;background:var(--bg);border-bottom:1px solid var(--border);font-size:10px;font-weight:600;text-transform:uppercase;color:var(--dim); }
+.csv-preview-table td { padding:6px 10px;border-bottom:1px solid rgba(30,33,40,.4);color:var(--muted); }
+.csv-row-ok   { color:var(--green) !important; }
+.csv-row-err  { color:var(--red)   !important; }
+
 </style>
 </head>
 <body>
@@ -403,6 +439,9 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input class="search-input" type="text" id="user-search" placeholder="Search users..." oninput="Pages.filterUsers()">
             </div>
+            <button class="btn btn-outline btn-sm" onclick="AdminCSV.showImport()" title="Import users from CSV">Import CSV</button>
+            <button class="btn btn-outline btn-sm" onclick="AdminCSV.exportCSV()" title="Export users to CSV">Export CSV</button>
+            <button class="btn btn-red btn-sm" onclick="AdminBatch.showReset()" title="Reset all analyst progress for new cohort">Batch Reset</button>
             <button class="btn btn-orange" onclick="Modals.createUser()">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add User
@@ -1319,6 +1358,10 @@ const Pages = {
             <td style="padding:10px 14px"><span style="font-family:var(--mono);font-weight:600">${r.breakdown.coverage.score}%</span>${bar(r.breakdown.coverage.score,'var(--muted)')}</td>
             <td style="padding:10px 14px;font-size:11.5px;color:var(--muted)">${r.raw.questions_correct}/${r.raw.questions_attempted}</td>
             <td style="padding:10px 14px;font-size:11.5px;color:var(--muted)">${r.raw.labs_completed}/${r.raw.total_labs}</td>
+            <td style="padding:10px 14px;white-space:nowrap">
+              <button class="btn btn-outline btn-xs" data-uid="${r.id}" data-uname="${r.username}" onclick="ReportCard.view(this.dataset.uid, this.dataset.uname)">View</button>
+              <button class="btn btn-outline btn-xs" data-uid="${r.id}" data-uname="${r.username}" style="margin-left:4px" onclick="ReportCard.print(this.dataset.uid, this.dataset.uname)">PDF</button>
+            </td>
           </tr>`).join('')}
         </tbody>
       </table>`;
@@ -2712,10 +2755,378 @@ window.LabPages  = LabPages;
 window.LabModals = LabModals;
 window.LabBuilder = LabBuilder;
 
+
+// ── REPORT CARD ─────────────────────────────────────────────────────────
+const ReportCard = {
+  _currentUserId: null,
+  _currentUsername: null,
+
+  async view(userId, username) {
+    this._currentUserId = userId;
+    this._currentUsername = username;
+    document.getElementById('rc-modal').style.display = '';
+    document.getElementById('rc-body').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+    document.getElementById('rc-dps').textContent = '–';
+    document.getElementById('rc-name').textContent = username;
+
+    try {
+      const d = await API.get('/api/admin/graduation/report/' + userId);
+      this._render(d);
+    } catch(e) {
+      document.getElementById('rc-body').innerHTML = '<div style="color:var(--red);padding:20px">Failed to load report. Student may not have enough activity yet.</div>';
+    }
+  },
+
+  _render(d) {
+    if (!d) return;
+    const verdictEl = document.getElementById('rc-verdict-badge');
+    const verdictColors = { Distinction:'Distinction', Merit:'Merit', Pass:'Pass', Refer:'Refer' };
+    verdictEl.className = 'rc-verdict ' + (verdictColors[d.verdict] || '');
+    verdictEl.textContent = d.verdict || 'Incomplete';
+    document.getElementById('rc-dps').textContent  = d.dps || 0;
+    document.getElementById('rc-name').textContent = (d.user?.username || '');
+
+    const gradeColors = { 'A+':'var(--green)', A:'var(--green)', B:'var(--blue)', C:'var(--yellow)', D:'var(--orange)', F:'var(--red)' };
+    const gradeColor  = gradeColors[d.grade] || 'var(--dim)';
+
+    const pillarRows = d.performance_pillars ? Object.values(d.performance_pillars).map(b => `
+      <div class="rc-pillar">
+        <div class="rc-pillar-label">
+          <span style="color:var(--text)">${b.label}</span>
+          <span style="font-family:var(--mono);font-weight:600;color:${b.score>=70?'var(--green)':b.score>=50?'var(--blue)':'var(--red)'}">${b.score}% × ${b.weight}%</span>
+        </div>
+        <div class="rc-pillar-bar"><div class="rc-pillar-fill" style="width:${b.score}%;background:${b.score>=70?'var(--green)':b.score>=50?'var(--blue)':'var(--red)'}"></div></div>
+      </div>`).join('') : '';
+
+    const catRows = (d.category_breakdown || []).map(c => `
+      <div class="rc-row"><span class="rc-label">${c.category}</span><span class="rc-value">${c.labs_done} labs · ${c.score} pts</span></div>`).join('');
+
+    document.getElementById('rc-body').innerHTML = `
+      <div style="text-align:center;padding-bottom:16px;border-bottom:1px solid var(--border);margin-bottom:16px">
+        <div style="font-size:11px;color:var(--dim)">Performance Score / 100</div>
+        <div style="font-size:13px;font-weight:700;color:${gradeColor}">Grade ${d.grade || '–'}</div>
+        <div style="font-size:11px;color:var(--dim);margin-top:4px">Generated ${d.generated_at ? new Date(d.generated_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : ''}</div>
+      </div>
+      <div class="rc-section">Score Summary</div>
+      <div class="rc-row"><span class="rc-label">Total Score</span><span class="rc-value">${d.score_summary?.total_score || 0} pts</span></div>
+      <div class="rc-row"><span class="rc-label">Lab Score</span><span class="rc-value">${d.score_summary?.lab_score || 0} pts</span></div>
+      <div class="rc-row"><span class="rc-label">Alert Score</span><span class="rc-value">${d.score_summary?.alert_score || 0} pts</span></div>
+      <div class="rc-section">Lab Performance</div>
+      <div class="rc-row"><span class="rc-label">Completed</span><span class="rc-value">${d.labs?.completed || 0} / ${d.labs?.total || 0} (${d.labs?.completion_pct || 0}%)</span></div>
+      <div class="rc-row"><span class="rc-label">Question Accuracy</span><span class="rc-value">${d.questions?.accuracy || 0}%</span></div>
+      <div class="rc-row"><span class="rc-label">Answer Efficiency</span><span class="rc-value">${d.questions?.efficiency || 0}% (no hints/retries)</span></div>
+      <div class="rc-section">Alert Triage</div>
+      <div class="rc-row"><span class="rc-label">Triaged</span><span class="rc-value">${d.alerts?.total || 0} alerts</span></div>
+      <div class="rc-row"><span class="rc-label">Classification Accuracy</span><span class="rc-value">${d.alerts?.triage_accuracy || 0}%</span></div>
+      <div class="rc-row"><span class="rc-label">Avg IR Report Score</span><span class="rc-value">${d.alerts?.avg_ir_score || 0}%</span></div>
+      <div class="rc-section">Performance Pillars</div>
+      ${pillarRows}
+      ${catRows ? `<div class="rc-section">Category Breakdown</div>${catRows}` : ''}
+      <div class="rc-section">Attendance</div>
+      <div class="rc-row"><span class="rc-label">Day Streak</span><span class="rc-value">${d.streak?.current || 0} days (best: ${d.streak?.longest || 0})</span></div>`;
+  },
+
+  async print(userId, username) {
+    await this.view(userId, username);
+    setTimeout(() => this.printCurrent(), 600);
+  },
+
+  printCurrent() {
+    window.print();
+  },
+
+  close() {
+    document.getElementById('rc-modal').style.display = 'none';
+  },
+};
+
+// ── CSV IMPORT / EXPORT ─────────────────────────────────────────────────
+const AdminCSV = {
+  _rows: [],
+
+  downloadTemplate() {
+    const csv = 'username,password,role,display_name,email,institution\n' +
+      'analyst_01,SecurePass@123,analyst,Alice Smith,alice@example.com,DIAAS Institute\n' +
+      'analyst_02,SecurePass@456,analyst,Bob Jones,bob@example.com,DIAAS Institute';
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = 'diaas-import-template.csv';
+    a.click();
+  },
+
+  exportCSV() {
+    window.location.href = '/api/admin/users/export?token=' + API.token();
+    // Inject token via custom header fallback
+    fetch('/api/admin/users/export', { headers: API.headers() })
+      .then(r => r.text())
+      .then(csv => {
+        const a = document.createElement('a');
+        a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+        a.download = 'diaas-users-' + new Date().toISOString().slice(0,10) + '.csv';
+        a.click();
+      }).catch(() => toast('Export failed', 'error'));
+  },
+
+  showImport() {
+    document.getElementById('csv-modal').style.display = '';
+    document.getElementById('csv-preview').style.display = 'none';
+    document.getElementById('csv-result').style.display = 'none';
+    document.getElementById('csv-file-input').value = '';
+    this._rows = [];
+  },
+
+  closeImport() {
+    document.getElementById('csv-modal').style.display = 'none';
+  },
+
+  handleFile(file) {
+    if (!file) return;
+    if (!file.name.endsWith('.csv') && file.type !== 'text/csv') {
+      toast('Please select a .csv file', 'warn'); return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => this.parseCSV(e.target.result);
+    reader.readAsText(file);
+  },
+
+  parseCSV(text) {
+    const lines = text.trim().split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) { toast('CSV must have a header row and at least one data row', 'warn'); return; }
+
+    const header = lines[0].toLowerCase().replace(/\s/g,'').split(',');
+    const cols   = { username: header.indexOf('username'), password: header.indexOf('password'),
+                     role: header.indexOf('role'), display_name: header.indexOf('display_name'),
+                     email: header.indexOf('email'), institution: header.indexOf('institution') };
+
+    if (cols.username < 0 || cols.password < 0) {
+      toast('CSV must have username and password columns', 'error'); return;
+    }
+
+    this._rows = lines.slice(1).map((line, i) => {
+      const vals = this._parseCSVLine(line);
+      const get  = col => cols[col] >= 0 ? (vals[cols[col]] || '').trim() : '';
+      const row  = { username: get('username'), password: get('password'), role: get('role') || 'analyst',
+                     display_name: get('display_name'), email: get('email'), institution: get('institution') };
+      row._valid = row.username.length >= 3 && row.password.length >= 8;
+      row._error = !row.username ? 'Missing username' : row.username.length < 3 ? 'Username too short' :
+                  !row.password ? 'Missing password' : row.password.length < 8 ? 'Password too short' : '';
+      return row;
+    });
+
+    const valid  = this._rows.filter(r => r._valid).length;
+    const invalid = this._rows.filter(r => !r._valid).length;
+    document.getElementById('csv-preview-summary').innerHTML =
+      `<span style="color:var(--green)">${valid} valid</span>` +
+      (invalid ? ` · <span style="color:var(--red)">${invalid} invalid (will be skipped)</span>` : '');
+
+    const tableHTML = '<table class="csv-preview-table"><thead><tr>' +
+      ['Row','Username','Role','Display Name','Email','Status'].map(h => `<th>${h}</th>`).join('') +
+      '</tr></thead><tbody>' +
+      this._rows.map((r, i) => `<tr>
+        <td>${i+1}</td>
+        <td class="${r._valid?'csv-row-ok':'csv-row-err'}">${escapeHtml(r.username)}</td>
+        <td>${escapeHtml(r.role)}</td>
+        <td>${escapeHtml(r.display_name)}</td>
+        <td>${escapeHtml(r.email)}</td>
+        <td class="${r._valid?'csv-row-ok':'csv-row-err'}">${r._valid ? 'OK' : r._error}</td>
+      </tr>`).join('') + '</tbody></table>';
+
+    document.getElementById('csv-preview-table').innerHTML = tableHTML;
+    document.getElementById('csv-preview').style.display = '';
+    document.getElementById('csv-result').style.display = 'none';
+    document.getElementById('csv-import-btn').disabled = valid === 0;
+  },
+
+  _parseCSVLine(line) {
+    const result = []; let current = ''; let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { if (inQuotes && line[i+1] === '"') { current += '"'; i++; } else inQuotes = !inQuotes; }
+      else if (c === ',' && !inQuotes) { result.push(current); current = ''; }
+      else current += c;
+    }
+    result.push(current);
+    return result;
+  },
+
+  clearPreview() {
+    this._rows = [];
+    document.getElementById('csv-preview').style.display = 'none';
+    document.getElementById('csv-file-input').value = '';
+  },
+
+  async doImport() {
+    const validRows = this._rows.filter(r => r._valid).map(r => ({
+      username: r.username, password: r.password, role: r.role,
+      display_name: r.display_name || null, email: r.email || null, institution: r.institution || null,
+    }));
+    if (!validRows.length) { toast('No valid rows to import', 'warn'); return; }
+
+    const btn = document.getElementById('csv-import-btn');
+    btn.disabled = true; btn.textContent = 'Importing...';
+    try {
+      const res = await API.post('/api/admin/users/import', { rows: validRows });
+      btn.disabled = false; btn.textContent = 'Import Users';
+      if (!res.ok) { toast(res.data?.error || 'Import failed', 'error'); return; }
+      const d = res.data;
+      const el = document.getElementById('csv-result');
+      el.style.display = '';
+      el.innerHTML = `<div style="background:var(--green-dim);border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:12px">
+        <div style="font-size:13px;font-weight:600;color:var(--green)">Import complete</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">${d.created} users created.${d.errors?.length ? ' ' + d.errors.length + ' rows had errors.' : ''}</div>
+        ${d.errors?.length ? '<div style="margin-top:8px;font-size:11.5px;color:var(--red)">' + d.errors.map(e => `Row ${e.row}: ${e.error}`).join('<br>') + '</div>' : ''}
+      </div>`;
+      Pages.loadUsers();
+      toast(d.created + ' users imported', 'success');
+    } catch(e) {
+      btn.disabled = false; btn.textContent = 'Import Users';
+      toast('Import failed: ' + e.message, 'error');
+    }
+  },
+};
+
+// ── BATCH RESET ─────────────────────────────────────────────────────────
+const AdminBatch = {
+  showReset() {
+    document.getElementById('batch-modal').style.display = '';
+    document.getElementById('batch-note').value = '';
+    document.getElementById('batch-confirm-input').value = '';
+    document.getElementById('batch-confirm-btn').disabled = true;
+  },
+
+  hide() {
+    document.getElementById('batch-modal').style.display = 'none';
+  },
+
+  checkConfirm() {
+    const v = document.getElementById('batch-confirm-input').value;
+    document.getElementById('batch-confirm-btn').disabled = v !== 'RESET';
+  },
+
+  async doReset() {
+    const note = document.getElementById('batch-note').value;
+    const btn  = document.getElementById('batch-confirm-btn');
+    btn.disabled = true; btn.textContent = 'Resetting...';
+    try {
+      const res = await API.post('/api/admin/batch/reset', { confirm: 'RESET', note });
+      btn.textContent = 'Reset All Progress';
+      if (!res.ok) { toast(res.data?.error || 'Reset failed', 'error'); btn.disabled = false; return; }
+      this.hide();
+      toast('All analyst progress reset. Ready for new cohort.', 'success', 5000);
+      Pages.loadOverview();
+      Pages.loadUsers();
+    } catch(e) {
+      btn.textContent = 'Reset All Progress'; btn.disabled = false;
+      toast('Reset failed: ' + e.message, 'error');
+    }
+  },
+};
+
+window.ReportCard  = ReportCard;
+window.AdminCSV    = AdminCSV;
+window.AdminBatch  = AdminBatch;
+
 window.App    = App;
 window.Pages  = Pages;
 window.Modals = Modals;
 document.addEventListener('DOMContentLoaded', App.init);
 </script>
+
+<!-- ── REPORT CARD MODAL ─────────────────────────────────────── -->
+<div id="rc-modal" style="display:none" class="rc-overlay" onclick="if(event.target===this)ReportCard.close()">
+  <div class="rc-modal">
+    <div class="rc-header">
+      <div>
+        <div id="rc-verdict-badge" class="rc-verdict">–</div>
+        <div class="rc-dps" id="rc-dps">–</div>
+        <div class="rc-name" id="rc-name">–</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <button class="btn btn-outline btn-sm" onclick="ReportCard.printCurrent()">Print / PDF</button>
+        <button class="btn btn-outline btn-sm" onclick="ReportCard.close()">Close</button>
+      </div>
+    </div>
+    <div class="rc-body" id="rc-body">
+      <div class="loading-state"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CSV IMPORT MODAL ─────────────────────────────────────── -->
+<div id="csv-modal" style="display:none" class="rc-overlay" onclick="if(event.target===this)AdminCSV.closeImport()">
+  <div class="rc-modal" style="max-width:700px">
+    <div class="rc-header">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px">Import Users from CSV</div>
+        <div style="font-size:12px;color:var(--dim)">Upload a CSV file to create multiple analyst accounts at once</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="AdminCSV.closeImport()">Close</button>
+    </div>
+    <div class="rc-body">
+      <!-- Format guide -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:8px">Required CSV Format</div>
+        <code style="font-family:var(--mono);font-size:12px;color:var(--text);display:block;line-height:1.8">
+          username,password,role,display_name,email,institution<br>
+          analyst_01,SecurePass@123,analyst,Alice Smith,alice@school.edu,DIAAS Institute<br>
+          analyst_02,SecurePass@456,analyst,Bob Jones,bob@school.edu,DIAAS Institute
+        </code>
+        <div style="font-size:11px;color:var(--dim);margin-top:8px">
+          Required: <strong>username</strong>, <strong>password</strong> (8+ chars). Optional: role (default: analyst), display_name, email, institution.<br>
+          All imported accounts are set to <strong>force password change on first login</strong>.
+        </div>
+        <button class="btn btn-outline btn-xs" style="margin-top:8px" onclick="AdminCSV.downloadTemplate()">Download Template</button>
+      </div>
+      <!-- File drop area -->
+      <div class="csv-drop-area" id="csv-drop"
+           onclick="document.getElementById('csv-file-input').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="event.preventDefault();this.classList.remove('drag-over');AdminCSV.handleFile(event.dataTransfer.files[0])">
+        <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display:none" onchange="AdminCSV.handleFile(this.files[0])">
+        <div style="font-size:13px;color:var(--muted)">Drop CSV file here or click to browse</div>
+        <div style="font-size:11px;color:var(--dim);margin-top:4px">Max 200 users per import</div>
+      </div>
+      <!-- Preview -->
+      <div id="csv-preview" style="display:none">
+        <div style="font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:8px" id="csv-preview-summary"></div>
+        <div style="overflow-x:auto;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:4px" id="csv-preview-table"></div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-primary" id="csv-import-btn" onclick="AdminCSV.doImport()">Import Users</button>
+          <button class="btn btn-outline" onclick="AdminCSV.clearPreview()">Clear</button>
+        </div>
+      </div>
+      <!-- Result -->
+      <div id="csv-result" style="display:none;margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── BATCH RESET MODAL ─────────────────────────────────────── -->
+<div id="batch-modal" style="display:none" class="rc-overlay" onclick="if(event.target===this)AdminBatch.hide()">
+  <div style="background:var(--card);border:1px solid rgba(239,68,68,.4);border-radius:8px;width:100%;max-width:480px;padding:28px">
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">Batch Reset — New Cohort</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px">
+      This will wipe <strong>all analyst progress</strong> — lab answers, scores, alert closures, streaks, achievements.
+      User accounts are kept. Use this when starting a new class/batch.
+    </div>
+    <div style="background:var(--red-dim);border:1px solid rgba(239,68,68,.3);border-radius:4px;padding:10px 12px;font-size:12.5px;color:var(--red);margin-bottom:14px">
+      This cannot be undone. All student progress will be permanently erased.
+    </div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:5px">Note (optional)</div>
+      <input type="text" id="batch-note" placeholder="e.g. Batch 2 — June 2025" style="width:100%;height:36px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;padding:0 10px;font-size:13px;color:var(--text);outline:none;font-family:var(--font)">
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:5px">Type RESET to confirm</div>
+      <input type="text" id="batch-confirm-input" placeholder="RESET" style="width:100%;height:36px;background:var(--input-bg);border:1px solid rgba(239,68,68,.4);border-radius:4px;padding:0 10px;font-size:13px;color:var(--red);outline:none;font-family:var(--mono)" oninput="AdminBatch.checkConfirm()">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="AdminBatch.hide()">Cancel</button>
+      <button class="btn btn-red" id="batch-confirm-btn" onclick="AdminBatch.doReset()" disabled>Reset All Progress</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

@@ -276,8 +276,102 @@ function getProfile(req, res, userId) {
   return ok(res, data);
 }
 
+// ── POST /api/admin/batch/reset — wipe all analyst progress ─────────────
+async function batchReset(req, res) {
+  const admin = requireAdmin(req, res); if (!admin) return;
+  const { note, confirm } = await parseBody(req);
+  if (confirm !== 'RESET') return badRequest(res, 'Send { confirm: "RESET" } to confirm.');
+
+  const analysts = db.prepare(`SELECT id FROM users WHERE role='analyst'`).all();
+  const tables   = ['user_progress','user_answers','draft_answers','alert_closures',
+                    'user_alert_state','incidents','escalations','user_achievements','streaks',
+                    'lab_notes','bonus_lab_completions'];
+
+  db.transaction(() => {
+    for (const tbl of tables) {
+      try { db.prepare(`DELETE FROM ${tbl} WHERE user_id IN (SELECT id FROM users WHERE role='analyst')`).run(); }
+      catch { /* table may not exist */ }
+    }
+    // Reset points and force_pw_change for all analysts
+    db.prepare(`UPDATE users SET points=0, extra_labs_bonus=0 WHERE role='analyst'`).run();
+    // Log the reset
+    db.prepare(`INSERT INTO batch_resets (reset_by, note, users_affected) VALUES (?,?,?)`)
+      .run(admin.id, sanitize(note || ''), analysts.length);
+  })();
+
+  return ok(res, { reset: true, analysts_affected: analysts.length, note: note || '' });
+}
+
+// ── GET /api/admin/users/export — export all analysts as CSV ─────────────
+function exportUsers(req, res) {
+  const admin = requireAdmin(req, res); if (!admin) return;
+  const users = db.prepare(
+    `SELECT username, role, is_active, display_name, email, institution, created_at FROM users ORDER BY role, username`
+  ).all();
+
+  const header = 'username,password,role,display_name,email,institution';
+  const rows = users.map(u =>
+    [u.username, '', u.role, u.display_name || '', u.email || '', u.institution || '']
+      .map(v => `"${String(v).replace(/"/g, '""')}"`)
+      .join(',')
+  );
+  const csv = [header, ...rows].join('\n');
+
+  require('../middleware/response').jsonRes(res, 200, csv, {
+    'Content-Type':        'text/csv; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="diaas-users.csv"',
+    'Cache-Control':       'no-store',
+  });
+}
+
+// ── POST /api/admin/users/import — import analysts from CSV ──────────────
+async function importUsers(req, res) {
+  const admin = requireAdmin(req, res); if (!admin) return;
+  const body  = await parseBody(req);
+  const { rows } = body; // [{ username, password, role?, display_name?, email?, institution? }]
+
+  if (!Array.isArray(rows) || !rows.length) return badRequest(res, 'rows array required');
+  if (rows.length > 200) return badRequest(res, 'Maximum 200 users per import');
+
+  const created = []; const errors = [];
+
+  db.transaction(() => {
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r.username || !r.password) { errors.push({ row: i+1, error: 'username and password required' }); continue; }
+
+      const uname = sanitize(r.username).toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      if (uname.length < 3) { errors.push({ row: i+1, error: 'username too short' }); continue; }
+      if (r.password.length < 8) { errors.push({ row: i+1, error: 'password must be 8+ characters' }); continue; }
+      if (db.prepare(`SELECT id FROM users WHERE username=?`).get(uname)) {
+        errors.push({ row: i+1, error: `username '${uname}' already exists` }); continue;
+      }
+
+      const hash = require('bcryptjs').hashSync(r.password, 10);
+      const role = r.role === 'admin' ? 'admin' : 'analyst';
+      const info = db.prepare(
+        `INSERT INTO users (username, password_hash, role, display_name, email, institution, force_pw_change) VALUES (?,?,?,?,?,?,1)`
+      ).run(uname, hash, role, r.display_name || null, r.email || null, r.institution || null);
+      created.push({ id: info.lastInsertRowid, username: uname, role });
+    }
+  })();
+
+  return ok(res, { created: created.length, errors, users: created });
+}
+
+// ── GET /api/admin/batch/history ─────────────────────────────────────────
+function batchHistory(req, res) {
+  const admin = requireAdmin(req, res); if (!admin) return;
+  const rows = db.prepare(
+    `SELECT br.*, u.username AS reset_by_name FROM batch_resets br
+     LEFT JOIN users u ON u.id=br.reset_by ORDER BY br.reset_at DESC LIMIT 20`
+  ).all();
+  return ok(res, rows);
+}
+
 module.exports = {
   getStats, listUsers, createUser, updateUser, deleteUser, getProfile,
+  batchReset, exportUsers, importUsers, batchHistory,
   getProgress, listAdminLabs, createLab, updateLab, deleteLab,
   getLabQuestions, addQuestion, updateQuestion, deleteQuestion,
   getAnalystActivity,
