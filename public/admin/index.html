@@ -1974,6 +1974,735 @@ const Pages = {
   },
 };
 
+const LabBuilder = {
+  evidence: [],
+  questions: [],
+
+  reset() {
+    this.evidence = [];
+    this.questions = [];
+    this.renderEvidence();
+    this.renderQuestions();
+  },
+
+  loadFromLab(lab) {
+    this.evidence = Array.isArray(lab.evidence) ? lab.evidence.map(item => ({
+      label: item.label || '',
+      type: item.type || 'log',
+      content: item.content || ''
+    })) : [];
+    this.questions = [];
+    this.renderEvidence();
+    this.renderQuestions();
+  },
+
+  addEvidence() {
+    this.evidence.push({ label: '', type: 'log', content: '' });
+    this.renderEvidence();
+  },
+
+  removeEvidence(idx) {
+    this.evidence.splice(idx, 1);
+    this.renderEvidence();
+  },
+
+  updateEvidence(idx, field, value) {
+    if (!this.evidence[idx]) return;
+    this.evidence[idx][field] = value;
+  },
+
+  renderEvidence() {
+    const wrap = document.getElementById('lf-evidence-builder');
+    if (!wrap) return;
+    if (!this.evidence.length) {
+      wrap.innerHTML = '<div class="form-hint">No evidence added yet.</div>';
+      return;
+    }
+    wrap.innerHTML = this.evidence.map((item, idx) => `
+      <div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px;background:rgba(255,255,255,0.02)">
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Evidence Label</label>
+            <input type="text" class="form-input" value="${esc(item.label)}" placeholder="e.g. Firewall log excerpt" oninput="LabBuilder.updateEvidence(${idx}, 'label', this.value)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <select class="form-select" onchange="LabBuilder.updateEvidence(${idx}, 'type', this.value)">
+              <option value="log" ${item.type==='log'?'selected':''}>Log</option>
+              <option value="evidence" ${item.type==='evidence'?'selected':''}>Evidence</option>
+              <option value="ioc" ${item.type==='ioc'?'selected':''}>IOC</option>
+              <option value="note" ${item.type==='note'?'selected':''}>Investigation Note</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Content</label>
+          <textarea class="form-textarea" rows="4" placeholder="Paste the raw logs, evidence, IOC list, or analyst reference material here..." oninput="LabBuilder.updateEvidence(${idx}, 'content', this.value)">${esc(item.content)}</textarea>
+        </div>
+        <button type="button" class="btn btn-red btn-xs" onclick="LabBuilder.removeEvidence(${idx})">Remove Evidence</button>
+      </div>
+    `).join('');
+  },
+
+  addQuestion() {
+    this.questions.push({
+      question: '',
+      answer_type: 'choice',
+      options: ['', ''],
+      correct_answer: '',
+      hint: '',
+      hint_levels: ['', ''],
+      explanation: '',
+      points: 20,
+      difficulty: 'medium',
+      alert_ref: ''
+    });
+    this.renderQuestions();
+  },
+
+  removeQuestion(idx) {
+    this.questions.splice(idx, 1);
+    this.renderQuestions();
+  },
+
+  updateQuestion(idx, field, value) {
+    if (!this.questions[idx]) return;
+    this.questions[idx][field] = value;
+  },
+
+  updateQuestionOption(qIdx, optIdx, value) {
+    if (!this.questions[qIdx]) return;
+    this.questions[qIdx].options[optIdx] = value;
+  },
+
+  addQuestionOption(qIdx) {
+    if (!this.questions[qIdx]) return;
+    this.questions[qIdx].options.push('');
+    this.renderQuestions();
+  },
+
+  removeQuestionOption(qIdx, optIdx) {
+    if (!this.questions[qIdx]) return;
+    if (this.questions[qIdx].options.length <= 2) { toast('Each multiple-choice question needs at least 2 options', 'error'); return; }
+    this.questions[qIdx].options.splice(optIdx, 1);
+    this.renderQuestions();
+  },
+
+  renderQuestions() {
+    const wrap = document.getElementById('lf-question-builder');
+    if (!wrap) return;
+    if (!this.questions.length) {
+      wrap.innerHTML = '<div class="form-hint">No bundled questions yet. Add at least one if you want the full lab package created in one step.</div>';
+      return;
+    }
+    wrap.innerHTML = this.questions.map((q, idx) => `
+      <div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px;background:rgba(255,255,255,0.02)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="form-label" style="margin:0">Question ${idx + 1}</div>
+          <button type="button" class="btn btn-red btn-xs" onclick="LabBuilder.removeQuestion(${idx})">Remove</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Question Text</label>
+          <textarea class="form-textarea" rows="3" placeholder="Enter the question analysts will answer..." oninput="LabBuilder.updateQuestion(${idx}, 'question', this.value)">${esc(q.question)}</textarea>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Answer Type</label>
+            <select class="form-select" onchange="LabBuilder.updateQuestion(${idx}, 'answer_type', this.value); LabBuilder.renderQuestions();">
+              <option value="choice" ${q.answer_type==='choice'?'selected':''}>Multiple Choice</option>
+              <option value="text" ${q.answer_type==='text'?'selected':''}>Free Text</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Difficulty</label>
+            <select class="form-select" onchange="LabBuilder.updateQuestion(${idx}, 'difficulty', this.value)">
+              <option value="easy" ${q.difficulty==='easy'?'selected':''}>Easy</option>
+              <option value="medium" ${q.difficulty==='medium'?'selected':''}>Medium</option>
+              <option value="hard" ${q.difficulty==='hard'?'selected':''}>Hard</option>
+              <option value="expert" ${q.difficulty==='expert'?'selected':''}>Expert</option>
+            </select>
+          </div>
+        </div>
+        ${q.answer_type === 'choice' ? `
+          <div class="form-group">
+            <label class="form-label">Options</label>
+            ${(q.options || []).map((opt, optIdx) => `
+              <div style="display:flex;gap:8px;margin-bottom:8px">
+                <input type="text" class="form-input" value="${esc(opt)}" placeholder="Option ${optIdx + 1}" oninput="LabBuilder.updateQuestionOption(${idx}, ${optIdx}, this.value)">
+                <button type="button" class="btn btn-red btn-xs" onclick="LabBuilder.removeQuestionOption(${idx}, ${optIdx})">✕</button>
+              </div>
+            `).join('')}
+            <button type="button" class="btn btn-outline btn-xs" onclick="LabBuilder.addQuestionOption(${idx})">Add Option</button>
+          </div>
+        ` : ''}
+        <div class="form-group">
+          <label class="form-label">Correct Answer</label>
+          <input type="text" class="form-input" value="${esc(q.correct_answer)}" placeholder="Correct answer or keyword phrase" oninput="LabBuilder.updateQuestion(${idx}, 'correct_answer', this.value)">
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Hint 1: Where to look (-5 pts)</label>
+            <input type="text" class="form-input" value="${esc(q.hint || '')}" placeholder="Guide the analyst to the right logs, evidence, or alert" oninput="LabBuilder.updateQuestion(${idx}, 'hint', this.value)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Points</label>
+            <input type="number" class="form-input" value="${Number(q.points) || 20}" min="5" max="999" oninput="LabBuilder.updateQuestion(${idx}, 'points', this.value)">
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Hint 2: Narrow it down (-10 pts total)</label>
+            <input type="text" class="form-input" value="${esc((q.hint_levels && q.hint_levels[0]) || '')}" placeholder="Make the student re-check the exact field or value" oninput="LabBuilder.questions[${idx}].hint_levels[0] = this.value">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Hint 3: Final clue (0 pts)</label>
+            <input type="text" class="form-input" value="${esc((q.hint_levels && q.hint_levels[1]) || '')}" placeholder="Optional final clue. If blank, the system will show a masked answer pattern." oninput="LabBuilder.questions[${idx}].hint_levels[1] = this.value">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Explanation</label>
+          <textarea class="form-textarea" rows="2" placeholder="Why is this the correct answer?" oninput="LabBuilder.updateQuestion(${idx}, 'explanation', this.value)">${esc(q.explanation)}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Alert Reference</label>
+          <input type="text" class="form-input" value="${esc(q.alert_ref)}" placeholder="e.g. ALT-204" oninput="LabBuilder.updateQuestion(${idx}, 'alert_ref', this.value)">
+        </div>
+      </div>
+    `).join('');
+  },
+
+  collectEvidence() {
+    return this.evidence
+      .map(item => ({
+        label: String(item.label || '').trim(),
+        type: String(item.type || 'log').trim(),
+        content: String(item.content || '').trim()
+      }))
+      .filter(item => item.label || item.content);
+  },
+
+  collectQuestions() {
+    return this.questions
+      .map(q => ({
+        question: String(q.question || '').trim(),
+        answer_type: q.answer_type === 'text' ? 'text' : 'choice',
+        options: (Array.isArray(q.options) ? q.options : []).map(o => String(o || '').trim()).filter(Boolean),
+        correct_answer: String(q.correct_answer || '').trim(),
+        hint: String(q.hint || '').trim(),
+        hint_levels: (Array.isArray(q.hint_levels) ? q.hint_levels : []).map(h => String(h || '').trim()).filter(Boolean),
+        explanation: String(q.explanation || '').trim(),
+        points: parseInt(q.points) || 20,
+        difficulty: q.difficulty || 'medium',
+        alert_ref: String(q.alert_ref || '').trim()
+      }))
+      .filter(q => q.question || q.correct_answer);
+  }
+};
+
+// ── LAB MODALS ──────────────────────────────────────────
+const LabModals = {
+  open(id)  { const el = document.getElementById(id); if (el) el.classList.add('open'); },
+  close(id) { const el = document.getElementById(id); if (el) el.classList.remove('open'); },
+
+  openCreateLab() {
+    document.getElementById('lab-form-title').textContent = 'Create New Lab';
+    document.getElementById('btn-save-lab').textContent  = 'Create Lab';
+    document.getElementById('lf-id').value          = '';
+    document.getElementById('lf-title').value        = '';
+    document.getElementById('lf-description').value  = '';
+    document.getElementById('lf-category').value     = '';
+    document.getElementById('lf-difficulty').value   = 'medium';
+    document.getElementById('lf-points').value       = '100';
+    document.getElementById('lf-visible').value      = '1';
+    document.getElementById('lf-alert-refs').value   = '';
+    LabBuilder.reset();
+    this.open('modal-lab-form');
+    setTimeout(() => document.getElementById('lf-title').focus(), 100);
+  },
+
+  openEditLab(lab) {
+    document.getElementById('lab-form-title').textContent = 'Edit Lab';
+    document.getElementById('btn-save-lab').textContent  = 'Save Changes';
+    document.getElementById('lf-id').value          = lab.id;
+    document.getElementById('lf-title').value        = lab.title;
+    document.getElementById('lf-description').value  = lab.description || '';
+    document.getElementById('lf-category').value     = lab.category || '';
+    document.getElementById('lf-difficulty').value   = lab.difficulty || 'medium';
+    document.getElementById('lf-points').value       = lab.points;
+    document.getElementById('lf-visible').value      = lab.is_visible ? '1' : '0';
+    document.getElementById('lf-alert-refs').value   = Array.isArray(lab.alert_refs) ? lab.alert_refs.join(', ') : '';
+    LabBuilder.loadFromLab(lab);
+    this.open('modal-lab-form');
+    setTimeout(() => document.getElementById('lf-title').focus(), 100);
+  },
+
+  onTypeChange() {
+    const type = document.getElementById('qf-type').value;
+    document.getElementById('qf-options-section').style.display = type === 'choice' ? '' : 'none';
+    document.getElementById('qf-answer-hint').textContent = type === 'choice'
+      ? 'Must match one of the options exactly (case-insensitive).'
+      : 'Key phrases the answer must contain.';
+  },
+
+  _options: [],
+
+  initOptions(opts) {
+    this._options = opts && opts.length ? [...opts] : ['', ''];
+    this._renderOptions();
+  },
+
+  addOption() {
+    if (this._options.length >= 6) { toast('Maximum 6 options', 'error'); return; }
+    this._options.push('');
+    this._renderOptions();
+    // focus the new field
+    const rows = document.querySelectorAll('#options-builder .option-input');
+    if (rows.length) rows[rows.length - 1].focus();
+  },
+
+  removeOption(idx) {
+    if (this._options.length <= 2) { toast('Minimum 2 options required', 'error'); return; }
+    this._options.splice(idx, 1);
+    this._renderOptions();
+  },
+
+  _renderOptions() {
+    const builder = document.getElementById('options-builder');
+    builder.innerHTML = this._options.map((opt, i) => `
+      <div class="option-row">
+        <input type="text" class="form-input option-input" value="${opt.replace(/"/g,'&quot;')}"
+          placeholder="Option ${i + 1}"
+          oninput="LabModals._options[${i}] = this.value">
+        <button type="button" class="btn btn-red btn-xs" onclick="LabModals.removeOption(${i})">✕</button>
+      </div>
+    `).join('');
+  },
+
+  getOptions() {
+    // re-read from DOM to catch any last keystrokes
+    document.querySelectorAll('#options-builder .option-input').forEach((el, i) => {
+      this._options[i] = el.value;
+    });
+    return this._options.map(o => o.trim()).filter(o => o.length > 0);
+  },
+
+  openAddQuestion() {
+    document.getElementById('qform-title').textContent        = 'Add Question';
+    document.getElementById('btn-save-question').textContent  = 'Add Question';
+    document.getElementById('qf-id').value         = '';
+    document.getElementById('qf-question').value   = '';
+    document.getElementById('qf-type').value       = 'choice';
+    document.getElementById('qf-difficulty').value = 'medium';
+    document.getElementById('qf-answer').value     = '';
+    document.getElementById('qf-points').value     = '20';
+    document.getElementById('qf-hint').value       = '';
+    document.getElementById('qf-explanation').value= '';
+    document.getElementById('qf-alert-ref').value   = '';
+    this.initOptions(['', '']);
+    this.onTypeChange();
+    this.open('modal-question-form');
+    setTimeout(() => document.getElementById('qf-question').focus(), 100);
+  },
+
+  openEditQuestion(q) {
+    document.getElementById('qform-title').textContent        = 'Edit Question';
+    document.getElementById('btn-save-question').textContent  = 'Save Changes';
+    document.getElementById('qf-id').value         = q.id;
+    document.getElementById('qf-question').value   = q.question;
+    document.getElementById('qf-type').value       = q.answer_type || 'choice';
+    document.getElementById('qf-difficulty').value = q.difficulty || 'medium';
+    document.getElementById('qf-answer').value     = q.correct_answer;
+    document.getElementById('qf-points').value     = q.points;
+    document.getElementById('qf-hint').value       = q.hint || '';
+    document.getElementById('qf-explanation').value= q.explanation || '';
+    document.getElementById('qf-alert-ref').value   = q.alert_ref || '';
+    this.initOptions(q.options && q.options.length ? q.options : ['', '']);
+    this.onTypeChange();
+    this.open('modal-question-form');
+    setTimeout(() => document.getElementById('qf-question').focus(), 100);
+  }
+};
+
+// Close new modals on overlay click
+['modal-lab-form','modal-question-form','modal-delete-lab','modal-delete-question','modal-bulk-import'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ── LAB PAGES ───────────────────────────────────────────
+const LabPages = {
+  _labsRaw:        [],
+  _activeLab:      null,
+  _deleteLabTarget: null,
+  _deleteQTarget:   null,
+
+  async load() {
+    document.getElementById('labs-table-wrap').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading labs...</div>';
+    document.getElementById('questions-panel').style.display = 'none';
+    this._activeLab = null;
+    try {
+      const labs = await API.get('/api/admin/labs');
+      this._labsRaw = labs;
+      this.renderLabsTable(labs);
+    } catch(e) { toast('Failed to load labs', 'error'); }
+  },
+
+  filterLabs() {
+    const q = document.getElementById('labs-search').value.toLowerCase();
+    this.renderLabsTable(q
+      ? this._labsRaw.filter(l => l.title.toLowerCase().includes(q) || (l.category||'').toLowerCase().includes(q))
+      : this._labsRaw
+    );
+  },
+
+  renderLabsTable(labs) {
+    const wrap = document.getElementById('labs-table-wrap');
+    if (!labs.length) {
+      wrap.innerHTML = '<div class="empty-state"><div class="empty-title">No labs yet</div><div style="font-size:12px;margin-top:6px">Click "New Lab" to create the first one.</div></div>';
+      return;
+    }
+    const diffColor = { easy:'#22C55E', medium:'var(--blue)', hard:'var(--orange)', expert:'var(--red)' };
+    wrap.innerHTML = `<table>
+      <thead><tr>
+        <th>#</th><th>Title</th><th>Category</th><th>Difficulty</th>
+        <th>Questions</th><th>Completions</th><th>Points</th><th>Visible</th><th>Actions</th>
+      </tr></thead>
+      <tbody>${labs.map((l, i) => {
+        const dc = diffColor[l.difficulty] || 'var(--dim)';
+        const rowCls = this._activeLab?.id === l.id ? 'class="lab-row-expanded"' : '';
+        return `<tr id="lab-row-${l.id}" ${rowCls}>
+          <td class="td-mono" style="color:var(--dim)">${i + 1}</td>
+          <td class="td-main">${esc(l.title)}</td>
+          <td style="color:var(--muted);font-size:12px">${esc(l.category||'–')}</td>
+          <td><span style="font-size:11px;font-weight:500;font-family:var(--mono);color:${dc}">${l.difficulty||'–'}</span></td>
+          <td class="td-mono">${l.question_count}</td>
+          <td class="td-mono">${l.completions}</td>
+          <td class="td-mono" style="color:var(--blue)">${l.points}</td>
+          <td>
+            <label class="vis-toggle" title="${l.is_visible ? 'Visible' : 'Hidden (draft)'}">
+              <input type="checkbox" ${l.is_visible ? 'checked' : ''} onchange="LabPages.toggleVisible(${l.id}, this.checked)">
+              <span class="vis-track"><span class="vis-thumb"></span></span>
+            </label>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline btn-xs" onclick="LabPages.viewQuestions(${l.id})">Questions</button>
+              <button class="btn btn-outline btn-xs" onclick="LabPages.editLab(${l.id})">Edit</button>
+              <button class="btn btn-red btn-xs" onclick="LabPages.deleteLab(${l.id}, '${esc(l.title)}')">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  },
+
+  async viewQuestions(labId) {
+    const lab = this._labsRaw.find(l => l.id === labId);
+    if (!lab) return;
+    // highlight row
+    document.querySelectorAll('#labs-table-wrap tbody tr').forEach(r => r.classList.remove('lab-row-expanded'));
+    const row = document.getElementById('lab-row-' + labId);
+    if (row) row.classList.add('lab-row-expanded');
+    this._activeLab = lab;
+    document.getElementById('qpanel-title').textContent = lab.title + ' — Questions';
+    document.getElementById('qpanel-count').textContent = '';
+    const panel = document.getElementById('questions-panel');
+    panel.style.display = '';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    document.getElementById('questions-list').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading...</div>';
+    await this._loadQuestions(labId);
+  },
+
+  async _loadQuestions(labId) {
+    try {
+      const qs = await API.get('/api/admin/labs/' + labId + '/questions');
+      document.getElementById('qpanel-count').textContent = `${qs.length} question${qs.length !== 1 ? 's' : ''}`;
+      this._renderQuestions(qs);
+    } catch(e) { toast('Failed to load questions', 'error'); }
+  },
+
+  _renderQuestions(qs) {
+    const wrap = document.getElementById('questions-list');
+    if (!qs.length) {
+      wrap.innerHTML = '<div class="empty-state"><div class="empty-title">No questions yet</div><div style="font-size:12px;margin-top:6px">Click "Add Question" to create the first one.</div></div>';
+      return;
+    }
+    const diffColor = { easy:'diff-easy', medium:'diff-medium', hard:'diff-hard', expert:'diff-expert' };
+    wrap.innerHTML = qs.map((q, i) => {
+      const typeLabel = q.answer_type === 'choice' ? 'Multiple Choice' : 'Free Text';
+      const opts = q.options && q.options.length ? q.options : [];
+      const optsHtml = opts.length
+        ? `<span style="display:flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>${opts.length} options</span>`
+        : '';
+      return `<div class="q-row">
+        <div class="q-num">${i + 1}</div>
+        <div class="q-body">
+          <div class="q-text">${esc(q.question)}</div>
+          <div class="q-meta">
+            <span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>${typeLabel}</span>
+            ${optsHtml}
+            <span class="diff-chip ${diffColor[q.difficulty]||'diff-medium'}">${q.difficulty||'medium'}</span>
+            <span style="color:var(--blue)">${q.points} pts</span>
+            <span style="color:#22C55E;font-family:var(--mono);font-size:10.5px">✓ ${esc(q.correct_answer)}</span>
+            ${q.hint ? `<span style="color:var(--dim)">Hint: ${esc(q.hint)}</span>` : ''}
+          </div>
+        </div>
+        <div class="q-actions">
+          <button class="btn btn-outline btn-xs" onclick='LabPages.editQuestion(${JSON.stringify(q).replace(/'/g,"&#39;")})'>Edit</button>
+          <button class="btn btn-red btn-xs" onclick="LabPages.deleteQuestion(${q.id})">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  },
+
+  closeQPanel() {
+    document.getElementById('questions-panel').style.display = 'none';
+    document.querySelectorAll('#labs-table-wrap tbody tr').forEach(r => r.classList.remove('lab-row-expanded'));
+    this._activeLab = null;
+  },
+
+  editLab(labId) {
+    const lab = this._labsRaw.find(l => l.id === labId);
+    if (lab) LabModals.openEditLab(lab);
+  },
+
+  async saveLab() {
+    const title       = document.getElementById('lf-title').value.trim();
+    const description = document.getElementById('lf-description').value.trim();
+    const category    = document.getElementById('lf-category').value.trim();
+    const difficulty  = document.getElementById('lf-difficulty').value;
+    const points      = parseInt(document.getElementById('lf-points').value) || 100;
+    const is_visible  = document.getElementById('lf-visible').value === '1';
+    const id          = document.getElementById('lf-id').value;
+    const alert_refs  = document.getElementById('lf-alert-refs').value.split(',').map(s => s.trim()).filter(Boolean);
+    const evidence    = LabBuilder.collectEvidence();
+    const questions   = LabBuilder.collectQuestions();
+
+    if (!title) { toast('Title is required', 'error'); document.getElementById('lf-title').focus(); return; }
+    const invalidQuestion = questions.find(q => !q.question || !q.correct_answer || (q.answer_type === 'choice' && q.options.length < 2));
+    if (invalidQuestion) {
+      toast('Every bundled question must include question text, correct answer, and at least 2 options for multiple-choice.', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('btn-save-lab');
+    btn.disabled = true; btn.textContent = 'Saving...';
+
+    let res;
+    if (id) {
+      res = await API.put('/api/admin/labs/' + id, { title, description, category, difficulty, points, is_visible, alert_refs, evidence });
+    } else {
+      res = await API.post('/api/admin/labs', { title, description, category, difficulty, points, is_visible, alert_refs, evidence, questions });
+    }
+
+    btn.disabled = false; btn.textContent = id ? 'Save Changes' : 'Create Lab';
+
+    if (res.ok) {
+      toast(id ? 'Lab updated' : 'Lab created', 'success');
+      LabModals.close('modal-lab-form');
+      await this.load();
+    } else {
+      toast(res.data.error || 'Failed to save lab', 'error');
+    }
+  },
+
+  async toggleVisible(labId, visible) {
+    const res = await API.put('/api/admin/labs/' + labId, { is_visible: visible });
+    if (res.ok) {
+      toast(visible ? 'Lab is now visible' : 'Lab hidden (draft)', visible ? 'success' : 'info');
+      const lab = this._labsRaw.find(l => l.id === labId);
+      if (lab) lab.is_visible = visible ? 1 : 0;
+    } else {
+      toast('Failed to update visibility', 'error');
+      await this.load();
+    }
+  },
+
+  deleteLab(labId, name) {
+    this._deleteLabTarget = labId;
+    document.getElementById('del-lab-name').textContent = name;
+    LabModals.open('modal-delete-lab');
+  },
+
+  async confirmDeleteLab() {
+    const btn = document.getElementById('btn-confirm-delete-lab');
+    btn.disabled = true; btn.textContent = 'Deleting...';
+    const res = await API.del('/api/admin/labs/' + this._deleteLabTarget);
+    btn.disabled = false; btn.textContent = 'Delete Lab';
+    if (res.ok) {
+      toast('Lab deleted', 'success');
+      LabModals.close('modal-delete-lab');
+      this.closeQPanel();
+      await this.load();
+    } else {
+      toast(res.data.error || 'Failed to delete lab', 'error');
+    }
+  },
+
+  openAddQuestion() {
+    if (!this._activeLab) { toast('Select a lab first', 'error'); return; }
+    LabModals.openAddQuestion();
+  },
+
+  editQuestion(q) {
+    LabModals.openEditQuestion(q);
+  },
+
+  async saveQuestion() {
+    const id         = document.getElementById('qf-id').value;
+    const question   = document.getElementById('qf-question').value.trim();
+    const type       = document.getElementById('qf-type').value;
+    const difficulty = document.getElementById('qf-difficulty').value;
+    const answer     = document.getElementById('qf-answer').value.trim();
+    const points     = parseInt(document.getElementById('qf-points').value) || 20;
+    const hint       = document.getElementById('qf-hint').value.trim();
+    const explanation= document.getElementById('qf-explanation').value.trim();
+    const alertRef   = document.getElementById('qf-alert-ref').value.trim();
+
+    if (!question) { toast('Question text is required', 'error'); document.getElementById('qf-question').focus(); return; }
+    if (!answer)   { toast('Correct answer is required', 'error'); document.getElementById('qf-answer').focus(); return; }
+
+    let options = [];
+    if (type === 'choice') {
+      options = LabModals.getOptions();
+      if (options.length < 2) { toast('Add at least 2 options', 'error'); return; }
+      const answerLower = answer.toLowerCase();
+      if (!options.some(o => o.toLowerCase() === answerLower)) {
+        toast('Correct answer must match one of the options exactly', 'error');
+        document.getElementById('qf-answer').focus(); return;
+      }
+    }
+
+    const btn = document.getElementById('btn-save-question');
+    btn.disabled = true; btn.textContent = 'Saving...';
+
+    const payload = { question, answer_type: type, options, correct_answer: answer, hint, explanation, points, difficulty, alert_ref: alertRef };
+    let res;
+    if (id) {
+      res = await API.put('/api/admin/questions/' + id, payload);
+    } else {
+      res = await API.post('/api/admin/labs/' + this._activeLab.id + '/questions', payload);
+    }
+
+    btn.disabled = false; btn.textContent = id ? 'Save Changes' : 'Add Question';
+
+    if (res.ok) {
+      toast(id ? 'Question updated' : 'Question added', 'success');
+      LabModals.close('modal-question-form');
+      await this._loadQuestions(this._activeLab.id);
+      // refresh question_count in table
+      const labRow = this._labsRaw.find(l => l.id === this._activeLab.id);
+      if (labRow) { if (!id) labRow.question_count = (labRow.question_count || 0) + 1; }
+      const qs = await API.get('/api/admin/labs/' + this._activeLab.id + '/questions');
+      document.getElementById('qpanel-count').textContent = `${qs.length} question${qs.length !== 1 ? 's' : ''}`;
+      // re-render table row count only if loaded
+      const cell = document.querySelector(`#lab-row-${this._activeLab.id} td:nth-child(5)`);
+      if (cell) cell.textContent = qs.length;
+    } else {
+      toast(res.data.error || 'Failed to save question', 'error');
+    }
+  },
+
+  deleteQuestion(qId) {
+    this._deleteQTarget = qId;
+    LabModals.open('modal-delete-question');
+  },
+
+  async confirmDeleteQuestion() {
+    const btn = document.getElementById('btn-confirm-delete-q');
+    btn.disabled = true; btn.textContent = 'Deleting...';
+    const res = await API.del('/api/admin/questions/' + this._deleteQTarget);
+    btn.disabled = false; btn.textContent = 'Delete Question';
+    if (res.ok) {
+      toast('Question deleted', 'success');
+      LabModals.close('modal-delete-question');
+      if (this._activeLab) {
+        const qs = await API.get('/api/admin/labs/' + this._activeLab.id + '/questions');
+        this._renderQuestions(qs);
+        document.getElementById('qpanel-count').textContent = `${qs.length} question${qs.length !== 1 ? 's' : ''}`;
+        const cell = document.querySelector(`#lab-row-${this._activeLab.id} td:nth-child(5)`);
+        if (cell) cell.textContent = qs.length;
+      }
+    } else {
+      toast(res.data.error || 'Failed to delete question', 'error');
+    }
+  },
+
+  showTemplate() {
+    const template = JSON.stringify([
+      {
+        question: 'What type of vulnerability is CVE-2023-34362 in MOVEit Transfer?',
+        answer_type: 'mcq',
+        options: ['Buffer overflow', 'SQL injection', 'XSS reflected', 'Path traversal'],
+        correct_answer: 'SQL injection',
+        hint: 'The exploit uses crafted HTTP requests to manipulate the database',
+        explanation: 'CVE-2023-34362 is an SQL injection vulnerability in MOVEit Transfer that allows unauthenticated attackers to gain access to MOVEit Transfer database.',
+        points: 20,
+        difficulty: 'medium',
+        alert_ref: 'ALT-204'
+      }
+    ], null, 2);
+    document.getElementById('bulk-json').value = template;
+    document.getElementById('bulk-parse-result').textContent = 'Template loaded. Edit and click Import Questions.';
+    document.getElementById('bulk-parse-result').style.color = 'var(--accent)';
+    LabModals.open('modal-bulk-import');
+  },
+  parseTemplate() {
+    const raw = document.getElementById('bulk-json').value.trim();
+    const el = document.getElementById('bulk-parse-result');
+    try {
+      const data = JSON.parse(raw);
+      if (!Array.isArray(data)) throw new Error('Must be a JSON array');
+      el.textContent = `✓ Valid JSON — ${data.length} question(s) ready to import.`;
+      el.style.color = '#22c55e';
+    } catch(e) {
+      el.textContent = `✗ Invalid JSON: ${e.message}`;
+      el.style.color = 'var(--red)';
+    }
+  },
+  async bulkImport() {
+    const raw = document.getElementById('bulk-json').value.trim();
+    const el = document.getElementById('bulk-parse-result');
+    let data;
+    try {
+      data = JSON.parse(raw);
+      if (!Array.isArray(data)) throw new Error('Must be a JSON array');
+    } catch(e) {
+      el.textContent = `✗ Invalid JSON: ${e.message}`;
+      el.style.color = 'var(--red)';
+      return;
+    }
+    if (!this._activeLab) { toast('No lab selected', 'error'); return; }
+    el.textContent = `Importing ${data.length} question(s)...`;
+    el.style.color = 'var(--dim)';
+    let ok = 0, fail = 0;
+    for (const q of data) {
+      const payload = {
+        question: q.question || '',
+        answer_type: q.answer_type || 'mcq',
+        options: Array.isArray(q.options) ? q.options : [],
+        correct_answer: q.correct_answer || '',
+        hint: q.hint || '',
+        explanation: q.explanation || '',
+        points: parseInt(q.points) || 20,
+        difficulty: q.difficulty || 'medium',
+        alert_ref: q.alert_ref || ''
+      };
+      if (!payload.question || !payload.correct_answer) { fail++; continue; }
+      const res = await API.post('/api/admin/labs/' + this._activeLab.id + '/questions', payload);
+      if (res.ok) ok++; else fail++;
+    }
+    el.textContent = `Done — ${ok} imported, ${fail} failed.`;
+    el.style.color = ok > 0 ? '#22c55e' : 'var(--red)';
+    if (ok > 0) {
+      await this._loadQuestions(this._activeLab.id);
+      const qs = await API.get('/api/admin/labs/' + this._activeLab.id + '/questions');
+      document.getElementById('qpanel-count').textContent = `${qs.length} question${qs.length !== 1 ? 's' : ''}`;
+    }
+  },
+};
+
+
 function esc(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
