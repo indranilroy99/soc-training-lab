@@ -162,10 +162,12 @@ async function submitAnswer(req, res, slug) {
     `SELECT COUNT(*) as c FROM user_answers WHERE user_id=? AND lab_id=? AND is_correct=1`
   ).get(user.id, lab.id).c;
 
-  // ── Award achievements + update streak on correct answer ──────────────
+  // ── Update streak on any attempt (attendance = any activity) ──────────
+  const streakResult = updateStreak(user.id);
+
+  // ── Award achievements on correct answer ─────────────────────────────
   let newAchievements = [];
   if (isCorrect) {
-    updateStreak(user.id);
     newAchievements = checkAchievements(user.id);
     // Lab-level quality achievements when lab completes
     if (doneQ >= totalQ && totalQ > 0) {
@@ -176,6 +178,7 @@ async function submitAnswer(req, res, slug) {
 
   return ok(res, {
     correct: isCorrect, pts: ptsAwarded, hints_used: hintsUsed,
+    streak: streakResult.current, streak_bonus: streakResult.bonus,
     attempts: nextAttempt, wrong_count: wrongCount,
     potential_points: potentialPts, locked,
     lab_status: doneQ >= totalQ && totalQ > 0 ? 'completed' : 'in_progress',

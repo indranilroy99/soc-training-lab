@@ -258,7 +258,7 @@ input, textarea, select { font-family: var(--font); }
 .questions-panel { display: flex; flex-direction: column; gap: 12px; }
 .q-card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; transition: border-color 0.12s; scroll-margin-top: 16px; }
 .q-card.done { border-left: 2px solid var(--blue); }
-.q-card.locked { opacity: 0.4; pointer-events: none; }
+.q-card.locked { opacity: 0.55; }  /* locked = wrong-attempt lock only, not navigation lock */
 .q-card-header { padding: 14px 16px 0; }
 .q-num { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.6px; color: var(--dim); margin-bottom: 8px; }
 .q-text { font-size: 13.5px; color: var(--text); line-height: 1.65; font-weight: 500; }
@@ -1518,8 +1518,9 @@ const Pages = {
 
     const panel = document.getElementById('questions-panel');
     panel.innerHTML = lab.questions.map((q, i) => {
-      const isLocked = i > 0 && !lab.questions[i - 1].completed;
-      return Pages._renderQuestion(q, i, lab.slug, isLocked, lab.questions.length);
+      // All questions accessible — no sequential locking
+      // Penalties (wrong attempts, hints) discourage guessing without hard blocking
+      return Pages._renderQuestion(q, i, lab.slug, false, lab.questions.length);
     }).join('');
 
     // Scroll to first unsolved question OR last known position
@@ -1545,7 +1546,6 @@ const Pages = {
       if (q.answer_type === 'choice') {
         document.querySelectorAll(`#q-choices-${q.id} .q-choice`).forEach(el => {
           el.addEventListener('click', () => {
-            if (document.getElementById('q-card-' + q.id)?.classList.contains('locked')) return;
             document.querySelectorAll(`#q-choices-${q.id} .q-choice`).forEach(c => c.classList.remove('selected'));
             el.classList.add('selected');
             const input = el.querySelector('input');
@@ -1788,6 +1788,17 @@ const Pages = {
         toast('Correct answer submitted.', 'success');
         document.getElementById('topbar-score').textContent  = d.total_score;
         document.getElementById('sidebar-score').textContent = d.total_score;
+        // Streak bonus notification
+        if (d.streak_bonus && d.streak_bonus > 0) {
+          toast(`+${d.streak_bonus} attendance bonus — Day ${d.streak} streak!`, 'success', 4000);
+        }
+        // Update streak display
+        if (d.streak > 0) {
+          const sw = document.getElementById('streak-widget');
+          const sc = document.getElementById('streak-count');
+          if (sw) sw.style.display = 'flex';
+          if (sc) sc.textContent   = d.streak;
+        }
         // Update XP bar on correct answer
         const lv = App.getLevelInfo(d.total_score || 0);
         const xpFill = document.getElementById('xp-bar-fill');
@@ -1804,7 +1815,6 @@ const Pages = {
         // Clear draft from server since answer is now submitted
         delete Pages._draftAnswers[questionId];
         
-        Pages._unlockNext(questionId);
         if (d.lab_status === 'completed') {
           setTimeout(() => {
             document.getElementById('lab-completion-banner').innerHTML = `<div class="completion-banner">
@@ -1848,6 +1858,16 @@ const Pages = {
           btn.textContent = 'Submit Answer';
         }
         
+        // Update streak even on wrong attempts — attendance counts
+        if (d.streak > 0) {
+          const sw = document.getElementById('streak-widget');
+          const sc = document.getElementById('streak-count');
+          if (sw) sw.style.display = 'flex';
+          if (sc) sc.textContent   = d.streak;
+        }
+        if (d.streak_bonus && d.streak_bonus > 0) {
+          toast(`+${d.streak_bonus} attendance bonus — Day ${d.streak} streak!`, 'success', 4000);
+        }
         toast(isLocked ? 'Maximum attempts reached. Request a hint to continue.' : 'Incorrect. Review the evidence and try again.', 'error');
       }
     } catch(e) {
