@@ -7,6 +7,7 @@ const { ok, badRequest, unauthorized } = require('../middleware/response');
 const { parseBody } = require('../middleware/security');
 const { validateNewPassword } = require('../middleware/validate');
 const { getUserTotalScore, getUserRank } = require('../services/users');
+const { getStreak } = require('../services/streaks');
 
 // GET /api/me
 function getMe(req, res) {
@@ -33,10 +34,12 @@ function getMe(req, res) {
   const correctAnswered = stats?.correct_answered || 0;
   const accuracy = totalAnswered > 0 ? Math.round((correctAnswered / totalAnswered) * 100) : 0;
 
+  const streak = getStreak(user.id);
   return ok(res, {
     id: user.id, username: user.username, role: user.role,
     score, rank, labs_done: labsDone, labs_in_progress: labsInProgress,
     total_answered: totalAnswered, correct_answered: correctAnswered, accuracy,
+    streak,
   });
 }
 

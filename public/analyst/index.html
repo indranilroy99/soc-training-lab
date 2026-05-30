@@ -479,6 +479,75 @@ input, textarea, select { font-family: var(--font); }
 .lab-section-label { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; color: var(--dim); }
 .lab-section-title-text { font-size: 13px; font-weight: 500; color: var(--muted); }
 
+/* ── Achievements page ─────────────────────────────────────────────────── */
+.ach-stats-row { display:flex; gap:12px; margin-bottom:24px; }
+.ach-stat-card { flex:1; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:16px; text-align:center; }
+.ach-stat-val { font-size:28px; font-weight:700; font-family:var(--mono); color:var(--text); }
+.ach-stat-lbl { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:0.8px; color:var(--dim); margin-top:4px; }
+.ach-section-hdr { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:var(--dim); margin:20px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.ach-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; }
+.ach-card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:14px 16px; display:flex; gap:12px; align-items:flex-start; transition:border-color .15s; }
+.ach-card.earned { border-color:var(--green); background:rgba(16,185,129,.05); }
+.ach-card.earned .ach-icon { filter:none; }
+.ach-icon { font-size:28px; flex-shrink:0; filter:grayscale(1) opacity(.35); }
+.ach-card.earned .ach-icon { filter:none; }
+.ach-title { font-size:13px; font-weight:600; color:var(--text); margin-bottom:3px; }
+.ach-card:not(.earned) .ach-title { color:var(--dim); }
+.ach-desc { font-size:11.5px; color:var(--dim); line-height:1.4; }
+.ach-pts { font-size:10px; font-family:var(--mono); color:var(--green); font-weight:600; margin-top:5px; }
+.ach-earned-at { font-size:10px; color:var(--dim); margin-top:4px; }
+/* streak banner */
+.streak-banner { display:flex; align-items:center; gap:14px; background:linear-gradient(135deg,rgba(249,115,22,.12),rgba(234,179,8,.08)); border:1px solid rgba(249,115,22,.3); border-radius:8px; padding:16px 20px; margin-bottom:20px; }
+.streak-fire { font-size:36px; }
+.streak-num { font-size:36px; font-weight:800; font-family:var(--mono); color:#F97316; }
+.streak-lbl { font-size:12px; color:var(--dim); }
+.streak-best { font-size:11px; color:var(--dim); margin-top:2px; }
+
+/* ── Learning Paths page ────────────────────────────────────────────────── */
+.paths-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+.path-card { background:var(--card); border:1px solid var(--border); border-radius:10px; overflow:hidden; cursor:pointer; transition:border-color .15s, transform .15s; display:flex; flex-direction:column; }
+.path-card:hover { border-color:var(--blue); transform:translateY(-2px); }
+.path-card-top { padding:18px 18px 14px; flex:1; }
+.path-card-icon { font-size:28px; margin-bottom:10px; }
+.path-card-title { font-size:15px; font-weight:700; color:var(--text); margin-bottom:6px; }
+.path-card-desc { font-size:12.5px; color:var(--dim); line-height:1.5; margin-bottom:12px; }
+.path-tags { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:12px; }
+.path-tag { font-size:10px; font-weight:500; padding:2px 7px; border-radius:3px; background:rgba(59,130,246,.1); border:1px solid rgba(59,130,246,.2); color:#60A5FA; letter-spacing:.3px; }
+.path-card-footer { padding:12px 18px; background:var(--bg); border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.path-progress-bar { flex:1; height:5px; background:var(--border); border-radius:3px; overflow:hidden; }
+.path-progress-fill { height:100%; background:linear-gradient(90deg,var(--green),#34D399); border-radius:3px; transition:width .6s; }
+.path-progress-pct { font-size:11px; font-family:var(--mono); font-weight:600; color:var(--green); }
+.path-meta-row { display:flex; gap:12px; margin-top:8px; }
+.path-meta-item { font-size:11px; color:var(--dim); display:flex; align-items:center; gap:4px; }
+.path-complete-badge { font-size:10px; font-weight:600; color:var(--green); background:rgba(16,185,129,.12); border:1px solid var(--green); border-radius:3px; padding:2px 7px; }
+
+/* ── Achievement popup ────────────────────────────────────────────────── */
+#ach-popup-container { position:fixed; bottom:24px; right:24px; z-index:9999; display:flex; flex-direction:column-reverse; gap:10px; pointer-events:none; }
+.ach-popup { background:#111827; border:1px solid var(--green); border-radius:10px; padding:14px 16px; width:280px; display:flex; gap:12px; align-items:center; box-shadow:0 8px 32px rgba(0,0,0,.5); transform:translateX(320px); transition:transform .4s cubic-bezier(.34,1.56,.64,1); pointer-events:auto; }
+.ach-popup.show { transform:translateX(0); }
+.ach-popup-icon { font-size:32px; flex-shrink:0; }
+.ach-popup-title { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--green); margin-bottom:3px; }
+.ach-popup-name { font-size:14px; font-weight:700; color:var(--text); margin-bottom:2px; }
+.ach-popup-desc { font-size:11.5px; color:var(--dim); line-height:1.4; }
+.ach-popup-pts { font-size:10px; font-family:var(--mono); color:var(--green); font-weight:600; margin-top:4px; }
+
+/* ── Level / XP ────────────────────────────────────────────────────────── */
+.level-badge-lg { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:20px; background:rgba(59,130,246,.1); border:1px solid rgba(59,130,246,.3); }
+.level-badge-num { font-size:18px; font-weight:800; font-family:var(--mono); color:var(--blue); }
+.level-badge-name { font-size:13px; font-weight:600; color:var(--text); }
+.xp-bar-container { margin-top:8px; }
+.xp-bar-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--dim); margin-bottom:4px; font-family:var(--mono); }
+.xp-bar-outer { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+.xp-bar-inner { height:100%; background:linear-gradient(90deg,var(--blue),#6366F1); border-radius:4px; transition:width .8s; }
+
+/* ── Lab notes tab ──────────────────────────────────────────────────────── */
+.notes-tab-content { padding:16px; }
+.notes-textarea { width:100%; height:220px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:var(--mono); font-size:12.5px; padding:12px; resize:vertical; outline:none; transition:border-color .15s; }
+.notes-textarea:focus { border-color:var(--blue); }
+.notes-save-row { display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+.notes-saved-status { font-size:11px; color:var(--dim); }
+.notes-saved-status.saved { color:var(--green); }
+
 </style>
 </head>
 <body>
@@ -504,6 +573,15 @@ input, textarea, select { font-family: var(--font); }
         <span class="nav-label">My Labs</span>
         <span class="nav-badge" id="badge-labs">6</span>
       </div>
+      <div class="nav-item" data-page="paths">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span class="nav-label">Learning Paths</span>
+      </div>
+      <div class="nav-item" data-page="achievements">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+        <span class="nav-label">Achievements</span>
+        <span class="nav-badge" id="badge-ach" style="display:none;background:#A855F7">●</span>
+      </div>
       <div class="nav-item" data-page="leaderboard">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6L3 12l5 6M16 6l5 6-5 6M11 3l2 18"/></svg>
         <span class="nav-label">Leaderboard</span>
@@ -513,6 +591,24 @@ input, textarea, select { font-family: var(--font); }
         <span class="nav-label">My Profile</span>
       </div>
     </nav>
+    <!-- Streak Widget -->
+    <div id="streak-widget" style="display:none;padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <span style="font-size:20px">🔥</span>
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#F97316;font-family:var(--mono);line-height:1" id="streak-count">0</div>
+        <div style="font-size:10px;color:var(--dim)">day streak</div>
+      </div>
+    </div>
+    <!-- XP Bar -->
+    <div id="sidebar-xp-wrap" style="display:none;padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:10px;font-weight:700;color:var(--blue);background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);padding:2px 8px;border-radius:10px" id="xp-level-text">Level 1</span>
+        <span style="font-size:10px;color:var(--dim);font-family:var(--mono)" id="xp-pts-text">0 pts</span>
+      </div>
+      <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+        <div style="height:100%;background:linear-gradient(90deg,var(--blue),#6366F1);border-radius:2px;transition:width .6s" id="xp-bar-fill"></div>
+      </div>
+    </div>
     <div class="sidebar-footer">
       <div class="analyst-chip" id="analyst-chip">
         <div class="analyst-avatar" id="sidebar-avatar">A</div>
@@ -758,6 +854,48 @@ input, textarea, select { font-family: var(--font); }
       </div>
     </div>
 
+      <!-- ACHIEVEMENTS PAGE -->
+      <div class="page" id="page-achievements">
+        <div class="page-hdr">
+          <h1 class="page-title">Achievements</h1>
+          <p class="page-sub">Earn badges by completing labs, closing alerts, building streaks, and mastering skills.</p>
+        </div>
+        <div id="streak-banner-ach" class="streak-banner" style="display:none">
+          <span class="streak-fire">🔥</span>
+          <div>
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span class="streak-num" id="ach-streak-num">0</span>
+              <span style="font-size:15px;font-weight:600;color:var(--text)">day streak</span>
+            </div>
+            <div class="streak-best" id="ach-streak-best">Longest streak: 0 days</div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div style="font-size:12px;color:var(--dim)">Keep it up — log in daily</div>
+          </div>
+        </div>
+        <div class="ach-stats-row">
+          <div class="ach-stat-card"><div class="ach-stat-val" id="ach-earned-count">0</div><div class="ach-stat-lbl">Earned</div></div>
+          <div class="ach-stat-card"><div class="ach-stat-val" id="ach-total-count">0</div><div class="ach-stat-lbl">Total</div></div>
+          <div class="ach-stat-card"><div class="ach-stat-val" id="ach-bonus-pts">0</div><div class="ach-stat-lbl">Bonus XP</div></div>
+          <div class="ach-stat-card"><div class="ach-stat-val" id="ach-completion-pct">0%</div><div class="ach-stat-lbl">Complete</div></div>
+        </div>
+        <div id="ach-content"><div class="loading-state"><div class="spinner"></div>Loading achievements...</div></div>
+      </div>
+
+      <!-- LEARNING PATHS PAGE -->
+      <div class="page" id="page-paths">
+        <div class="page-hdr">
+          <h1 class="page-title">Learning Paths</h1>
+          <p class="page-sub">Structured training paths from SOC Fundamentals to Active Directory Defence. Complete labs in sequence to master each skill domain.</p>
+        </div>
+        <div id="paths-content"><div class="loading-state"><div class="spinner"></div>Loading paths...</div></div>
+      </div>
+
+    </div><!-- end #content -->
+
+    <!-- Achievement popup container -->
+    <div id="ach-popup-container"></div>
+
     <!-- LAB VIEW (outside pages) -->
     <div id="lab-view">
       <!-- Back bar — fixed at top -->
@@ -786,6 +924,14 @@ input, textarea, select { font-family: var(--font); }
             <div class="q-progress-row">
               <div style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--dim)">Question Progress</div>
               <div class="q-dots" id="q-dots"></div>
+            </div>
+            <!-- Notes tab -->
+            <div style="padding:10px 20px;border-top:1px solid var(--border)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--dim)">My Notes</span>
+                <span class="notes-saved-status" id="notes-status"></span>
+              </div>
+              <textarea class="notes-textarea" id="lab-notes-input" placeholder="Type investigation notes here...&#10;&#10;• What you found&#10;• IOCs to remember&#10;• Steps taken&#10;&#10;Notes are saved automatically."></textarea>
             </div>
           </div>
         </div>
@@ -1013,10 +1159,32 @@ const App = {
     }
   },
 
+  getLevelInfo(pts) {
+    const levels = [
+      { level:1,  name:'Rookie',             min:0,    max:200  },
+      { level:2,  name:'Trainee',            min:200,  max:500  },
+      { level:3,  name:'Junior Analyst',     min:500,  max:1000 },
+      { level:4,  name:'Analyst',            min:1000, max:1800 },
+      { level:5,  name:'Senior Analyst',     min:1800, max:3000 },
+      { level:6,  name:'SOC Lead',           min:3000, max:4500 },
+      { level:7,  name:'Threat Hunter',      min:4500, max:6500 },
+      { level:8,  name:'Security Engineer',  min:6500, max:9000 },
+      { level:9,  name:'Principal Analyst',  min:9000, max:12500},
+      { level:10, name:'Elite Defender',     min:12500,max:99999},
+    ];
+    const cur = levels.slice().reverse().find(l => pts >= l.min) || levels[0];
+    const next = levels.find(l => l.level === cur.level + 1);
+    const progress = next
+      ? Math.min(100, Math.round(((pts - cur.min) / (next.min - cur.min)) * 100))
+      : 100;
+    return { ...cur, next, progress, pts_to_next: next ? next.min - pts : 0 };
+  },
+
   async loadMe() {
     try {
       const me = await API.get('/api/me');
       App.meData = me;
+      // Basic stats
       document.getElementById('sidebar-score').textContent  = me.score;
       document.getElementById('topbar-score').textContent   = me.score;
       document.getElementById('topbar-rank').textContent    = me.rank > 0 ? '#' + me.rank : '–';
@@ -1031,6 +1199,24 @@ const App = {
       document.getElementById('prof-acc').textContent   = me.accuracy + '%';
       document.getElementById('profile-username').textContent = me.username;
       document.getElementById('profile-avatar').textContent   = me.username.slice(0,2).toUpperCase();
+      // XP / Level in sidebar
+      const lv = App.getLevelInfo(me.score || 0);
+      const xpWrap = document.getElementById('sidebar-xp-wrap');
+      if (xpWrap) {
+        xpWrap.style.display = 'block';
+        document.getElementById('xp-level-text').textContent = 'Lv.' + lv.level + ' ' + lv.name;
+        document.getElementById('xp-pts-text').textContent   = me.score + ' pts';
+        document.getElementById('xp-bar-fill').style.width   = lv.progress + '%';
+        document.getElementById('xp-bar-fill').title = lv.next ? (lv.pts_to_next + ' pts to Lv.' + lv.next.level) : 'Max level!';
+      }
+      // Streak in sidebar
+      if (me.streak) {
+        const sw = document.getElementById('streak-widget');
+        if (sw && me.streak.current_streak > 0) {
+          sw.style.display = 'flex';
+          document.getElementById('streak-count').textContent = me.streak.current_streak;
+        }
+      }
     } catch(e) { console.error(e); }
   },
 
@@ -1062,14 +1248,16 @@ const App = {
     if (pageEl) pageEl.classList.add('active');
     if (navEl)  navEl.classList.add('active');
 
-    const labels = { dashboard:'Dashboard', soc:'SOC Dashboard', labs:'My Labs', leaderboard:'Leaderboard', profile:'My Profile' };
+    const labels = { dashboard:'Dashboard', soc:'SOC Dashboard', labs:'My Labs', leaderboard:'Leaderboard', profile:'My Profile', achievements:'Achievements', paths:'Learning Paths' };
     document.getElementById('bc-cur').textContent = labels[page] || page;
 
-    if (page === 'dashboard')   { App.loadMe(); Pages.renderDashboardLabs(); }
-    if (page === 'soc')         SocDash.load();
-    if (page === 'labs')        Pages.renderLabsGrid(Pages._currentCat || 'all');
-    if (page === 'leaderboard') Pages.leaderboard();
-    if (page === 'profile')     Pages.profile();
+    if (page === 'dashboard')    { App.loadMe(); Pages.renderDashboardLabs(); }
+    if (page === 'soc')          SocDash.load();
+    if (page === 'labs')         Pages.renderLabsGrid(Pages._currentCat || 'all');
+    if (page === 'leaderboard')  Pages.leaderboard();
+    if (page === 'profile')      Pages.profile();
+    if (page === 'achievements') Pages.loadAchievements();
+    if (page === 'paths')        Pages.loadPaths();
   },
 
   async openLab(slug, isRestore = false) {
@@ -1089,9 +1277,12 @@ const App = {
     try {
       const lab = await API.get('/api/labs/' + slug);
       // Load draft answers for this lab
-      const draftsRes = await API.get('/api/me/drafts/' + slug);
+      let draftsRes = { drafts: {} };
+      try { draftsRes = await API.get('/api/me/drafts/' + slug); } catch {}
       Pages._draftAnswers = draftsRes.drafts || {};
       Pages.renderLabView(lab);
+      // Init notes auto-save
+      setTimeout(() => Notes.init(slug), 50);
     } catch(e) { toast('Failed to load lab', 'error'); }
   },
 
@@ -1570,6 +1761,18 @@ const Pages = {
         toast('Correct answer submitted.', 'success');
         document.getElementById('topbar-score').textContent  = d.total_score;
         document.getElementById('sidebar-score').textContent = d.total_score;
+        // Update XP bar on correct answer
+        const lv = App.getLevelInfo(d.total_score || 0);
+        const xpFill = document.getElementById('xp-bar-fill');
+        if (xpFill) { xpFill.style.width = lv.progress + '%'; xpFill.title = lv.next ? (lv.pts_to_next + ' pts to Lv.' + lv.next.level) : 'Max level!'; }
+        const xpLvTxt = document.getElementById('xp-level-text');
+        if (xpLvTxt) xpLvTxt.textContent = 'Lv.' + lv.level + ' ' + lv.name;
+        const xpPtsTxt = document.getElementById('xp-pts-text');
+        if (xpPtsTxt) xpPtsTxt.textContent = d.total_score + ' pts';
+        // Show achievement popups if new achievements unlocked
+        if (d.new_achievements && d.new_achievements.length > 0) {
+          AchPopup.queue(d.new_achievements);
+        }
         
         // Clear draft from server since answer is now submitted
         delete Pages._draftAnswers[questionId];
@@ -1686,6 +1889,109 @@ const Pages = {
         `).join('');
       })
       .catch(() => {});
+  },
+
+  async loadAchievements() {
+    try {
+      const data = await API.get('/api/achievements');
+      // Update stat counters
+      const el = (id) => document.getElementById(id);
+      if (el('ach-earned-count')) el('ach-earned-count').textContent = data.earned_count || 0;
+      if (el('ach-total-count'))  el('ach-total-count').textContent  = data.total || 0;
+      if (el('ach-bonus-pts'))    el('ach-bonus-pts').textContent    = data.bonus_points || 0;
+      const pct = data.total > 0 ? Math.round((data.earned_count / data.total) * 100) : 0;
+      if (el('ach-completion-pct')) el('ach-completion-pct').textContent = pct + '%';
+
+      // Streak banner
+      if (data.streak && data.streak.current_streak > 0) {
+        const banner = document.getElementById('streak-banner-ach');
+        if (banner) {
+          banner.style.display = 'flex';
+          el('ach-streak-num').textContent  = data.streak.current_streak;
+          el('ach-streak-best').textContent = 'Longest streak: ' + (data.streak.longest_streak || 0) + ' days';
+        }
+      }
+
+      // Group achievements by category
+      const cats = { general:'Getting Started', labs:'Lab Completion', score:'Score Milestones', skill:'Skill & Quality', soc:'SOC Workflow', specialist:'Specialisations', streak:'Streaks' };
+      const byCategory = {};
+      (data.achievements || []).forEach(a => {
+        const cat = a.category || 'general';
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push(a);
+      });
+
+      let html = '';
+      for (const [cat, label] of Object.entries(cats)) {
+        const items = byCategory[cat];
+        if (!items || items.length === 0) continue;
+        html += `<div class="ach-section-hdr">${escapeHtml(label)}</div><div class="ach-grid">`;
+        html += items.map(a => `
+          <div class="ach-card ${a.earned ? 'earned' : ''}">
+            <span class="ach-icon">${escapeHtml(a.icon || '🏅')}</span>
+            <div>
+              <div class="ach-title">${escapeHtml(a.title)}</div>
+              <div class="ach-desc">${escapeHtml(a.description)}</div>
+              ${a.points > 0 ? `<div class="ach-pts">+${a.points} bonus XP</div>` : ''}
+              ${a.earned && a.earned_at ? `<div class="ach-earned-at">Earned ${new Date(a.earned_at).toLocaleDateString()}</div>` : ''}
+              ${!a.earned ? `<div class="ach-earned-at" style="color:var(--dim)">Not yet earned</div>` : ''}
+            </div>
+          </div>`).join('');
+        html += '</div>';
+      }
+      document.getElementById('ach-content').innerHTML = html || '<div style="color:var(--dim);padding:40px;text-align:center">No achievements yet. Start completing labs!</div>';
+    } catch(e) { console.error(e); document.getElementById('ach-content').innerHTML = '<div style="color:var(--red);padding:20px">Failed to load achievements.</div>'; }
+  },
+
+  async loadPaths() {
+    try {
+      const paths = await API.get('/api/paths');
+      if (!Array.isArray(paths) || paths.length === 0) {
+        document.getElementById('paths-content').innerHTML = '<div style="color:var(--dim);padding:40px;text-align:center">No learning paths available yet.</div>';
+        return;
+      }
+      const diffIcon = { Beginner:'🟢', Intermediate:'🟡', Advanced:'🟠', Expert:'🔴' };
+      const html = `<div class="paths-grid">${paths.map(p => {
+        const pct = p.progress_pct || 0;
+        const done = p.labs_completed || 0;
+        const total = p.labs_total || (p.lab_slugs ? p.lab_slugs.length : 0);
+        const tags = Array.isArray(p.tags) ? p.tags : [];
+        return `
+        <div class="path-card" onclick="Pages.openPath('${escapeHtml(p.id)}')">
+          <div class="path-card-top">
+            <div class="path-card-icon">${escapeHtml(p.icon || '📚')}</div>
+            <div class="path-card-title">${escapeHtml(p.title)}</div>
+            <div class="path-card-desc">${escapeHtml(p.description)}</div>
+            <div class="path-tags">
+              ${diffIcon[p.difficulty] ? `<span class="path-tag">${diffIcon[p.difficulty]} ${escapeHtml(p.difficulty)}</span>` : ''}
+              ${p.estimated_hours ? `<span class="path-tag">~${p.estimated_hours}h</span>` : ''}
+              ${tags.slice(0,3).map(t => `<span class="path-tag">${escapeHtml(t)}</span>`).join('')}
+            </div>
+            <div class="path-meta-row">
+              <span class="path-meta-item">📋 ${total} labs</span>
+              <span class="path-meta-item">✅ ${done} done</span>
+            </div>
+          </div>
+          <div class="path-card-footer">
+            <div class="path-progress-bar"><div class="path-progress-fill" style="width:${pct}%"></div></div>
+            ${pct === 100
+              ? `<span class="path-complete-badge">✓ Complete</span>`
+              : `<span class="path-progress-pct">${pct}%</span>`}
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+      document.getElementById('paths-content').innerHTML = html;
+    } catch(e) { console.error(e); document.getElementById('paths-content').innerHTML = '<div style="color:var(--red);padding:20px">Failed to load paths.</div>'; }
+  },
+
+  openPath(pathId) {
+    // Filter labs page by path
+    App.navigate('labs');
+    // Give the labs page a moment to render, then filter by path tag
+    setTimeout(() => {
+      const filterBtn = document.querySelector(`.filter-tab[data-cat="path-${pathId}"]`);
+      if (filterBtn) filterBtn.click();
+    }, 100);
   },
 
   async changePassword() {
@@ -1938,10 +2244,91 @@ const SocDash = {
   }
 };
 
+// ── ACHIEVEMENT POPUP ──────────────────────────────────
+const AchPopup = {
+  _queue: [],
+  _showing: false,
+
+  queue(achievements) {
+    this._queue.push(...(achievements || []));
+    if (!this._showing) this._next();
+  },
+
+  _next() {
+    if (this._queue.length === 0) { this._showing = false; return; }
+    this._showing = true;
+    const a = this._queue.shift();
+    this._show(a);
+  },
+
+  _show(a) {
+    const container = document.getElementById('ach-popup-container');
+    if (!container) { this._next(); return; }
+    const popup = document.createElement('div');
+    popup.className = 'ach-popup';
+    popup.innerHTML = `
+      <span class="ach-popup-icon">${escapeHtml(a.icon || '🏅')}</span>
+      <div>
+        <div class="ach-popup-title">🎉 Achievement Unlocked!</div>
+        <div class="ach-popup-name">${escapeHtml(a.title || a.id)}</div>
+        <div class="ach-popup-desc">${escapeHtml(a.description || a.desc || '')}</div>
+        ${(a.points || a.pts) > 0 ? `<div class="ach-popup-pts">+${a.points || a.pts} bonus XP</div>` : ''}
+      </div>
+    `;
+    container.appendChild(popup);
+    // Trigger CSS transition
+    requestAnimationFrame(() => { requestAnimationFrame(() => { popup.classList.add('show'); }); });
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => {
+      popup.classList.remove('show');
+      setTimeout(() => { popup.remove(); this._next(); }, 400);
+    }, 4000);
+  }
+};
+
+// ── LAB NOTES AUTO-SAVE ─────────────────────────────────
+const Notes = {
+  _timer: null,
+  _slug: null,
+
+  init(slug) {
+    this._slug = slug;
+    const textarea = document.getElementById('lab-notes-input');
+    const status   = document.getElementById('notes-status');
+    if (!textarea) return;
+
+    // Load existing notes
+    API.get('/api/labs/' + slug + '/notes').then(data => {
+      textarea.value = data.content || '';
+    }).catch(() => {});
+
+    // Auto-save on input with 1.5s debounce
+    textarea.addEventListener('input', () => {
+      if (status) { status.textContent = 'Saving…'; status.className = 'notes-saved-status'; }
+      clearTimeout(this._timer);
+      this._timer = setTimeout(() => this._save(), 1500);
+    });
+  },
+
+  async _save() {
+    const textarea = document.getElementById('lab-notes-input');
+    const status   = document.getElementById('notes-status');
+    if (!textarea || !this._slug) return;
+    try {
+      await API.put('/api/labs/' + this._slug + '/notes', { content: textarea.value });
+      if (status) { status.textContent = 'Saved ✓'; status.className = 'notes-saved-status saved'; }
+    } catch(e) {
+      if (status) { status.textContent = 'Save failed'; status.className = 'notes-saved-status'; }
+    }
+  }
+};
+
 // ── BOOT ───────────────────────────────────────────────
 window.App     = App;
 window.Pages   = Pages;
 window.SocDash = SocDash;
+window.AchPopup = AchPopup;
+window.Notes   = Notes;
 document.addEventListener('DOMContentLoaded', App.init);
 
 // ── IR WORKFLOW FUNCTIONS ───────────────────────────────
