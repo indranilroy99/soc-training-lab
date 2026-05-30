@@ -854,25 +854,37 @@ const API = {
   token()   { return localStorage.getItem('diaas_token') || ''; },
   user()    { try { return JSON.parse(localStorage.getItem('diaas_user') || 'null'); } catch { return null; } },
   headers() { return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.token() }; },
+
+  // Unwraps { ok:true, data:[...] } → array, { ok:true, ...obj } → obj
+  _unwrap(d) {
+    if (!d || typeof d !== 'object') return d;
+    if (d.data !== undefined) return d.data;
+    return d;
+  },
+
   async get(path) {
     const r = await fetch(path, { headers: this.headers() });
     if (r.status === 401) { App.logout(); throw new Error('Unauthorized'); }
-    return r.json();
+    const d = await r.json().catch(() => ({}));
+    return this._unwrap(d);
   },
   async post(path, body) {
     const r = await fetch(path, { method: 'POST', headers: this.headers(), body: JSON.stringify(body) });
     if (r.status === 401) { App.logout(); throw new Error('Unauthorized'); }
-    return { ok: r.ok, status: r.status, data: await r.json() };
+    const d = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data: d };
   },
   async put(path, body) {
     const r = await fetch(path, { method: 'PUT', headers: this.headers(), body: JSON.stringify(body) });
     if (r.status === 401) { App.logout(); throw new Error('Unauthorized'); }
-    return { ok: r.ok, status: r.status, data: await r.json() };
+    const d = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data: d };
   },
   async del(path) {
     const r = await fetch(path, { method: 'DELETE', headers: this.headers() });
     if (r.status === 401) { App.logout(); throw new Error('Unauthorized'); }
-    return { ok: r.ok, status: r.status, data: await r.json() };
+    const d = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data: d };
   }
 };
 

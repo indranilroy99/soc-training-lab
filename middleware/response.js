@@ -2,11 +2,15 @@
 
 // ── Consistent API response helpers ───────────────────────────────────────
 // Every API endpoint uses these. Never call res.writeHead manually in routes.
+//
+// IMPORTANT: ok() wraps arrays inside { data: [...] } so the structure is
+// preserved over the wire. API.get() in the frontend already does:
+//   return d.data !== undefined ? d.data : d
+// so array responses are transparently unwrapped on the client side.
 
 const cfg = require('../config');
 
 function jsonRes(res, status, data, extraHeaders = {}) {
-  // Ensure data is always an object — never send a bare string or array
   const body = JSON.stringify(data);
   res.writeHead(status, {
     'Content-Type':  'application/json',
@@ -16,8 +20,13 @@ function jsonRes(res, status, data, extraHeaders = {}) {
   res.end(body);
 }
 
+// Wrap arrays in { data: [...] } so spreading doesn't destroy them.
+// Objects are spread as before: ok(res, { key: val }) → { ok: true, key: val }
 function ok(res, data = {}, status = 200) {
-  return jsonRes(res, status, { ok: true, ...data });
+  const body = Array.isArray(data)
+    ? { ok: true, data }
+    : { ok: true, ...data };
+  return jsonRes(res, status, body);
 }
 
 function created(res, data = {}) {

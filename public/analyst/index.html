@@ -1080,19 +1080,35 @@ const API = {
   token() { return localStorage.getItem('diaas_token') || ''; },
   user()  { try { return JSON.parse(localStorage.getItem('diaas_user') || 'null'); } catch { return null; } },
   headers() { return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + this.token() }; },
+
+  // Unwraps { ok:true, data: [...] } → array, { ok:true, key:val } → object
+  _unwrap(d) {
+    if (!d || typeof d !== 'object') return d;
+    if (d.data !== undefined) return d.data;  // array responses wrapped by ok()
+    return d;                                  // plain object responses
+  },
+
   async get(path) {
     const r = await fetch(path, { headers: this.headers() });
     if (r.status === 401) { App.logout(); throw new Error('Unauthorized'); }
-    return r.json();
+    const d = await r.json().catch(() => ({}));
+    return this._unwrap(d);
   },
   async post(path, body) {
     const r = await fetch(path, { method: 'POST', headers: this.headers(), body: JSON.stringify(body) });
     if (r.status === 401) { App.logout(); throw new Error('Unauthorized'); }
-    return { ok: r.ok, status: r.status, data: await r.json() };
+    const d = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data: d };
   },
   async put(path, body) {
     const r = await fetch(path, { method: 'PUT', headers: this.headers(), body: JSON.stringify(body) });
-    return { ok: r.ok, status: r.status, data: await r.json() };
+    const d = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data: d };
+  },
+  async del(path) {
+    const r = await fetch(path, { method: 'DELETE', headers: this.headers() });
+    const d = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data: d };
   }
 };
 
@@ -1222,7 +1238,8 @@ const App = {
 
   async loadLabs() {
     try {
-      App.labsData = await API.get('/api/labs');
+      const raw = await API.get('/api/labs');
+      App.labsData = Array.isArray(raw) ? raw : [];
       const badge = App.labsData.filter(l => l.status !== 'completed').length;
       document.getElementById('badge-labs').textContent = badge;
       Pages.renderDashboardLabs();
