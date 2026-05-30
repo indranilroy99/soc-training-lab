@@ -482,6 +482,13 @@ input, textarea, select { font-family: var(--font); }
 .lab-section-title-text { font-size: 13px; font-weight: 500; color: var(--muted); }
 
 /* ── Achievements page ─────────────────────────────────────────────────── */
+.ach-letter-badge {
+  width: 38px; height: 38px; border-radius: 4px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; color: var(--blue);
+  background: var(--blue-muted); border: 1px solid rgba(59,130,246,.3);
+}
+.ach-letter-badge.locked { color: var(--dim); background: rgba(255,255,255,.03); border-color: var(--border); }
 .ach-stats-row { display:flex; gap:12px; margin-bottom:24px; }
 .ach-stat-card { flex:1; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:16px; text-align:center; }
 .ach-stat-val { font-size:28px; font-weight:700; font-family:var(--mono); color:var(--text); }
@@ -575,14 +582,10 @@ input, textarea, select { font-family: var(--font); }
         <span class="nav-label">My Labs</span>
         <span class="nav-badge" id="badge-labs">6</span>
       </div>
-      <div class="nav-item" data-page="paths">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        <span class="nav-label">Learning Paths</span>
-      </div>
       <div class="nav-item" data-page="achievements">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
         <span class="nav-label">Achievements</span>
-        <span class="nav-badge" id="badge-ach" style="display:none;background:#A855F7">●</span>
+        <span class="nav-badge" id="badge-ach" style="display:none"></span>
       </div>
       <div class="nav-item" data-page="leaderboard">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6L3 12l5 6M16 6l5 6-5 6M11 3l2 18"/></svg>
@@ -595,7 +598,7 @@ input, textarea, select { font-family: var(--font); }
     </nav>
     <!-- Streak Widget -->
     <div id="streak-widget" style="display:none;padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0">
-      <span style="font-size:20px">🔥</span>
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--dim)">STREAK</span>
       <div>
         <div style="font-size:16px;font-weight:700;color:#F97316;font-family:var(--mono);line-height:1" id="streak-count">0</div>
         <div style="font-size:10px;color:var(--dim)">day streak</div>
@@ -816,6 +819,19 @@ input, textarea, select { font-family: var(--font); }
                     <span style="color:var(--dim)">Accuracy</span><span style="color:var(--text);font-weight:600" id="prof-acc">–</span>
                   </div>
                 </div>
+                <!-- Performance Score -->
+                <div style="margin-top:16px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:4px" id="prof-dps-wrap" style="display:none">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                    <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Performance Score</span>
+                    <span style="font-size:10px;color:var(--dim)">Weighted 0–100</span>
+                  </div>
+                  <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">
+                    <span style="font-size:32px;font-weight:700;font-family:var(--mono);color:var(--blue)" id="prof-dps">–</span>
+                    <span style="font-size:14px;font-weight:700;color:var(--muted)" id="prof-grade">–</span>
+                    <span style="font-size:11px;color:var(--dim)">/100</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:5px" id="prof-dps-breakdown"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -863,7 +879,7 @@ input, textarea, select { font-family: var(--font); }
           <p class="page-sub">Earn badges by completing labs, closing alerts, building streaks, and mastering skills.</p>
         </div>
         <div id="streak-banner-ach" class="streak-banner" style="display:none">
-          <span class="streak-fire">🔥</span>
+          <div style="width:32px;height:32px;background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.4);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#F97316">STK</div>
           <div>
             <div style="display:flex;align-items:baseline;gap:8px">
               <span class="streak-num" id="ach-streak-num">0</span>
@@ -882,15 +898,6 @@ input, textarea, select { font-family: var(--font); }
           <div class="ach-stat-card"><div class="ach-stat-val" id="ach-completion-pct">0%</div><div class="ach-stat-lbl">Complete</div></div>
         </div>
         <div id="ach-content"><div class="loading-state"><div class="spinner"></div>Loading achievements...</div></div>
-      </div>
-
-      <!-- LEARNING PATHS PAGE -->
-      <div class="page" id="page-paths">
-        <div class="page-hdr">
-          <h1 class="page-title">Learning Paths</h1>
-          <p class="page-sub">Structured training paths from SOC Fundamentals to Active Directory Defence. Complete labs in sequence to master each skill domain.</p>
-        </div>
-        <div id="paths-content"><div class="loading-state"><div class="spinner"></div>Loading paths...</div></div>
       </div>
 
     </div><!-- end #content -->
@@ -1268,7 +1275,7 @@ const App = {
     if (pageEl) pageEl.classList.add('active');
     if (navEl)  navEl.classList.add('active');
 
-    const labels = { dashboard:'Dashboard', soc:'SOC Dashboard', labs:'My Labs', leaderboard:'Leaderboard', profile:'My Profile', achievements:'Achievements', paths:'Learning Paths' };
+    const labels = { dashboard:'Dashboard', soc:'SOC Dashboard', labs:'My Labs', leaderboard:'Leaderboard', profile:'My Profile', achievements:'Achievements' };
     document.getElementById('bc-cur').textContent = labels[page] || page;
 
     if (page === 'dashboard')    { App.loadMe(); Pages.renderDashboardLabs(); }
@@ -1277,7 +1284,6 @@ const App = {
     if (page === 'leaderboard')  Pages.leaderboard();
     if (page === 'profile')      Pages.profile();
     if (page === 'achievements') Pages.loadAchievements();
-    if (page === 'paths')        Pages.loadPaths();
   },
 
   async openLab(slug, isRestore = false) {
@@ -1888,6 +1894,30 @@ const Pages = {
   },
 
   profile() {
+    // Load performance score
+    API.get('/api/me/performance').then(p => {
+      if (!p || typeof p.dps === 'undefined') return;
+      const wrap = document.getElementById('prof-dps-wrap');
+      if (wrap) wrap.style.display = '';
+      const el = (id) => document.getElementById(id);
+      if (el('prof-dps'))   el('prof-dps').textContent   = p.dps;
+      if (el('prof-grade')) el('prof-grade').textContent = p.grade;
+      const gradeColors = { 'A+':'var(--green)', A:'var(--green)', B:'var(--blue)', C:'var(--yellow)', D:'var(--orange)', F:'var(--red)' };
+      if (el('prof-grade')) el('prof-grade').style.color = gradeColors[p.grade] || 'var(--dim)';
+      if (el('prof-dps-breakdown') && p.breakdown) {
+        el('prof-dps-breakdown').innerHTML = Object.values(p.breakdown).map(b => `
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+              <span style="color:var(--dim)">${b.label}</span>
+              <span style="font-family:var(--mono);color:var(--text);font-weight:600">${b.score}% <span style="color:var(--dim);font-weight:400">× ${b.weight}%</span></span>
+            </div>
+            <div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden">
+              <div style="height:100%;background:var(--blue);width:${b.score}%;border-radius:2px;transition:width .5s"></div>
+            </div>
+          </div>`).join('');
+      }
+    }).catch(() => {});
+
     // Load triage history
     fetch('/api/me/closures', { headers: API.headers() })
       .then(r => r.json())
@@ -1934,7 +1964,7 @@ const Pages = {
       }
 
       // Group achievements by category
-      const cats = { general:'Getting Started', labs:'Lab Completion', score:'Score Milestones', skill:'Skill & Quality', soc:'SOC Workflow', specialist:'Specialisations', streak:'Streaks' };
+      const cats = { general:'Getting Started', labs:'Lab Completion', score:'Score Milestones', skill:'Skill & Quality', soc:'SOC Workflow', specialist:'Specialist', streak:'Consistency' };
       const byCategory = {};
       (data.achievements || []).forEach(a => {
         const cat = a.category || 'general';
@@ -1949,13 +1979,13 @@ const Pages = {
         html += `<div class="ach-section-hdr">${escapeHtml(label)}</div><div class="ach-grid">`;
         html += items.map(a => `
           <div class="ach-card ${a.earned ? 'earned' : ''}">
-            <span class="ach-icon">${escapeHtml(a.icon || '🏅')}</span>
+            <div class="ach-letter-badge ${a.earned ? '' : 'locked'}">${escapeHtml((a.title||'?').charAt(0).toUpperCase())}</div>
             <div>
               <div class="ach-title">${escapeHtml(a.title)}</div>
               <div class="ach-desc">${escapeHtml(a.description)}</div>
-              ${a.points > 0 ? `<div class="ach-pts">+${a.points} bonus XP</div>` : ''}
-              ${a.earned && a.earned_at ? `<div class="ach-earned-at">Earned ${new Date(a.earned_at).toLocaleDateString()}</div>` : ''}
-              ${!a.earned ? `<div class="ach-earned-at" style="color:var(--dim)">Not yet earned</div>` : ''}
+              ${a.points > 0 ? `<div class="ach-pts">+${a.points} pts</div>` : ''}
+              ${a.earned && a.earned_at ? `<div class="ach-earned-at">${new Date(a.earned_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}</div>` : ''}
+              ${!a.earned ? `<div class="ach-earned-at" style="color:var(--dim)">Not earned</div>` : ''}
             </div>
           </div>`).join('');
         html += '</div>';
@@ -2288,7 +2318,7 @@ const AchPopup = {
     const popup = document.createElement('div');
     popup.className = 'ach-popup';
     popup.innerHTML = `
-      <span class="ach-popup-icon">${escapeHtml(a.icon || '🏅')}</span>
+      <div class="ach-letter-badge" style="width:36px;height:36px;font-size:15px;flex-shrink:0">${escapeHtml((a.title||'?').charAt(0))}</div>
       <div>
         <div class="ach-popup-title">🎉 Achievement Unlocked!</div>
         <div class="ach-popup-name">${escapeHtml(a.title || a.id)}</div>

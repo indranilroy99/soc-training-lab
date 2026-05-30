@@ -319,6 +319,10 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         <span class="nav-label">Progress Matrix</span>
       </div>
+      <div class="nav-item" data-page="performance">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span class="nav-label">Performance</span>
+      </div>
       <div class="nav-item" data-page="labs">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
         <span class="nav-label">Labs & Questions</span>
@@ -436,6 +440,48 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
       </div>
 
       <!-- LEADERBOARD -->
+
+      <!-- PERFORMANCE PAGE -->
+      <div class="page" id="page-performance">
+        <div class="page-hdr">
+          <h1 class="page-title">Student Performance</h1>
+          <p class="page-sub">Weighted Performance Score (0–100) across all students. Formula: Lab Accuracy 40% · Alert Quality 30% · Efficiency 20% · Coverage 10%.</p>
+        </div>
+        <!-- Score formula explanation -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px" id="perf-formula">
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px">
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-bottom:4px">Lab Accuracy</div>
+            <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--blue)">40%</div>
+            <div style="font-size:11px;color:var(--dim);margin-top:3px">pts earned / pts possible</div>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px">
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-bottom:4px">Alert Quality</div>
+            <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--blue)">30%</div>
+            <div style="font-size:11px;color:var(--dim);margin-top:3px">correct closures + IR depth</div>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px">
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-bottom:4px">Efficiency</div>
+            <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--blue)">20%</div>
+            <div style="font-size:11px;color:var(--dim);margin-top:3px">no hints, no retries</div>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px">
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-bottom:4px">Coverage</div>
+            <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--blue)">10%</div>
+            <div style="font-size:11px;color:var(--dim);margin-top:3px">% of platform engaged</div>
+          </div>
+        </div>
+        <!-- Performance table -->
+        <div class="card">
+          <div class="card-hdr">
+            <span class="card-title">Student Performance Index</span>
+            <button class="btn btn-outline btn-sm" onclick="Pages.loadPerformance()">Refresh</button>
+          </div>
+          <div style="overflow-x:auto" id="perf-table-wrap">
+            <div class="loading-state"><div class="spinner"></div>Loading...</div>
+          </div>
+        </div>
+      </div>
+
       <div class="page" id="page-leaderboard">
         <div class="page-hdr">
           <div class="page-hdr-left">
@@ -948,11 +994,12 @@ const App = {
     const navEl  = document.querySelector(`.nav-item[data-page="${page}"]`);
     if (pageEl) pageEl.classList.add('active');
     if (navEl)  navEl.classList.add('active');
-    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', leaderboard:'Leaderboard', labs:'Labs & Questions', 'analyst-profile':'Analyst Profile', settings:'My Profile' };
+    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', performance:'Performance', leaderboard:'Leaderboard', labs:'Labs & Questions', 'analyst-profile':'Analyst Profile', settings:'My Profile' };
     document.getElementById('bc-cur').textContent = labels[page] || page;
     if (page === 'overview')    Pages.loadOverview();
     if (page === 'users')       Pages.loadUsers();
     if (page === 'progress')    Pages.loadProgress();
+    if (page === 'performance') Pages.loadPerformance();
     if (page === 'leaderboard') Pages.loadLeaderboard();
     if (page === 'labs')        LabPages.load();
   },
@@ -1170,6 +1217,54 @@ const Pages = {
         </table>`;
     } catch(e) { console.error(e); toast('Failed to load progress', 'error'); }
   },
+
+  async loadPerformance() {
+    const wrap = document.getElementById('perf-table-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading performance data...</div>';
+    try {
+      const rows = await API.get('/api/admin/performance/all');
+      if (!Array.isArray(rows) || rows.length === 0) {
+        wrap.innerHTML = '<div class="empty-state"><div class="empty-title">No student data yet.</div></div>';
+        return;
+      }
+      const gradeColor = g => ({ 'A+':'var(--green)', A:'var(--green)', B:'var(--blue)', C:'var(--yellow)', D:'var(--orange)', F:'var(--red)' }[g] || 'var(--dim)');
+      const bar = (pct, color) => `<div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;margin-left:6px"><div style="height:100%;background:${color};width:${pct}%;border-radius:2px"></div></div>`;
+      
+      wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
+        <thead><tr style="border-bottom:1px solid var(--border)">
+          <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Rank</th>
+          <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Analyst</th>
+          <th style="padding:9px 14px;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Score</th>
+          <th style="padding:9px 14px;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Grade</th>
+          <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Lab Accuracy (40%)</th>
+          <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Alert Quality (30%)</th>
+          <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Efficiency (20%)</th>
+          <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Coverage (10%)</th>
+          <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Questions</th>
+          <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Labs</th>
+        </tr></thead>
+        <tbody>${rows.map((r, i) => `
+          <tr style="border-bottom:1px solid rgba(30,33,40,.5);cursor:pointer" onclick="App.showAnalyst(${r.id})">
+            <td style="padding:10px 14px;font-family:var(--mono);color:var(--dim)">${i + 1}</td>
+            <td style="padding:10px 14px;font-weight:600;color:var(--text)">${escapeHtml(r.username)}</td>
+            <td style="padding:10px 14px;text-align:center;font-family:var(--mono);font-size:18px;font-weight:700;color:var(--blue)">${r.dps}</td>
+            <td style="padding:10px 14px;text-align:center;font-weight:700;font-size:14px;color:${gradeColor(r.grade)}">${r.grade}</td>
+            <td style="padding:10px 14px"><span style="font-family:var(--mono);font-weight:600">${r.breakdown.lab_accuracy.score}%</span>${bar(r.breakdown.lab_accuracy.score,'var(--blue)')}</td>
+            <td style="padding:10px 14px"><span style="font-family:var(--mono);font-weight:600">${r.breakdown.alert_quality.score}%</span>${bar(r.breakdown.alert_quality.score,'var(--cyan)')}</td>
+            <td style="padding:10px 14px"><span style="font-family:var(--mono);font-weight:600">${r.breakdown.efficiency.score}%</span>${bar(r.breakdown.efficiency.score,'var(--green)')}</td>
+            <td style="padding:10px 14px"><span style="font-family:var(--mono);font-weight:600">${r.breakdown.coverage.score}%</span>${bar(r.breakdown.coverage.score,'var(--muted)')}</td>
+            <td style="padding:10px 14px;font-size:11.5px;color:var(--muted)">${r.raw.questions_correct}/${r.raw.questions_attempted}</td>
+            <td style="padding:10px 14px;font-size:11.5px;color:var(--muted)">${r.raw.labs_completed}/${r.raw.total_labs}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+    } catch(e) {
+      console.error(e);
+      wrap.innerHTML = '<div style="color:var(--red);padding:20px">Failed to load performance data.</div>';
+    }
+  },
+
 
   async loadLeaderboard() {
     document.getElementById('lb-wrap').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading...</div>';

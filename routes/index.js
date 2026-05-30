@@ -14,6 +14,7 @@ const alertRoutes  = require('./alerts');
 const lbRoutes     = require('./leaderboard');
 const adminRoutes  = require('./admin');
 const achRoutes    = require('./achievements');
+const perfRoutes   = require('./performance');
 const pathRoutes   = require('./paths');
 const noteRoutes   = require('./notes');
 
@@ -67,6 +68,8 @@ async function router(req, res) {
   if (method === 'GET'  && url === '/api/me')            return userRoutes.getMe(req, res);
   if (method === 'GET'  && url === '/api/me/closures')   return userRoutes.getMyClosures(req, res);
   if (method === 'POST' && url === '/api/user/password') return userRoutes.changePassword(req, res);
+  if (method === 'GET'  && url === '/api/me/performance') return perfRoutes.myPerformance(req, res);
+  if (method === 'GET'  && url === '/api/admin/performance/all') return perfRoutes.allPerformance(req, res);
   // Drafts stub — admin page calls this; return empty if no route
   if (method === 'GET'  && url.startsWith('/api/me/drafts/')) return jsonRes(res, 200, { ok: true, drafts: {} });
 
