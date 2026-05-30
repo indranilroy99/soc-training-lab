@@ -6,6 +6,7 @@ const { requireAdmin } = require('../middleware/auth');
 const { parseBody }    = require('../middleware/security');
 const { ok, created, notFound, badRequest } = require('../middleware/response');
 const { requireString, validateNewPassword, sanitize } = require('../middleware/validate');
+const { getAnalystProfile } = require('../services/analyst_profile');
 
 // ── GET /api/admin/stats ─────────────────────────────────────────────────
 function getStats(req, res) {
@@ -248,8 +249,17 @@ function getAnalystActivity(req, res, userId) {
   });
 }
 
+// ── GET /api/admin/analysts/:id/profile ──────────────────────────────────
+function getProfile(req, res, userId) {
+  const admin = requireAdmin(req, res); if (!admin) return;
+  const uid   = parseInt(userId, 10);
+  const data  = getAnalystProfile(uid);
+  if (!data) return notFound(res, 'Analyst not found');
+  return ok(res, data);
+}
+
 module.exports = {
-  getStats, listUsers, createUser, updateUser, deleteUser,
+  getStats, listUsers, createUser, updateUser, deleteUser, getProfile,
   getProgress, listAdminLabs, createLab, updateLab, deleteLab,
   getLabQuestions, addQuestion, updateQuestion, deleteQuestion,
   getAnalystActivity,

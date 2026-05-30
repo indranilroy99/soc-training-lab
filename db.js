@@ -16,6 +16,9 @@ db.pragma('temp_store = MEMORY');   // temp tables in RAM
 
 // ── Schema migrations (idempotent — safe to run on every startup) ─────────
 function runMigrations() {
+  const sessionSQL = `ALTER TABLE sessions ADD COLUMN created_at TEXT DEFAULT (datetime('now'))`;
+  try { db.prepare(sessionSQL).run(); } catch (e) { /* already exists */ }
+
   const cols = [
     [`ALTER TABLE labs ADD COLUMN is_visible INTEGER DEFAULT 1`,             'labs.is_visible'],
     [`ALTER TABLE labs ADD COLUMN evidence TEXT`,                             'labs.evidence'],

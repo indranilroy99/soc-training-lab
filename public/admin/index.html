@@ -548,33 +548,96 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
 
       <!-- ANALYST PROFILE PAGE -->
       <div class="page" id="page-analyst-profile">
-        <div class="page-hdr" style="display:flex;align-items:center;gap:12px">
-          <button class="btn btn-outline btn-sm" onclick="Pages.showPage('users')" style="padding:4px 10px">&larr; Back</button>
+        <!-- ── Header ──────────────────────────────────────────────────── -->
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+          <button class="btn btn-outline btn-sm" onclick="Pages.showPage('users')">&larr; All Analysts</button>
           <div>
-            <h1 class="page-title" id="ap-name">Analyst Profile</h1>
-            <p class="page-sub" id="ap-meta">Loading&hellip;</p>
+            <h1 class="page-title" id="ap-username" style="margin-bottom:3px">–</h1>
+            <p class="page-sub" id="ap-subtitle">–</p>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:10px">
+            <div id="ap-grade-badge" style="display:none;padding:6px 16px;border-radius:4px;font-size:20px;font-weight:800;font-family:var(--mono)"></div>
+            <div id="ap-dps-badge" style="display:none;padding:6px 16px;background:var(--card);border:1px solid var(--border);border-radius:4px;text-align:center">
+              <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--blue)" id="ap-dps">–</div>
+              <div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Performance</div>
+            </div>
           </div>
         </div>
 
-        <!-- 4-stat summary row -->
-        <div class="stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
-          <div class="stat-card"><div class="stat-sub">ALERTS TRIAGED</div><div class="stat-val" id="ap-total">&ndash;</div></div>
-          <div class="stat-card"><div class="stat-sub">CORRECT CLOSES</div><div class="stat-val" id="ap-correct">&ndash;</div></div>
-          <div class="stat-card"><div class="stat-sub">TRIAGE ACCURACY</div><div class="stat-val" id="ap-accuracy">&ndash;</div></div>
-          <div class="stat-card"><div class="stat-sub">TOTAL POINTS</div><div class="stat-val" id="ap-points">&ndash;</div></div>
+        <!-- ── 7-stat row ────────────────────────────────────────────────── -->
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:20px">
+          <div class="stat-card blue"><div class="stat-label">Score</div><div class="stat-val blue" id="ap-score">–</div><div class="stat-sub">total pts</div></div>
+          <div class="stat-card"><div class="stat-label">Rank</div><div class="stat-val" id="ap-rank">–</div><div class="stat-sub">among analysts</div></div>
+          <div class="stat-card green"><div class="stat-label">Labs Done</div><div class="stat-val green" id="ap-labs">–</div><div class="stat-sub">completed</div></div>
+          <div class="stat-card"><div class="stat-label">Accuracy</div><div class="stat-val" id="ap-acc">–</div><div class="stat-sub">correct rate</div></div>
+          <div class="stat-card"><div class="stat-label">Alerts</div><div class="stat-val" id="ap-alerts">–</div><div class="stat-sub">triaged</div></div>
+          <div class="stat-card"><div class="stat-label">Streak</div><div class="stat-val" id="ap-streak">–</div><div class="stat-sub">day streak</div></div>
+          <div class="stat-card"><div class="stat-label">Last Seen</div><div class="stat-val" style="font-size:13px" id="ap-last-seen">–</div><div class="stat-sub">&nbsp;</div></div>
         </div>
 
-        <!-- Alert activity table -->
-        <div class="card">
-          <div class="card-hdr">
-            <span class="card-title">Alert Investigations</span>
-            <span class="card-meta" id="ap-count">0 records</span>
+        <!-- ── Tabs ─────────────────────────────────────────────────────── -->
+        <div class="filter-tabs" style="margin-bottom:20px" id="ap-tabs">
+          <button class="filter-tab active" onclick="Pages.switchProfileTab('overview',this)">Overview</button>
+          <button class="filter-tab" onclick="Pages.switchProfileTab('labs',this)">Labs &amp; Questions</button>
+          <button class="filter-tab" onclick="Pages.switchProfileTab('alerts',this)">Alert Triage</button>
+          <button class="filter-tab" onclick="Pages.switchProfileTab('activity',this)">Activity Feed</button>
+        </div>
+
+        <!-- ── TAB: Overview ─────────────────────────────────────────────── -->
+        <div id="ap-tab-overview">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+            <!-- Performance pillars -->
+            <div class="card">
+              <div class="card-hdr"><span class="card-title">Performance Breakdown</span></div>
+              <div class="card-body" id="ap-perf-pillars">
+                <div class="loading-state" style="padding:20px"><div class="spinner sm"></div></div>
+              </div>
+            </div>
+            <!-- Category accuracy -->
+            <div class="card">
+              <div class="card-hdr"><span class="card-title">Category Performance</span></div>
+              <div class="card-body" id="ap-cat-perf" style="padding:0">
+                <div class="loading-state" style="padding:20px"><div class="spinner sm"></div></div>
+              </div>
+            </div>
           </div>
-          <div id="ap-alert-list" style="padding:0">
-            <div style="padding:40px;text-align:center;color:var(--dim);font-size:13px">Loading&hellip;</div>
+          <!-- Stuck questions -->
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">Struggling — Questions with Repeated Wrong Attempts</span><span class="card-meta" id="ap-stuck-count"></span></div>
+            <div id="ap-stuck-list" style="overflow-x:auto">
+              <div class="loading-state" style="padding:20px"><div class="spinner sm"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TAB: Labs ──────────────────────────────────────────────────── -->
+        <div id="ap-tab-labs" style="display:none">
+          <div id="ap-labs-list">
+            <div class="loading-state"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- ── TAB: Alerts ────────────────────────────────────────────────── -->
+        <div id="ap-tab-alerts" style="display:none">
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">Alert Triage History</span><span class="card-meta" id="ap-alert-count"></span></div>
+            <div id="ap-alert-list" style="overflow-x:auto">
+              <div class="loading-state"><div class="spinner sm"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TAB: Activity ─────────────────────────────────────────────── -->
+        <div id="ap-tab-activity" style="display:none">
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">Activity Timeline</span><span class="card-meta">Last 50 events</span></div>
+            <div id="ap-activity-feed" style="padding:16px;max-height:600px;overflow-y:auto">
+              <div class="loading-state"><div class="spinner sm"></div></div>
+            </div>
           </div>
         </div>
       </div>
+
 
       <!-- ═══ Settings Page ═══ -->
       <div class="page" id="page-settings">
@@ -1097,7 +1160,7 @@ const Pages = {
     }
     wrap.innerHTML = `<table>
       <thead><tr>
-        <th>Username</th><th>Role</th><th>Status</th><th>Score</th>
+        <th>Analyst</th><th>Status</th><th>Score</th>
         <th>Labs Done</th><th>Last Active</th><th>Actions</th>
       </tr></thead>
       <tbody>${users.map(u => {
@@ -1105,7 +1168,7 @@ const Pages = {
           ? new Date(u.last_session).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
           : 'Never';
         return `<tr>
-          <td class="td-main"><span style="cursor:pointer;color:var(--blue)" onclick="Pages.viewProfile(${u.id}, ${JSON.stringify(String(u.username || ''))}, ${JSON.stringify(String(u.role || ''))})">${escapeHtml(u.username)}</span></td>
+          <td class="td-main"><span style="cursor:pointer;color:var(--blue)" onclick="Pages.showAnalyst(${u.id}, ${JSON.stringify(String(u.username || ''))}, ${JSON.stringify(String(u.role || ''))})">${escapeHtml(u.username)}</span></td>
           <td><span class="chip ${u.role==='admin'?'chip-orange':'chip-blue'}">${escapeHtml(u.role)}</span></td>
           <td><span class="chip ${u.is_active?'chip-blue':'chip-red'}">${u.is_active?'Active':'Disabled'}</span></td>
           <td class="td-mono" style="color:var(--blue)">${u.score}</td>
@@ -1113,7 +1176,7 @@ const Pages = {
           <td style="color:var(--dim);font-size:11.5px">${lastActive}</td>
           <td>
             <div style="display:flex;gap:6px;align-items:center">
-              <button class="btn btn-outline btn-xs" onclick="Pages.viewProfile(${u.id}, ${JSON.stringify(String(u.username || ''))}, ${JSON.stringify(String(u.role || ''))})">Profile</button>
+              <button class="btn btn-outline btn-xs" onclick="Pages.showAnalyst(${u.id}, ${JSON.stringify(String(u.username || ''))}, ${JSON.stringify(String(u.role || ''))})">Profile</button>
               <button class="btn btn-outline btn-xs" onclick="Pages.toggleUser(${u.id}, ${u.is_active})">${u.is_active?'Disable':'Enable'}</button>
               <button class="btn btn-outline btn-xs" onclick="Pages.resetPw(${u.id}, ${JSON.stringify(String(u.username || ''))})">Reset PW</button>
               <button class="btn btn-red btn-xs" onclick="Pages.deleteUser(${u.id}, ${JSON.stringify(String(u.username || ''))})">Delete</button>
@@ -1245,7 +1308,7 @@ const Pages = {
           <th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Labs</th>
         </tr></thead>
         <tbody>${rows.map((r, i) => `
-          <tr style="border-bottom:1px solid rgba(30,33,40,.5);cursor:pointer" onclick="App.showAnalyst(${r.id})">
+          <tr style="border-bottom:1px solid rgba(30,33,40,.5);cursor:pointer" onclick="Pages.showAnalyst(${r.id})">
             <td style="padding:10px 14px;font-family:var(--mono);color:var(--dim)">${i + 1}</td>
             <td style="padding:10px 14px;font-weight:600;color:var(--text)">${escapeHtml(r.username)}</td>
             <td style="padding:10px 14px;text-align:center;font-family:var(--mono);font-size:18px;font-weight:700;color:var(--blue)">${r.dps}</td>
@@ -1288,462 +1351,262 @@ const Pages = {
     } catch(e) { document.getElementById('lb-wrap').innerHTML = '<div class="empty-state"><div class="empty-title">Failed to load</div></div>'; }
   },
 
-  async viewProfile(userId, username, role) {
-    // Update header
-    const nameEl = document.getElementById('ap-name');
-    const metaEl = document.getElementById('ap-meta');
-    if (nameEl) nameEl.textContent = username;
-    if (metaEl) metaEl.textContent = role + ' • ID ' + userId;
+  _profileData: null,
 
-    // Reset stats
-    ['ap-total','ap-correct','ap-accuracy','ap-points'].forEach(id => {
-      const el = document.getElementById(id); if (el) el.textContent = '–';
+  switchProfileTab(tab, btn) {
+    ['overview','labs','alerts','activity'].forEach(t => {
+      document.getElementById('ap-tab-' + t).style.display = t === tab ? '' : 'none';
     });
-    const listEl = document.getElementById('ap-alert-list');
-    if (listEl) listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--dim);font-size:13px">Loading…</div>';
+    document.querySelectorAll('#ap-tabs .filter-tab').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+  },
 
-    // Navigate to the profile page
+  async showAnalyst(userId) {
     Pages.showPage('analyst-profile');
 
+    // Reset everything
+    ['ap-username','ap-subtitle','ap-score','ap-rank','ap-labs','ap-acc','ap-alerts','ap-streak','ap-last-seen','ap-dps']
+      .forEach(id => { const e = document.getElementById(id); if (e) e.textContent = '–'; });
+    ['ap-perf-pillars','ap-cat-perf','ap-stuck-list','ap-labs-list','ap-alert-list','ap-activity-feed']
+      .forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = '<div class="loading-state" style="padding:20px"><div class="spinner sm"></div></div>'; });
+    Pages.switchProfileTab('overview', document.querySelector('#ap-tabs .filter-tab'));
+
     try {
-      const data = await API.get('/api/admin/analysts/' + userId + '/activity');
+      const d = await API.get('/api/admin/analysts/' + userId + '/profile');
+      if (!d || !d.user) { throw new Error('No data'); }
+      Pages._profileData = d;
 
-      // Populate summary stats
-      const setEl = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
-      setEl('ap-total',    data.alerts_triaged   ?? '–');
-      setEl('ap-correct',  data.correct_closes   ?? '–');
-      const acc = data.alerts_triaged > 0
-        ? Math.round((data.correct_closes / data.alerts_triaged) * 100) + '%'
-        : '–';
-      setEl('ap-accuracy', acc);
-      setEl('ap-points',   data.total_points     ?? '–');
-      const countEl = document.getElementById('ap-count');
-      if (countEl) countEl.textContent = (data.records?.length || 0) + ' records';
+      // ── Header ──────────────────────────────────────────────────────
+      const setEl = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+      setEl('ap-username',  d.user.username);
+      setEl('ap-subtitle', `Analyst · Joined ${d.user.joined ? new Date(d.user.joined).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : 'unknown'}`);
+      setEl('ap-score',    d.stats.score);
+      setEl('ap-rank',     d.stats.rank > 0 ? '#' + d.stats.rank : '–');
+      setEl('ap-labs',     d.stats.labs_done);
+      setEl('ap-acc',      d.stats.accuracy + '%');
+      setEl('ap-alerts',   d.stats.alerts_closed);
+      setEl('ap-streak',   d.streak?.current || 0);
+      setEl('ap-last-seen', d.stats.last_seen
+        ? new Date(d.stats.last_seen).toLocaleDateString('en-GB',{day:'numeric',month:'short'})
+        : 'Never');
 
-      // Render per-alert table
-      if (!listEl) return;
-      if (!data.records || data.records.length === 0) {
-        listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--dim);font-size:13px">No closed alerts yet.</div>';
-        return;
+      // ── Grade badge ──────────────────────────────────────────────────
+      if (d.performance) {
+        const gradeBadge = document.getElementById('ap-grade-badge');
+        const dpsBadge   = document.getElementById('ap-dps-badge');
+        if (gradeBadge) {
+          const gradeColors = { 'A+':'var(--green)', A:'var(--green)', B:'var(--blue)', C:'var(--yellow)', D:'var(--orange)', F:'var(--red)' };
+          gradeBadge.textContent = d.performance.grade;
+          gradeBadge.style.color = gradeColors[d.performance.grade] || 'var(--dim)';
+          gradeBadge.style.background = 'var(--card)';
+          gradeBadge.style.border = `1px solid ${gradeColors[d.performance.grade] || 'var(--border)'}`;
+          gradeBadge.style.display = '';
+        }
+        if (dpsBadge) { dpsBadge.style.display = ''; setEl('ap-dps', d.performance.dps); }
       }
 
-      listEl.innerHTML = data.records.map((c, i) => `
-        <div style="border-bottom:1px solid var(--border);padding:14px 20px">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px">
-            <div>
-              <span style="font-family:var(--mono);font-size:12px;color:var(--blue);margin-right:10px">${escapeHtml(c.alert_id)}</span>
-              <span style="font-size:12px;color:var(--muted)">${escapeHtml(c.alert_title || '')}</span>
+      // ── Performance pillars ──────────────────────────────────────────
+      if (d.performance?.breakdown) {
+        const el = document.getElementById('ap-perf-pillars');
+        if (el) el.innerHTML = Object.values(d.performance.breakdown).map(b => `
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+              <span style="font-size:12.5px;font-weight:500;color:var(--text)">${b.label}</span>
+              <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:${b.score>=70?'var(--green)':b.score>=50?'var(--blue)':'var(--red)'}">${b.score}% <span style="font-size:10px;color:var(--dim);font-weight:400">× ${b.weight}%</span></span>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-              <span style="font-size:11px;padding:2px 7px;border-radius:3px;font-weight:600;background:${c.classification === 'false_positive' ? 'rgba(249,115,22,0.1)' : 'rgba(59,130,246,0.1)'};color:${c.classification === 'false_positive' ? 'var(--orange)' : 'var(--blue)'}">${c.classification === 'false_positive' ? 'False Positive' : 'Resolved'}</span>
-              <span style="font-size:11px;font-weight:700;color:${c.is_correct ? 'var(--green)' : 'var(--red)'}">${c.is_correct ? '+' + c.points + ' pts' : '0 pts'}</span>
+            <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div style="height:100%;background:${b.score>=70?'var(--green)':b.score>=50?'var(--blue)':'var(--red)'};width:${b.score}%;border-radius:3px;transition:width .5s"></div>
             </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-            ${c.triage_reason ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 10px"><div style="color:var(--dim);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Initial Triage</div><div style="color:var(--muted)">${escapeHtml(c.triage_reason)}</div></div>` : ''}
-            ${c.containment_steps ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 10px"><div style="color:var(--dim);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Containment</div><div style="color:var(--muted)">${escapeHtml(c.containment_steps)}</div></div>` : ''}
-            ${c.eradication_steps ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 10px"><div style="color:var(--dim);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Eradication</div><div style="color:var(--muted)">${escapeHtml(c.eradication_steps)}</div></div>` : ''}
-            ${c.recovery_steps ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 10px"><div style="color:var(--dim);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Recovery</div><div style="color:var(--muted)">${escapeHtml(c.recovery_steps)}</div></div>` : ''}
-            ${c.rca_notes ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 10px;grid-column:1/-1"><div style="color:var(--dim);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Root Cause Analysis</div><div style="color:var(--muted)">${escapeHtml(c.rca_notes)}</div></div>` : ''}
-            ${c.fp_reason ? `<div style="background:rgba(249,115,22,0.05);border:1px solid rgba(249,115,22,0.2);border-radius:4px;padding:8px 10px;grid-column:1/-1"><div style="color:var(--orange);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">False Positive Justification</div><div style="color:var(--muted)">${escapeHtml(c.fp_reason)}</div></div>` : ''}
-          </div>
-          <div style="margin-top:6px;font-size:11px;color:var(--dim)">${c.closed_at ? new Date(c.closed_at).toLocaleString() : ''}</div>
-        </div>
-      `).join('');
-    } catch(e) {
-      if (listEl) listEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--red);font-size:13px">Failed to load activity.</div>';
-    }
-  },
+          </div>`).join('');
+      }
 
-  async changeAdminPassword() {
-    const cur = document.getElementById('sp-current-pw').value.trim();
-    const nw  = document.getElementById('sp-new-pw').value.trim();
-    const cf  = document.getElementById('sp-confirm-pw').value.trim();
-    const res = document.getElementById('sp-result');
-    const show = (msg, ok) => {
-      res.style.display = 'block';
-      res.style.color = ok ? 'var(--blue)' : 'var(--red)';
-      res.style.background = ok ? 'rgba(59,130,246,0.08)' : 'rgba(239,68,68,0.08)';
-      res.style.border = ok ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(239,68,68,0.2)';
-      res.textContent = msg;
-    };
-    if (!cur || !nw || !cf) { show('All fields required.', false); return; }
-    if (nw.length < 8) { show('New password must be at least 8 characters.', false); return; }
-    if (nw !== cf) { show('New passwords do not match.', false); return; }
-    const r = await API.post('/api/user/password', { current_password: cur, new_password: nw });
-    if (r.ok) {
-      show('Password updated successfully.', true);
-      document.getElementById('sp-current-pw').value='';
-      document.getElementById('sp-new-pw').value='';
-      document.getElementById('sp-confirm-pw').value='';
-    } else {
-      show(r.data?.error || 'Failed to update password.', false);
-    }
-  },
-};
-
-// ── LAB BUILDER ─────────────────────────────────────────
-const LabBuilder = {
-  evidence: [],
-  questions: [],
-
-  reset() {
-    this.evidence = [];
-    this.questions = [];
-    this.renderEvidence();
-    this.renderQuestions();
-  },
-
-  loadFromLab(lab) {
-    this.evidence = Array.isArray(lab.evidence) ? lab.evidence.map(item => ({
-      label: item.label || '',
-      type: item.type || 'log',
-      content: item.content || ''
-    })) : [];
-    this.questions = [];
-    this.renderEvidence();
-    this.renderQuestions();
-  },
-
-  addEvidence() {
-    this.evidence.push({ label: '', type: 'log', content: '' });
-    this.renderEvidence();
-  },
-
-  removeEvidence(idx) {
-    this.evidence.splice(idx, 1);
-    this.renderEvidence();
-  },
-
-  updateEvidence(idx, field, value) {
-    if (!this.evidence[idx]) return;
-    this.evidence[idx][field] = value;
-  },
-
-  renderEvidence() {
-    const wrap = document.getElementById('lf-evidence-builder');
-    if (!wrap) return;
-    if (!this.evidence.length) {
-      wrap.innerHTML = '<div class="form-hint">No evidence added yet.</div>';
-      return;
-    }
-    wrap.innerHTML = this.evidence.map((item, idx) => `
-      <div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px;background:rgba(255,255,255,0.02)">
-        <div class="form-row-2">
-          <div class="form-group">
-            <label class="form-label">Evidence Label</label>
-            <input type="text" class="form-input" value="${esc(item.label)}" placeholder="e.g. Firewall log excerpt" oninput="LabBuilder.updateEvidence(${idx}, 'label', this.value)">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Type</label>
-            <select class="form-select" onchange="LabBuilder.updateEvidence(${idx}, 'type', this.value)">
-              <option value="log" ${item.type==='log'?'selected':''}>Log</option>
-              <option value="evidence" ${item.type==='evidence'?'selected':''}>Evidence</option>
-              <option value="ioc" ${item.type==='ioc'?'selected':''}>IOC</option>
-              <option value="note" ${item.type==='note'?'selected':''}>Investigation Note</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Content</label>
-          <textarea class="form-textarea" rows="4" placeholder="Paste the raw logs, evidence, IOC list, or analyst reference material here..." oninput="LabBuilder.updateEvidence(${idx}, 'content', this.value)">${esc(item.content)}</textarea>
-        </div>
-        <button type="button" class="btn btn-red btn-xs" onclick="LabBuilder.removeEvidence(${idx})">Remove Evidence</button>
-      </div>
-    `).join('');
-  },
-
-  addQuestion() {
-    this.questions.push({
-      question: '',
-      answer_type: 'choice',
-      options: ['', ''],
-      correct_answer: '',
-      hint: '',
-      hint_levels: ['', ''],
-      explanation: '',
-      points: 20,
-      difficulty: 'medium',
-      alert_ref: ''
-    });
-    this.renderQuestions();
-  },
-
-  removeQuestion(idx) {
-    this.questions.splice(idx, 1);
-    this.renderQuestions();
-  },
-
-  updateQuestion(idx, field, value) {
-    if (!this.questions[idx]) return;
-    this.questions[idx][field] = value;
-  },
-
-  updateQuestionOption(qIdx, optIdx, value) {
-    if (!this.questions[qIdx]) return;
-    this.questions[qIdx].options[optIdx] = value;
-  },
-
-  addQuestionOption(qIdx) {
-    if (!this.questions[qIdx]) return;
-    this.questions[qIdx].options.push('');
-    this.renderQuestions();
-  },
-
-  removeQuestionOption(qIdx, optIdx) {
-    if (!this.questions[qIdx]) return;
-    if (this.questions[qIdx].options.length <= 2) { toast('Each multiple-choice question needs at least 2 options', 'error'); return; }
-    this.questions[qIdx].options.splice(optIdx, 1);
-    this.renderQuestions();
-  },
-
-  renderQuestions() {
-    const wrap = document.getElementById('lf-question-builder');
-    if (!wrap) return;
-    if (!this.questions.length) {
-      wrap.innerHTML = '<div class="form-hint">No bundled questions yet. Add at least one if you want the full lab package created in one step.</div>';
-      return;
-    }
-    wrap.innerHTML = this.questions.map((q, idx) => `
-      <div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px;background:rgba(255,255,255,0.02)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div class="form-label" style="margin:0">Question ${idx + 1}</div>
-          <button type="button" class="btn btn-red btn-xs" onclick="LabBuilder.removeQuestion(${idx})">Remove</button>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Question Text</label>
-          <textarea class="form-textarea" rows="3" placeholder="Enter the question analysts will answer..." oninput="LabBuilder.updateQuestion(${idx}, 'question', this.value)">${esc(q.question)}</textarea>
-        </div>
-        <div class="form-row-2">
-          <div class="form-group">
-            <label class="form-label">Answer Type</label>
-            <select class="form-select" onchange="LabBuilder.updateQuestion(${idx}, 'answer_type', this.value); LabBuilder.renderQuestions();">
-              <option value="choice" ${q.answer_type==='choice'?'selected':''}>Multiple Choice</option>
-              <option value="text" ${q.answer_type==='text'?'selected':''}>Free Text</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Difficulty</label>
-            <select class="form-select" onchange="LabBuilder.updateQuestion(${idx}, 'difficulty', this.value)">
-              <option value="easy" ${q.difficulty==='easy'?'selected':''}>Easy</option>
-              <option value="medium" ${q.difficulty==='medium'?'selected':''}>Medium</option>
-              <option value="hard" ${q.difficulty==='hard'?'selected':''}>Hard</option>
-              <option value="expert" ${q.difficulty==='expert'?'selected':''}>Expert</option>
-            </select>
-          </div>
-        </div>
-        ${q.answer_type === 'choice' ? `
-          <div class="form-group">
-            <label class="form-label">Options</label>
-            ${(q.options || []).map((opt, optIdx) => `
-              <div style="display:flex;gap:8px;margin-bottom:8px">
-                <input type="text" class="form-input" value="${esc(opt)}" placeholder="Option ${optIdx + 1}" oninput="LabBuilder.updateQuestionOption(${idx}, ${optIdx}, this.value)">
-                <button type="button" class="btn btn-red btn-xs" onclick="LabBuilder.removeQuestionOption(${idx}, ${optIdx})">✕</button>
+      // ── Category performance ──────────────────────────────────────────
+      const catEl = document.getElementById('ap-cat-perf');
+      if (catEl) {
+        if (!d.category_performance?.length) {
+          catEl.innerHTML = '<div style="padding:20px;color:var(--dim);font-size:13px">No lab data yet.</div>';
+        } else {
+          catEl.innerHTML = d.category_performance.map(c => {
+            const col = c.accuracy >= 70 ? 'var(--green)' : c.accuracy >= 50 ? 'var(--blue)' : c.accuracy > 0 ? 'var(--red)' : 'var(--dim)';
+            return `<div style="display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid rgba(30,33,40,.4)">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12.5px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.category)}</div>
+                <div style="font-size:11px;color:var(--dim);margin-top:1px">${c.labs_done}/${c.lab_count} labs · ${c.correct}/${c.attempted} questions</div>
               </div>
-            `).join('')}
-            <button type="button" class="btn btn-outline btn-xs" onclick="LabBuilder.addQuestionOption(${idx})">Add Option</button>
-          </div>
-        ` : ''}
-        <div class="form-group">
-          <label class="form-label">Correct Answer</label>
-          <input type="text" class="form-input" value="${esc(q.correct_answer)}" placeholder="Correct answer or keyword phrase" oninput="LabBuilder.updateQuestion(${idx}, 'correct_answer', this.value)">
-        </div>
-        <div class="form-row-2">
-          <div class="form-group">
-            <label class="form-label">Hint 1: Where to look (-5 pts)</label>
-            <input type="text" class="form-input" value="${esc(q.hint || '')}" placeholder="Guide the analyst to the right logs, evidence, or alert" oninput="LabBuilder.updateQuestion(${idx}, 'hint', this.value)">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Points</label>
-            <input type="number" class="form-input" value="${Number(q.points) || 20}" min="5" max="999" oninput="LabBuilder.updateQuestion(${idx}, 'points', this.value)">
-          </div>
-        </div>
-        <div class="form-row-2">
-          <div class="form-group">
-            <label class="form-label">Hint 2: Narrow it down (-10 pts total)</label>
-            <input type="text" class="form-input" value="${esc((q.hint_levels && q.hint_levels[0]) || '')}" placeholder="Make the student re-check the exact field or value" oninput="LabBuilder.questions[${idx}].hint_levels[0] = this.value">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Hint 3: Final clue (0 pts)</label>
-            <input type="text" class="form-input" value="${esc((q.hint_levels && q.hint_levels[1]) || '')}" placeholder="Optional final clue. If blank, the system will show a masked answer pattern." oninput="LabBuilder.questions[${idx}].hint_levels[1] = this.value">
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Explanation</label>
-          <textarea class="form-textarea" rows="2" placeholder="Why is this the correct answer?" oninput="LabBuilder.updateQuestion(${idx}, 'explanation', this.value)">${esc(q.explanation)}</textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Alert Reference</label>
-          <input type="text" class="form-input" value="${esc(q.alert_ref)}" placeholder="e.g. ALT-204" oninput="LabBuilder.updateQuestion(${idx}, 'alert_ref', this.value)">
-        </div>
-      </div>
-    `).join('');
+              <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:${col};flex-shrink:0">${c.accuracy}%</div>
+            </div>`;
+          }).join('');
+        }
+      }
+
+      // ── Stuck questions ───────────────────────────────────────────────
+      const stuckEl = document.getElementById('ap-stuck-list');
+      const stuckCount = document.getElementById('ap-stuck-count');
+      if (stuckEl) {
+        const stuck = d.stuck_questions || [];
+        if (stuckCount) stuckCount.textContent = stuck.length + ' stuck';
+        if (!stuck.length) {
+          stuckEl.innerHTML = '<div style="padding:20px;color:var(--dim);font-size:13px;text-align:center">No stuck questions — great work.</div>';
+        } else {
+          stuckEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead><tr style="border-bottom:1px solid var(--border)">
+              <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Lab</th>
+              <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Category</th>
+              <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Question</th>
+              <th style="padding:8px 14px;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Wrong</th>
+              <th style="padding:8px 14px;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Hints</th>
+            </tr></thead>
+            <tbody>${stuck.map(q => `<tr style="border-bottom:1px solid rgba(30,33,40,.4)">
+              <td style="padding:9px 14px;font-weight:500;color:var(--text)">${escapeHtml(q.lab_title)}</td>
+              <td style="padding:9px 14px;color:var(--dim);font-size:11.5px">${escapeHtml(q.category || '')}</td>
+              <td style="padding:9px 14px;color:var(--muted);max-width:300px">${escapeHtml(q.question)}</td>
+              <td style="padding:9px 14px;text-align:center;font-family:var(--mono);color:var(--red);font-weight:700">${q.wrong_count}</td>
+              <td style="padding:9px 14px;text-align:center;font-family:var(--mono);color:var(--yellow)">${q.hints_used}</td>
+            </tr>`).join('')}</tbody>
+          </table>`;
+        }
+      }
+
+      // ── Labs tab ─────────────────────────────────────────────────────
+      const labsEl = document.getElementById('ap-labs-list');
+      if (labsEl) {
+        const attempted = (d.lab_activity || []).filter(l => l.status !== 'not_started');
+        const notStarted = (d.lab_activity || []).filter(l => l.status === 'not_started');
+        const renderLabSection = (labs, title) => {
+          if (!labs.length) return '';
+          return `<div style="margin-bottom:16px">
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);padding:8px 14px;background:var(--bg);border-top:1px solid var(--border)">${title} (${labs.length})</div>
+            ${labs.map(lab => {
+              const statusColor = lab.status==='completed' ? 'var(--green)' : lab.status==='in_progress' ? 'var(--blue)' : 'var(--dim)';
+              const scorePct    = lab.max_score > 0 ? Math.round((lab.score_earned / lab.max_score) * 100) : 0;
+              const time        = lab.time_spent_mins != null
+                ? (lab.time_spent_mins < 60 ? lab.time_spent_mins + ' min' : Math.round(lab.time_spent_mins/60*10)/10 + ' hr')
+                : '–';
+              const qRows = lab.questions.filter(q => q.attempted).map(q => `
+                <tr style="border-bottom:1px solid rgba(30,33,40,.3)">
+                  <td style="padding:7px 14px 7px 28px;font-size:11.5px;color:var(--muted)">Q${q.order_index}</td>
+                  <td style="padding:7px 14px;font-size:11.5px;color:var(--text);max-width:260px">${escapeHtml(q.question)}</td>
+                  <td style="padding:7px 14px;text-align:center"><span style="font-size:11px;font-weight:600;color:${q.is_correct?'var(--green)':'var(--red)'}">${q.is_correct?'✓ Correct':'✗ Wrong'}</span></td>
+                  <td style="padding:7px 14px;text-align:center;font-family:var(--mono);font-size:11.5px;color:${q.wrong_count>0?'var(--red)':'var(--dim)'}">${q.wrong_count || 0}</td>
+                  <td style="padding:7px 14px;text-align:center;font-family:var(--mono);font-size:11.5px;color:${q.hints_used>0?'var(--yellow)':'var(--dim)'}">${q.hints_used || 0}</td>
+                  <td style="padding:7px 14px;text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--blue)">${q.pts_awarded || 0}</td>
+                </tr>`).join('');
+              return `<div style="border-bottom:1px solid var(--border)">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;background:var(--card)"
+                     onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+                  <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:3px;background:${lab.status==='completed'?'rgba(34,197,94,.1)':lab.status==='in_progress'?'rgba(59,130,246,.1)':'rgba(255,255,255,.05)'};color:${statusColor};text-transform:capitalize;border:1px solid ${statusColor}40">${lab.status.replace('_',' ')}</span>
+                  <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">${escapeHtml(lab.title)}</span>
+                  <span style="font-size:11.5px;color:var(--dim)">${escapeHtml(lab.category || '')}</span>
+                  <span style="font-family:var(--mono);font-size:12px;color:var(--blue)">${lab.score_earned}/${lab.max_score} pts</span>
+                  <span style="font-size:11px;color:var(--dim)">${lab.questions_correct}/${lab.questions_total} questions</span>
+                  ${time !== '–' ? `<span style="font-size:11px;color:var(--dim)">${time}</span>` : ''}
+                  <span style="font-size:11px;color:var(--dim)">▼</span>
+                </div>
+                <div style="display:none;overflow:hidden">
+                  ${qRows ? `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
+                    <thead><tr style="background:var(--bg)">
+                      <th style="padding:7px 14px 7px 28px;text-align:left;font-size:10px;color:var(--dim);font-weight:600;text-transform:uppercase">#</th>
+                      <th style="padding:7px 14px;text-align:left;font-size:10px;color:var(--dim);font-weight:600;text-transform:uppercase">Question</th>
+                      <th style="padding:7px 14px;text-align:center;font-size:10px;color:var(--dim);font-weight:600;text-transform:uppercase">Result</th>
+                      <th style="padding:7px 14px;text-align:center;font-size:10px;color:var(--dim);font-weight:600;text-transform:uppercase">Wrong</th>
+                      <th style="padding:7px 14px;text-align:center;font-size:10px;color:var(--dim);font-weight:600;text-transform:uppercase">Hints</th>
+                      <th style="padding:7px 14px;text-align:center;font-size:10px;color:var(--dim);font-weight:600;text-transform:uppercase">Pts</th>
+                    </tr></thead>
+                    <tbody>${qRows}</tbody>
+                  </table>` : '<div style="padding:12px 28px;font-size:12px;color:var(--dim)">No questions attempted yet.</div>'}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>`;
+        };
+        labsEl.innerHTML =
+          renderLabSection(attempted.filter(l=>l.status==='completed'),  'Completed') +
+          renderLabSection(attempted.filter(l=>l.status==='in_progress'),'In Progress') +
+          renderLabSection(notStarted, 'Not Started');
+      }
+
+      // ── Alerts tab ───────────────────────────────────────────────────
+      const alertEl = document.getElementById('ap-alert-list');
+      const alertCount = document.getElementById('ap-alert-count');
+      if (alertEl) {
+        const hist = d.alert_history || [];
+        if (alertCount) alertCount.textContent = hist.length + ' closures';
+        if (!hist.length) {
+          alertEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--dim)">No alerts triaged yet.</div>';
+        } else {
+          const correct = hist.filter(a=>a.is_correct).length;
+          alertEl.innerHTML = `
+            <div style="display:flex;gap:20px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg);font-size:12.5px">
+              <span>Total: <strong>${hist.length}</strong></span>
+              <span style="color:var(--green)">Correct: <strong>${correct}</strong></span>
+              <span style="color:var(--red)">Wrong: <strong>${hist.length-correct}</strong></span>
+              <span>Accuracy: <strong>${hist.length > 0 ? Math.round(correct/hist.length*100) : 0}%</strong></span>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+              <thead><tr style="border-bottom:1px solid var(--border)">
+                <th style="padding:8px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Alert</th>
+                <th style="padding:8px 14px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Sev</th>
+                <th style="padding:8px 14px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Classification</th>
+                <th style="padding:8px 14px;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Result</th>
+                <th style="padding:8px 14px;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">IR Score</th>
+                <th style="padding:8px 14px;text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Pts</th>
+                <th style="padding:8px 14px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--dim)">Date</th>
+              </tr></thead>
+              <tbody>${hist.map(a => `<tr style="border-bottom:1px solid rgba(30,33,40,.4)">
+                <td style="padding:9px 14px">
+                  <div style="font-size:12.5px;font-weight:500;color:var(--text)">${escapeHtml(a.alert_title || a.alert_id)}</div>
+                  <div style="font-size:11px;color:var(--dim);font-family:var(--mono)">${escapeHtml(a.alert_id)}</div>
+                </td>
+                <td style="padding:9px 14px"><span class="sev-badge ${escapeHtml(a.severity||'')}">${escapeHtml(a.severity||'–')}</span></td>
+                <td style="padding:9px 14px;font-size:11.5px;color:var(--muted)">${a.classification==='false_positive'?'False Positive':'Resolved'}</td>
+                <td style="padding:9px 14px;text-align:center"><span style="font-size:11px;font-weight:700;color:${a.is_correct?'var(--green)':'var(--red)'}">${a.is_correct?'Correct':'Wrong'}</span></td>
+                <td style="padding:9px 14px;text-align:center;font-family:var(--mono);font-size:12px">${a.investigation_score||0}%</td>
+                <td style="padding:9px 14px;text-align:center;font-family:var(--mono);font-weight:700;color:${a.points>0?'var(--blue)':'var(--dim)'}">${a.points||0}</td>
+                <td style="padding:9px 14px;font-size:11px;color:var(--dim)">${a.closed_at?new Date(a.closed_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}):'–'}</td>
+              </tr>`).join('')}</tbody>
+            </table>`;
+        }
+      }
+
+      // ── Activity feed tab ─────────────────────────────────────────────
+      const feedEl = document.getElementById('ap-activity-feed');
+      if (feedEl) {
+        const feed = d.activity_feed || [];
+        if (!feed.length) {
+          feedEl.innerHTML = '<div style="color:var(--dim);font-size:13px;text-align:center;padding:20px">No activity yet.</div>';
+        } else {
+          const typeIcon  = { answer:'Q', alert:'A', lab_start:'▶', lab_complete:'✓' };
+          const typeColor = { answer_correct:'var(--green)', answer_wrong:'var(--red)', alert_correct:'var(--green)', alert_wrong:'var(--red)', lab_start:'var(--blue)', lab_complete:'var(--green)' };
+          feedEl.innerHTML = feed.map(e => {
+            const key   = e.type + '_' + (e.result||'');
+            const icon  = typeIcon[e.type] || '·';
+            const color = typeColor[key] || 'var(--dim)';
+            const label =
+              e.type === 'answer'       ? (e.result==='correct' ? `Correct answer: ${e.detail?.slice(0,60)||''}` : `Wrong answer: ${e.detail?.slice(0,60)||''}`)
+              : e.type === 'alert'      ? (e.result==='correct' ? `Correct triage: ${e.detail||''}` : `Wrong triage: ${e.detail||''}`)
+              : e.type === 'lab_start'  ? `Started lab: ${e.lab_title||''}`
+              : e.type === 'lab_complete' ? `Completed lab: ${e.lab_title||''}`
+              : e.detail||'';
+            return `<div style="display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid rgba(30,33,40,.4)">
+              <div style="width:22px;height:22px;border-radius:3px;background:${color}20;border:1px solid ${color}40;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${color};flex-shrink:0">${icon}</div>
+              <div style="flex:1">
+                <div style="font-size:12.5px;color:var(--text)">${escapeHtml(label)}</div>
+                ${e.pts>0?`<div style="font-size:11px;color:var(--blue);font-family:var(--mono)">+${e.pts} pts</div>`:''}
+              </div>
+              <div style="font-size:11px;color:var(--dim);flex-shrink:0">${e.ts?new Date(e.ts).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'–'}</div>
+            </div>`;
+          }).join('');
+        }
+      }
+
+    } catch(err) {
+      console.error(err);
+      const e = document.getElementById('ap-username');
+      if (e) e.textContent = 'Failed to load profile';
+    }
   },
 
-  collectEvidence() {
-    return this.evidence
-      .map(item => ({
-        label: String(item.label || '').trim(),
-        type: String(item.type || 'log').trim(),
-        content: String(item.content || '').trim()
-      }))
-      .filter(item => item.label || item.content);
-  },
 
-  collectQuestions() {
-    return this.questions
-      .map(q => ({
-        question: String(q.question || '').trim(),
-        answer_type: q.answer_type === 'text' ? 'text' : 'choice',
-        options: (Array.isArray(q.options) ? q.options : []).map(o => String(o || '').trim()).filter(Boolean),
-        correct_answer: String(q.correct_answer || '').trim(),
-        hint: String(q.hint || '').trim(),
-        hint_levels: (Array.isArray(q.hint_levels) ? q.hint_levels : []).map(h => String(h || '').trim()).filter(Boolean),
-        explanation: String(q.explanation || '').trim(),
-        points: parseInt(q.points) || 20,
-        difficulty: q.difficulty || 'medium',
-        alert_ref: String(q.alert_ref || '').trim()
-      }))
-      .filter(q => q.question || q.correct_answer);
-  }
-};
-
-// ── LAB MODALS ──────────────────────────────────────────
-const LabModals = {
-  open(id)  { const el = document.getElementById(id); if (el) el.classList.add('open'); },
-  close(id) { const el = document.getElementById(id); if (el) el.classList.remove('open'); },
-
-  openCreateLab() {
-    document.getElementById('lab-form-title').textContent = 'Create New Lab';
-    document.getElementById('btn-save-lab').textContent  = 'Create Lab';
-    document.getElementById('lf-id').value          = '';
-    document.getElementById('lf-title').value        = '';
-    document.getElementById('lf-description').value  = '';
-    document.getElementById('lf-category').value     = '';
-    document.getElementById('lf-difficulty').value   = 'medium';
-    document.getElementById('lf-points').value       = '100';
-    document.getElementById('lf-visible').value      = '1';
-    document.getElementById('lf-alert-refs').value   = '';
-    LabBuilder.reset();
-    this.open('modal-lab-form');
-    setTimeout(() => document.getElementById('lf-title').focus(), 100);
-  },
-
-  openEditLab(lab) {
-    document.getElementById('lab-form-title').textContent = 'Edit Lab';
-    document.getElementById('btn-save-lab').textContent  = 'Save Changes';
-    document.getElementById('lf-id').value          = lab.id;
-    document.getElementById('lf-title').value        = lab.title;
-    document.getElementById('lf-description').value  = lab.description || '';
-    document.getElementById('lf-category').value     = lab.category || '';
-    document.getElementById('lf-difficulty').value   = lab.difficulty || 'medium';
-    document.getElementById('lf-points').value       = lab.points;
-    document.getElementById('lf-visible').value      = lab.is_visible ? '1' : '0';
-    document.getElementById('lf-alert-refs').value   = Array.isArray(lab.alert_refs) ? lab.alert_refs.join(', ') : '';
-    LabBuilder.loadFromLab(lab);
-    this.open('modal-lab-form');
-    setTimeout(() => document.getElementById('lf-title').focus(), 100);
-  },
-
-  onTypeChange() {
-    const type = document.getElementById('qf-type').value;
-    document.getElementById('qf-options-section').style.display = type === 'choice' ? '' : 'none';
-    document.getElementById('qf-answer-hint').textContent = type === 'choice'
-      ? 'Must match one of the options exactly (case-insensitive).'
-      : 'Key phrases the answer must contain.';
-  },
-
-  _options: [],
-
-  initOptions(opts) {
-    this._options = opts && opts.length ? [...opts] : ['', ''];
-    this._renderOptions();
-  },
-
-  addOption() {
-    if (this._options.length >= 6) { toast('Maximum 6 options', 'error'); return; }
-    this._options.push('');
-    this._renderOptions();
-    // focus the new field
-    const rows = document.querySelectorAll('#options-builder .option-input');
-    if (rows.length) rows[rows.length - 1].focus();
-  },
-
-  removeOption(idx) {
-    if (this._options.length <= 2) { toast('Minimum 2 options required', 'error'); return; }
-    this._options.splice(idx, 1);
-    this._renderOptions();
-  },
-
-  _renderOptions() {
-    const builder = document.getElementById('options-builder');
-    builder.innerHTML = this._options.map((opt, i) => `
-      <div class="option-row">
-        <input type="text" class="form-input option-input" value="${opt.replace(/"/g,'&quot;')}"
-          placeholder="Option ${i + 1}"
-          oninput="LabModals._options[${i}] = this.value">
-        <button type="button" class="btn btn-red btn-xs" onclick="LabModals.removeOption(${i})">✕</button>
-      </div>
-    `).join('');
-  },
-
-  getOptions() {
-    // re-read from DOM to catch any last keystrokes
-    document.querySelectorAll('#options-builder .option-input').forEach((el, i) => {
-      this._options[i] = el.value;
-    });
-    return this._options.map(o => o.trim()).filter(o => o.length > 0);
-  },
-
-  openAddQuestion() {
-    document.getElementById('qform-title').textContent        = 'Add Question';
-    document.getElementById('btn-save-question').textContent  = 'Add Question';
-    document.getElementById('qf-id').value         = '';
-    document.getElementById('qf-question').value   = '';
-    document.getElementById('qf-type').value       = 'choice';
-    document.getElementById('qf-difficulty').value = 'medium';
-    document.getElementById('qf-answer').value     = '';
-    document.getElementById('qf-points').value     = '20';
-    document.getElementById('qf-hint').value       = '';
-    document.getElementById('qf-explanation').value= '';
-    document.getElementById('qf-alert-ref').value   = '';
-    this.initOptions(['', '']);
-    this.onTypeChange();
-    this.open('modal-question-form');
-    setTimeout(() => document.getElementById('qf-question').focus(), 100);
-  },
-
-  openEditQuestion(q) {
-    document.getElementById('qform-title').textContent        = 'Edit Question';
-    document.getElementById('btn-save-question').textContent  = 'Save Changes';
-    document.getElementById('qf-id').value         = q.id;
-    document.getElementById('qf-question').value   = q.question;
-    document.getElementById('qf-type').value       = q.answer_type || 'choice';
-    document.getElementById('qf-difficulty').value = q.difficulty || 'medium';
-    document.getElementById('qf-answer').value     = q.correct_answer;
-    document.getElementById('qf-points').value     = q.points;
-    document.getElementById('qf-hint').value       = q.hint || '';
-    document.getElementById('qf-explanation').value= q.explanation || '';
-    document.getElementById('qf-alert-ref').value   = q.alert_ref || '';
-    this.initOptions(q.options && q.options.length ? q.options : ['', '']);
-    this.onTypeChange();
-    this.open('modal-question-form');
-    setTimeout(() => document.getElementById('qf-question').focus(), 100);
-  }
-};
-
-// Close new modals on overlay click
-['modal-lab-form','modal-question-form','modal-delete-lab','modal-delete-question','modal-bulk-import'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
-});
-
-// ── LAB PAGES ───────────────────────────────────────────
-const LabPages = {
-  _labsRaw:        [],
-  _activeLab:      null,
-  _deleteLabTarget: null,
-  _deleteQTarget:   null,
 
   async load() {
     document.getElementById('labs-table-wrap').innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading labs...</div>';

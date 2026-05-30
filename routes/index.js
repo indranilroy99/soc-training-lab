@@ -150,6 +150,9 @@ async function router(req, res) {
   const analystActMatch = url.match(/^\/api\/admin\/analysts\/(\d+)\/activity$/);
   if (method === 'GET' && analystActMatch) return adminRoutes.getAnalystActivity(req, res, analystActMatch[1]);
 
+  const analystProfileMatch = url.match(/^\/api\/admin\/analysts\/(\d+)\/profile$/);
+  if (method === 'GET' && analystProfileMatch) return adminRoutes.getProfile(req, res, analystProfileMatch[1]);
+
   // ── Static files ──────────────────────────────────────────────────────
   if (method === 'GET') {
     if (url === '/' || url === '/login' || url === '/login.html')
