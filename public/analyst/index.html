@@ -199,7 +199,7 @@ input, textarea, select { font-family: var(--font); }
 .filter-tab.active { color: var(--text); border-bottom-color: var(--blue); }
 
 /* ── LAB VIEW ── */
-#lab-view { display: none; flex-direction: column; flex: 1; overflow: hidden; height: 100vh; }
+#lab-view { display: none; flex-direction: column; overflow: hidden; position: fixed; top: 0; left: var(--sidebar-w); right: 0; bottom: 0; z-index: 200; }
 #lab-view.active { display: flex; }
 
 /* Back bar at top of lab view */
@@ -213,15 +213,17 @@ input, textarea, select { font-family: var(--font); }
 .lab-view-layout {
   display: grid;
   grid-template-columns: 300px 1fr;
-  flex: 1;
+  /* fill remaining height after the lab-view-topbar (44px) */
+  height: calc(100vh - 44px);
   overflow: hidden;
+  width: 100%;
 }
 
 /* Left info panel — fixed, non-scrolling */
 .lab-info-panel {
   border-right: 1px solid var(--border);
   overflow-y: auto;
-  height: 100%;
+  min-height: 0;      /* allow proper scrolling inside grid cell */
   background: var(--bg);
 }
 .lab-info-card { background: transparent; overflow: hidden; }
@@ -248,7 +250,7 @@ input, textarea, select { font-family: var(--font); }
 /* Right questions panel — independently scrollable */
 .questions-scroll-panel {
   overflow-y: auto;
-  height: 100%;
+  min-height: 0;      /* allow proper scrolling inside grid cell */
   padding: 24px;
 }
 
@@ -1255,6 +1257,7 @@ const App = {
     localStorage.removeItem('diaas_last_lab_slug');
 
     document.getElementById('lab-view').classList.remove('active');
+    document.getElementById('topbar').style.display = '';       // restore main topbar
     document.getElementById('content').style.display = 'block';
 
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1286,6 +1289,7 @@ const App = {
 
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('topbar').style.display = 'none';   // hide main topbar in lab mode
     document.getElementById('content').style.display = 'none';
     document.getElementById('lab-view').classList.add('active');
     document.querySelector('.nav-item[data-page="labs"]').classList.add('active');
