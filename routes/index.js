@@ -87,8 +87,21 @@ async function router(req, res) {
 
   const gradReportMatch = url.match(/^\/api\/admin\/graduation\/report\/(\d+)$/);
   if (method === 'GET' && gradReportMatch) return gradRoutes.getStudentReport(req, res, gradReportMatch[1]);
-  // Drafts stub — admin page calls this; return empty if no route
-  if (method === 'GET'  && url.startsWith('/api/me/drafts/')) return jsonRes(res, 200, { ok: true, drafts: {} });
+  // Drafts — return per-question drafts for a lab slug
+  if (method === 'GET' && url.startsWith('/api/me/drafts/')) {
+    const user = require('./middleware/auth').requireAuth(req, res);
+    if (!user) return;
+    const slug = url.replace('/api/me/drafts/', '');
+    const { db } = require('./db');
+    const lab = db.prepare(`SELECT id FROM labs WHERE slug=?`).get(slug);
+    if (!lab) return jsonRes(res, 200, { ok: true, drafts: {} });
+    const rows = db.prepare(
+      `SELECT question_id, draft_answer FROM draft_answers WHERE user_id=? AND lab_id=?`
+    ).all(user.id, lab.id);
+    const drafts = {};
+    rows.forEach(r => { drafts[r.question_id] = r.draft_answer; });
+    return jsonRes(res, 200, { ok: true, drafts });
+  }
 
   // ── Leaderboard ───────────────────────────────────────────────────────
   if (method === 'GET'  && url === '/api/leaderboard')  return lbRoutes.getLeaderboard(req, res);

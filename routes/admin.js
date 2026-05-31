@@ -79,7 +79,8 @@ async function createUser(req, res) {
   const existing   = db.prepare(`SELECT id FROM users WHERE username=?`).get(cleanName);
   if (existing) return badRequest(res, 'Username already exists');
   const hash = bcrypt.hashSync(password, 10);
-  const info = db.prepare(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`).run(cleanName, hash, validRole);
+  const forcePw = validRole === 'admin' ? 0 : 1;
+  const info = db.prepare(`INSERT INTO users (username, password_hash, role, force_pw_change) VALUES (?,?,?,?)`).run(cleanName, hash, validRole, forcePw);
   return created(res, { id: info.lastInsertRowid, username: cleanName, role: validRole });
 }
 
@@ -139,7 +140,14 @@ function getProgress(req, res) {
       const p = allProg.find(x => x.user_id === u.id && x.lab_id === l.id);
       row.labs[l.slug] = p ? { status: p.status, score: p.score, completed_at: p.completed_at } : { status: 'not_started', score: 0 };
     });
-    row.total_score = Object.values(row.labs).reduce((s, l) => s + (l.score || 0), 0);
+    // Sum user_answers pts directly — consistent with leaderboard scoring
+    const scoreRow = db.prepare(
+      `SELECT COALESCE(SUM(pts_awarded),0) AS s FROM user_answers WHERE user_id=? AND is_correct=1`
+    ).get(u.id);
+    const alertRow = db.prepare(
+      `SELECT COALESCE(SUM(points_awarded),0) AS s FROM alert_closures WHERE user_id=? AND is_correct=1`
+    ).get(u.id);
+    row.total_score = (scoreRow?.s || 0) + (alertRow?.s || 0);
     return row;
   });
   return ok(res, { users: matrix, labs });
@@ -156,7 +164,7 @@ function listAdminLabs(req, res) {
   ).all().map(l => ({
     ...l,
     alert_refs: (() => { try { return JSON.parse(l.alert_refs || '[]'); } catch { return []; } })(),
-    evidence:   (() => { try { return JSON.parse(l.evidence   || '[]'); } catch { return []; } })(),
+    evidence:   (() => { if (!l.evidence) return []; try { return JSON.parse(l.evidence); } catch { return l.evidence; } })(),
   }));
   return ok(res, labs);
 }
@@ -222,7 +230,7 @@ function getLabQuestions(req, res, labId) {
   const qs = db.prepare(
     `SELECT id, order_index, question, answer_type, correct_answer, options, points, hint, hint_levels, alert_ref
      FROM questions WHERE lab_id=? ORDER BY order_index`
-  ).all(parseInt(labId, 10)).map(q => ({ ...q, options: q.options ? JSON.parse(q.options) : null }));
+  ).all(parseInt(labId, 10)).map(q => ({ ...q, options: q.options ? (() => { try { return JSON.parse(q.options); } catch { return null; } })() : null }));
   return ok(res, qs);
 }
 
@@ -331,9 +339,16 @@ async function batchReset(req, res) {
       // Hard delete: remove all analyst accounts entirely
       db.prepare(`DELETE FROM users WHERE role='analyst'`).run();
     } else {
-      // Soft reset: keep accounts, reset scores and force password change on next login
-      db.prepare(`UPDATE users SET points=0, extra_labs_bonus=0, force_pw_change=1 WHERE role='analyst'`).run();
+      // Soft reset: keep accounts, reset scores and force password change
+      // Wrap in try/catch — extra_labs_bonus column may not exist on older installs
+      try {
+        db.prepare(`UPDATE users SET points=0, extra_labs_bonus=0, force_pw_change=1 WHERE role='analyst'`).run();
+      } catch {
+        db.prepare(`UPDATE users SET points=0, force_pw_change=1 WHERE role='analyst'`).run();
+      }
     }
+    // Also clear the leaderboard snapshot table if it exists
+    try { db.prepare(`DELETE FROM leaderboard WHERE user_id IN (SELECT id FROM users WHERE role='analyst')`).run(); } catch {}
 
     // Audit log
     db.prepare(`INSERT INTO batch_resets (reset_by, note, users_affected) VALUES (?,?,?)`)
@@ -352,9 +367,15 @@ async function batchReset(req, res) {
 // ── GET /api/admin/users/export — export all analysts as CSV ─────────────
 function exportUsers(req, res) {
   const admin = requireAdmin(req, res); if (!admin) return;
-  const users = db.prepare(
-    `SELECT username, role, is_active, display_name, email, institution, created_at FROM users ORDER BY role, username`
-  ).all();
+  let users;
+  try {
+    users = db.prepare(
+      `SELECT username, role, is_active, display_name, email, institution, created_at FROM users ORDER BY role, username`
+    ).all();
+  } catch {
+    // Fallback if extended columns don't exist yet
+    users = db.prepare(`SELECT username, role, is_active, created_at FROM users ORDER BY role, username`).all();
+  }
 
   const header = 'username,password,role,display_name,email,institution';
   const rows = users.map(u =>
@@ -385,23 +406,29 @@ async function importUsers(req, res) {
 
   const created = []; const errors = [];
 
+  // Pre-validate + pre-hash all passwords OUTSIDE the DB transaction
+  // bcrypt is expensive (~100ms each) — hashing inside a transaction blocks the DB
+  const validated = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r.username || !r.password) { errors.push({ row: i+1, error: 'username and password required' }); continue; }
+    const uname = sanitize(r.username).toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    if (uname.length < 3) { errors.push({ row: i+1, error: 'username too short' }); continue; }
+    if (r.password.length < 8) { errors.push({ row: i+1, error: 'password must be 8+ characters' }); continue; }
+    const role = r.role === 'admin' ? 'admin' : 'analyst';
+    const hash = bcrypt.hashSync(r.password, 10); // hashed outside transaction
+    validated.push({ row: i+1, uname, hash, role, r });
+  }
+
+  // Now insert all valid rows inside a single fast transaction (no hashing inside)
   db.transaction(() => {
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-      if (!r.username || !r.password) { errors.push({ row: i+1, error: 'username and password required' }); continue; }
-
-      const uname = sanitize(r.username).toLowerCase().replace(/[^a-z0-9_]/g, '_');
-      if (uname.length < 3) { errors.push({ row: i+1, error: 'username too short' }); continue; }
-      if (r.password.length < 8) { errors.push({ row: i+1, error: 'password must be 8+ characters' }); continue; }
+    for (const { row, uname, hash, role, r } of validated) {
       if (db.prepare(`SELECT id FROM users WHERE username=?`).get(uname)) {
-        errors.push({ row: i+1, error: `username '${uname}' already exists` }); continue;
+        errors.push({ row, error: `username '${uname}' already exists` }); continue;
       }
-
-      const hash = require('bcryptjs').hashSync(r.password, 10);
-      const role = r.role === 'admin' ? 'admin' : 'analyst';
       const info = db.prepare(
-        `INSERT INTO users (username, password_hash, role, display_name, email, institution, force_pw_change) VALUES (?,?,?,?,?,?,1)`
-      ).run(uname, hash, role, r.display_name || null, r.email || null, r.institution || null);
+        `INSERT INTO users (username, password_hash, role, display_name, email, institution, force_pw_change) VALUES (?,?,?,?,?,?,?)`
+      ).run(uname, hash, role, r.display_name || null, r.email || null, r.institution || null, role === 'admin' ? 0 : 1);
       created.push({ id: info.lastInsertRowid, username: uname, role });
     }
   })();

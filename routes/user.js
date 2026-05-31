@@ -36,7 +36,8 @@ function getMe(req, res) {
   let profile = null;
   try {
     profile = db.prepare(
-      `SELECT display_name, dob, institution, bio, profile_image, email, force_pw_change FROM users WHERE id=?`
+      `SELECT display_name, dob, institution, bio, profile_image, email, force_pw_change,
+              last_lab_slug, last_active_at FROM users WHERE id=?`
     ).get(user.id);
   } catch {
     // Fallback: extended columns not yet added via migration
@@ -55,6 +56,8 @@ function getMe(req, res) {
     score, rank, labs_done: labsDone, labs_in_progress: labsInProgress,
     total_answered: totalAnswered, correct_answered: correctAnswered, accuracy,
     streak,
+    last_lab_slug:   profile?.last_lab_slug   || null,
+    last_active_at:  profile?.last_active_at  || null,
   });
 }
 
