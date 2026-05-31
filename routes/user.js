@@ -32,9 +32,16 @@ function getMe(req, res) {
 
   const streak = getStreak(user.id);
 
-  const profile = db.prepare(
-    `SELECT display_name, dob, institution, bio, profile_image, email, force_pw_change FROM users WHERE id=?`
-  ).get(user.id);
+  // Wrap in try/catch: profile columns may not exist on older installs
+  let profile = null;
+  try {
+    profile = db.prepare(
+      `SELECT display_name, dob, institution, bio, profile_image, email, force_pw_change FROM users WHERE id=?`
+    ).get(user.id);
+  } catch {
+    // Fallback: extended columns not yet added via migration
+    profile = db.prepare(`SELECT username FROM users WHERE id=?`).get(user.id);
+  }
 
   return ok(res, {
     id: user.id, username: user.username, role: user.role,

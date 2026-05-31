@@ -29,7 +29,9 @@ async function login(req, res) {
   ).get(username.trim());
 
   // Use constant-time comparison to prevent timing attacks even on missing user
-  const dummyHash = '$2a$10$nothingdummyhashtopreventtiming';
+  // Valid bcrypt hash ensures compareSync takes the same time whether user exists or not
+  // (prevents username enumeration via timing attack)
+  const dummyHash = '$2a$10$fCExdckQx2QWNtaE96Cs5.sNQXiDMfkemEFahDcAQCA0vLXpKO2Ry';
   const hashToCheck = user?.password_hash || dummyHash;
   const passwordMatch = bcrypt.compareSync(password, hashToCheck);
 

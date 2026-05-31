@@ -67,17 +67,27 @@ function parseBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
     let bytes = 0;
+    let settled = false;
+    const done = (fn, val) => { if (!settled) { settled = true; fn(val); } };
+
+    // Timeout: abandon body parsing after 30s (prevents hanging connections)
+    const timer = setTimeout(() => {
+      done(reject, Object.assign(new Error('Request body timeout'), { code: 'BODY_TIMEOUT', status: 408 }));
+    }, 30_000);
+
     req.on('data', chunk => {
       bytes += chunk.length;
       if (bytes > cfg.MAX_BODY_BYTES) {
+        clearTimeout(timer);
         req.destroy(Object.assign(new Error('Request body too large'), { code: 'BODY_TOO_LARGE', status: 413 }));
         return;
       }
       body += chunk;
     });
     req.on('end', () => {
-      if (!body) return resolve({});
-      try { resolve(JSON.parse(body)); }
+      clearTimeout(timer);
+      if (!body) return done(resolve, {});
+      try { done(resolve, JSON.parse(body)); }
       catch { resolve({}); }
     });
     req.on('error', reject);

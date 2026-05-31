@@ -95,6 +95,11 @@ function runMigrations() {
     FOREIGN KEY(alert_id) REFERENCES soc_alerts(id) ON DELETE CASCADE
   )`).run();
 
+  // Prevent double-scoring: one closure per user per alert
+  try {
+    db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS uq_closure_user_alert ON alert_closures(user_id, alert_id)`).run();
+  } catch { /* index already exists */ }
+
   const closureCols = [
     [`ALTER TABLE alert_closures ADD COLUMN investigation_score INTEGER DEFAULT 0`],
     [`ALTER TABLE alert_closures ADD COLUMN step_scores TEXT DEFAULT '{}'`],

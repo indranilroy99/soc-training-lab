@@ -63,9 +63,12 @@ function getLab(req, res, slug) {
     `SELECT status, score, started_at, completed_at FROM user_progress WHERE user_id=? AND lab_id=?`
   ).get(user.id, lab.id);
 
-  let alert_refs = []; let evidence = [];
+  let alert_refs = [];
   try { alert_refs = lab.alert_refs ? JSON.parse(lab.alert_refs) : []; } catch {}
-  try { evidence   = lab.evidence   ? JSON.parse(lab.evidence)   : []; } catch {}
+
+  // Evidence may be a plain text string OR a JSON array — return as-is
+  // JSON.parse would silently fail for plain text, so we preserve the original
+  const evidence = lab.evidence || null;
 
   return ok(res, {
     ...lab, alert_refs, evidence,

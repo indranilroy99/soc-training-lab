@@ -36,9 +36,18 @@ function listAlerts(req, res) {
     where.push('(title LIKE ? OR description LIKE ? OR host LIKE ? OR src_ip LIKE ? OR mitre_technique LIKE ?)');
     const q = `%${search}%`; args.push(q, q, q, q, q);
   }
+
+  // Status filter: join user_alert_state for per-user status (analysts) or use global (admin)
+  if (status && user.role !== 'admin') {
+    where.push(`id IN (SELECT alert_id FROM user_alert_state WHERE user_id=? AND status=?)`);
+    args.push(user.id, status);
+  } else if (status && user.role === 'admin') {
+    where.push('status=?'); args.push(status);
+  }
+
   const whereStr = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-  let alerts = db.prepare(
+  const alerts = db.prepare(
     `SELECT id, severity, category, title, source, host, src_ip, dst_ip, username,
             process, event_id, mitre_tactic, mitre_technique, status, timestamp
      FROM soc_alerts ${whereStr}
@@ -50,11 +59,7 @@ function listAlerts(req, res) {
     status: user.role === 'admin' ? a.status : getUserAlertStatus(user.id, a.id, a.status),
   }));
 
-  if (status) alerts = alerts.filter(a => a.status === status);
-
-  const total = status
-    ? alerts.length
-    : db.prepare(`SELECT COUNT(*) as c FROM soc_alerts ${whereStr}`).get(...args).c;
+  const total = db.prepare(`SELECT COUNT(*) as c FROM soc_alerts ${whereStr}`).get(...args).c;
 
   const counts = db.prepare(`SELECT severity, COUNT(*) as n FROM soc_alerts GROUP BY severity`)
     .all().reduce((acc, r) => { acc[r.severity] = r.n; return acc; }, {});
@@ -104,6 +109,21 @@ async function updateAlertStatus(req, res, alertId) {
   let step_scores = {}, scoring_feedback = [];
 
   if (status === 'closed' || status === 'false_positive') {
+    // Check if already closed — prevent double-scoring
+    const existingClosure = db.prepare(
+      `SELECT id, is_correct, points_awarded FROM alert_closures WHERE user_id=? AND alert_id=?`
+    ).get(user.id, alertId);
+    if (existingClosure) {
+      return ok(res, {
+        alertId, status: 'already_closed',
+        is_correct: !!existingClosure.is_correct,
+        points_awarded: 0,  // no additional points
+        investigation_score: 0,
+        streak: 0, streak_bonus: 0,
+        message: 'You have already closed this alert.',
+      });
+    }
+
     const isTP = isTruePositive(alert);
 
     if (status === 'closed' && isTP) {
@@ -137,17 +157,19 @@ async function updateAlertStatus(req, res, alertId) {
 
   setUserAlertStatus(user.id, alertId, status);
 
-  // Award achievements + update streak on any alert close action
+  // Update streak on ANY alert submission (attendance = any activity)
+  const alertStreak = updateStreak(user.id);
+
+  // Award achievements only on correct classification
   let newAchievements = [];
   if (is_correct) {
-    const alertStreak = updateStreak(user.id);
     newAchievements = checkAchievements(user.id);
   }
 
   return ok(res, {
     alertId, status, is_correct, points_awarded,
     investigation_score: investigation_score || 0,
-    streak: alertStreak?.current || 0, streak_bonus: alertStreak?.bonus || 0,
+    streak: alertStreak.current || 0, streak_bonus: alertStreak.bonus || 0,
     step_scores:         step_scores || {},
     scoring_feedback:    scoring_feedback || [],
     new_achievements:    newAchievements,
