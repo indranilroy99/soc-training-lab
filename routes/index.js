@@ -86,6 +86,10 @@ async function router(req, res) {
   if (method === 'GET'  && url === '/api/admin/users/export')  return adminRoutes.exportUsers(req, res);
   if (method === 'POST' && url === '/api/admin/users/import')  return adminRoutes.importUsers(req, res);
 
+  // Full report card (per analyst)
+  const reportCardMatch = url.match(/^\/api\/admin\/report\/(\d+)$/);
+  if (method === 'GET' && reportCardMatch) return adminRoutes.getReportCard(req, res, reportCardMatch[1]);
+
   const gradReportMatch = url.match(/^\/api\/admin\/graduation\/report\/(\d+)$/);
   if (method === 'GET' && gradReportMatch) return gradRoutes.getStudentReport(req, res, gradReportMatch[1]);
   // Drafts — return per-question drafts for a lab slug
@@ -192,6 +196,33 @@ async function router(req, res) {
       return serveFile(res, path.join(cfg.PUBLIC, 'analyst', 'index.html'));
     if (url === '/admin' || url === '/admin/')
       return serveFile(res, path.join(cfg.PUBLIC, 'admin', 'index.html'));
+
+    // Logo proxy — fetch from diaas.in once and cache locally
+    if (url === '/assets/diaas-logo.png') {
+      const logoPath = path.join(cfg.PUBLIC, 'assets', 'diaas-logo.png');
+      if (fs.existsSync(logoPath) && fs.statSync(logoPath).size > 1000) {
+        return serveFile(res, logoPath);
+      }
+      // Fetch and cache
+      const https = require('https');
+      const http  = require('http');
+      const logoUrl = 'https://diaas.in/assets/images/Diaas_Logo.png';
+      const proto = logoUrl.startsWith('https') ? https : http;
+      proto.get(logoUrl, (r) => {
+        if (r.statusCode === 200) {
+          const chunks = [];
+          r.on('data', c => chunks.push(c));
+          r.on('end', () => {
+            const buf = Buffer.concat(chunks);
+            fs.mkdirSync(path.dirname(logoPath), { recursive: true });
+            fs.writeFileSync(logoPath, buf);
+            res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public,max-age=86400' });
+            res.end(buf);
+          });
+        } else { jsonRes(res, 404, { ok:false, error:'Logo not found' }); }
+      }).on('error', () => jsonRes(res, 502, { ok:false, error:'Logo fetch failed' }));
+      return;
+    }
 
     let normalised;
     try { normalised = path.posix.normalize(decodeURIComponent(url)).replace(/^\/+/, ''); }
