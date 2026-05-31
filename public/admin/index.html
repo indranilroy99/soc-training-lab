@@ -1080,9 +1080,9 @@ const App = {
     if (this._navHistory.length > 1) {
       this._navHistory.pop(); // remove current
       const prev = this._navHistory.pop(); // get previous (pop so navigate re-pushes it)
-      Pages.navigate(prev);
+      App.navigate(prev);   // App.navigate, not Pages.navigate (Pages has no navigate method)
     } else {
-      Pages.navigate('overview'); // default fallback
+      App.navigate('overview');
     }
   },
   _resetPwTarget: null,
@@ -3076,10 +3076,28 @@ window.Modals = Modals;
 // Handle browser back/forward buttons
 window.addEventListener('popstate', (e) => {
   const page = e.state?.page || (location.hash ? location.hash.slice(1) : 'overview');
-  if (page) {
-    // Navigate without pushing to history (it's already in browser history)
-    App._navHistory.pop(); // remove the entry navigate() just pushed
-    Pages.showPage(page);
+  const validPages = ['overview','users','progress','performance','leaderboard','labs','analyst-profile','settings'];
+  if (page && validPages.includes(page)) {
+    // Update _navHistory to match browser state (don't push — browser already updated history)
+    if (App._navHistory[App._navHistory.length - 1] !== page) {
+      App._navHistory.push(page);
+    }
+    // Show the page without re-pushing browser history
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const pageEl = document.getElementById('page-' + page);
+    const navEl  = document.querySelector(`.nav-item[data-page="${page}"]`);
+    if (pageEl) pageEl.classList.add('active');
+    if (navEl)  navEl.classList.add('active');
+    const labels = { overview:'Overview', users:'Manage Users', progress:'Progress Matrix', performance:'Performance', leaderboard:'Leaderboard', labs:'Labs & Questions', 'analyst-profile':'Analyst Profile', settings:'My Profile' };
+    document.getElementById('bc-cur').textContent = labels[page] || page;
+    // Load data for the page
+    if (page === 'overview')    Pages.loadOverview();
+    if (page === 'users')       Pages.loadUsers();
+    if (page === 'progress')    Pages.loadProgress();
+    if (page === 'performance') Pages.loadPerformance();
+    if (page === 'leaderboard') Pages.loadLeaderboard();
+    if (page === 'labs')        LabPages.load();
   }
 });
 

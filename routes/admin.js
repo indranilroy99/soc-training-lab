@@ -7,6 +7,7 @@ const { parseBody }    = require('../middleware/security');
 const { ok, created, notFound, badRequest } = require('../middleware/response');
 const { requireString, validateNewPassword, sanitize } = require('../middleware/validate');
 const { getAnalystProfile } = require('../services/analyst_profile');
+const { invalidateLeaderboardCache } = require('./leaderboard');
 
 // ── GET /api/admin/stats ─────────────────────────────────────────────────
 function getStats(req, res) {
@@ -48,10 +49,10 @@ function listUsers(req, res) {
       ORDER BY is_online DESC, u.username ASC
     `).all();
   } catch {
-    // Fallback: session tracking columns missing — run without them
+    // Fallback: use only columns guaranteed to exist in base schema
     users = db.prepare(`
       SELECT u.id, u.username, u.role, u.is_active, u.created_at,
-        u.display_name, u.email,
+        NULL AS display_name, NULL AS email, NULL AS force_pw_change,
         COALESCE(lab.score,0) + COALESCE(cls.score,0) AS score,
         COALESCE(prog.labs_done,0) AS labs_done,
         NULL AS last_seen, NULL AS expires_at, 0 AS is_online

@@ -13,7 +13,15 @@ CREATE TABLE IF NOT EXISTS users (
   last_lab_slug TEXT,                       -- Last lab user was viewing
   last_question_id INTEGER,                 -- Last question user was on
   last_active_at TEXT,                      -- Last activity timestamp
-  created_at   TEXT DEFAULT (datetime('now'))
+  created_at       TEXT DEFAULT (datetime('now')),
+  display_name     TEXT,
+  dob              TEXT,
+  institution      TEXT,
+  bio              TEXT,
+  profile_image    TEXT,
+  email            TEXT,
+  force_pw_change  INTEGER DEFAULT 1,
+  extra_labs_bonus INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

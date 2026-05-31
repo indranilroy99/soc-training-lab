@@ -2627,10 +2627,28 @@ window.AchPopup = AchPopup;
 window.Notes   = Notes;
 window.addEventListener('popstate', (e) => {
   const page = e.state?.page || (location.hash ? location.hash.slice(1) : 'dashboard');
-  if (page && page !== 'lab-view') {
-    App._navHistory.pop();
-    const pages = ['dashboard','soc','labs','leaderboard','profile','achievements'];
-    if (pages.includes(page)) App.navigate(page);
+  const valid = ['dashboard','soc','labs','leaderboard','profile','achievements'];
+  if (page && page !== 'lab-view' && valid.includes(page)) {
+    // Sync _navHistory without calling pushState (browser already updated URL)
+    if (App._navHistory[App._navHistory.length - 1] !== page) {
+      App._navHistory.push(page);
+    }
+    // Show page without re-triggering history
+    localStorage.setItem('diaas_last_page', page);
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const pageEl = document.getElementById('page-' + page);
+    const navEl  = document.querySelector(`.nav-item[data-page="${page}"]`);
+    if (pageEl) pageEl.classList.add('active');
+    if (navEl)  navEl.classList.add('active');
+    const labels = { dashboard:'Dashboard', soc:'SOC Dashboard', labs:'My Labs', leaderboard:'Leaderboard', profile:'My Profile', achievements:'Achievements' };
+    document.getElementById('bc-cur').textContent = labels[page] || page;
+    if (page === 'dashboard')    { App.loadMe(); Pages.renderDashboardLabs(); }
+    if (page === 'soc')          SocDash.load();
+    if (page === 'labs')         Pages.renderLabsGrid(Pages._currentCat || 'all');
+    if (page === 'leaderboard')  Pages.leaderboard();
+    if (page === 'profile')      Pages.profile();
+    if (page === 'achievements') Pages.loadAchievements();
   }
 });
 
