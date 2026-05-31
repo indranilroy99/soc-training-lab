@@ -13,7 +13,11 @@ const { award } = require('./achievements');
 const STREAK_BONUS_PTS = 5;
 
 function updateStreak(userId) {
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  // Use local date (not UTC) so midnight resets correctly for the server's timezone
+  // Set TZ env variable on server to match your classroom timezone (e.g. Asia/Kolkata)
+  const now = new Date();
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  const today = localDate.toISOString().slice(0, 10); // YYYY-MM-DD in server local time
 
   const row = db.prepare(
     `SELECT current_streak, longest_streak, last_active_date
@@ -31,9 +35,9 @@ function updateStreak(userId) {
     return { current, longest, isNew: false, bonus: 0 };
   }
 
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yStr = yesterday.toISOString().slice(0, 10);
+  const yesterdayLocal = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  yesterdayLocal.setDate(yesterdayLocal.getDate() - 1);
+  const yStr = yesterdayLocal.toISOString().slice(0, 10);
 
   if (lastDate === yStr) {
     // Active yesterday — extend the streak
@@ -75,7 +79,8 @@ function getStreak(userId) {
     `SELECT current_streak, longest_streak, last_active_date FROM streaks WHERE user_id=?`
   ).get(userId);
   if (!row) return { current: 0, longest: 0, last_active_date: null, active_today: false };
-  const today = new Date().toISOString().slice(0, 10);
+  const nowGet = new Date();
+  const today = new Date(nowGet.getTime() - nowGet.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   return {
     current:          row.current_streak,
     longest:          row.longest_streak,
