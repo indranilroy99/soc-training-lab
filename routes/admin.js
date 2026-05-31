@@ -509,6 +509,7 @@ async function getReportCard(req, res, userId) {
     grad,
     streak: streak || { current_streak: 0, longest_streak: 0 },
     generated_at: new Date().toISOString(),
+    report_id: getNextReportId(),
   });
 }
 

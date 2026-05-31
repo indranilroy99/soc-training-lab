@@ -2827,8 +2827,7 @@ function buildReportHTML(d) {
   const now  = new Date();
   const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
   const genDate = now.toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
-  const rndId   = Math.random().toString(36).slice(2,6).toUpperCase();
-  const reportId = `DIAAS-RPT-${now.getFullYear()}-${(u.username||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4)||'XXXX'}-${rndId}`;
+  const reportId = d.report_id || ('DRPT' + now.getFullYear() + '???');
 
   // ── Lab grouping ──────────────────────────────────────────────────────────
   const stackOrder = ['Stack 1','Stack 2','Stack 3','Advanced','Final Assessment','Graduation'];

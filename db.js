@@ -98,6 +98,14 @@ function runMigrations() {
     catch { /* column already exists — ignore */ }
   }
 
+  // Report ID sequence counter — one row per year, auto-increments
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS report_sequences (
+      year    INTEGER PRIMARY KEY,
+      counter INTEGER NOT NULL DEFAULT 0
+    )
+  `).run();
+
   // Tables added after initial schema
   db.prepare(`CREATE TABLE IF NOT EXISTS alert_closures (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -252,6 +260,20 @@ function startSessionCleanup() {
 }
 
 // ── Health check ──────────────────────────────────────────────────────────
+// ── Report ID generator ───────────────────────────────────────────────────
+// Returns a sequential ID like DRPT20260001. Thread-safe via SQLite serialised writes.
+function getNextReportId() {
+  const year = new Date().getFullYear();
+  // Atomic upsert + increment
+  db.prepare(`
+    INSERT INTO report_sequences (year, counter) VALUES (?, 1)
+    ON CONFLICT(year) DO UPDATE SET counter = counter + 1
+  `).run(year);
+  const row = db.prepare(`SELECT counter FROM report_sequences WHERE year = ?`).get(year);
+  const seq = String(row.counter).padStart(4, '0');
+  return `DRPT${year}${seq}`;
+}
+
 function healthCheck() {
   try {
     db.prepare(`SELECT 1`).get();
@@ -281,4 +303,4 @@ if (!cluster.isWorker) {
   ensureIndexes();
 }
 
-module.exports = { db, startSessionCleanup, healthCheck };
+module.exports = { db, startSessionCleanup, healthCheck, getNextReportId };

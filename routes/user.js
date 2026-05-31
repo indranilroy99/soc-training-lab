@@ -204,7 +204,7 @@ async function getMyReport(req, res) {
   try { grad = generateGraduationReport(user.id); } catch {}
   const streak  = db.prepare(`SELECT current_streak, longest_streak FROM streaks WHERE user_id=?`).get(user.id);
   const me      = db.prepare(`SELECT id, username, display_name, email, institution FROM users WHERE id=?`).get(user.id);
-  return ok(res, { user: me, perf, labs: profile.lab_activity||[], category_breakdown: profile.category_breakdown||[], alert_history: profile.alert_history||[], grad, streak: streak||{current_streak:0,longest_streak:0}, generated_at: new Date().toISOString() });
+  return ok(res, { user: me, perf, labs: profile.lab_activity||[], category_breakdown: profile.category_breakdown||[], alert_history: profile.alert_history||[], grad, streak: streak||{current_streak:0,longest_streak:0}, generated_at: new Date().toISOString(), report_id: getNextReportId() });
 }
 
 module.exports = { getMe, getMyClosures, updateProfile, changePassword, saveDraft, savePosition, getMyReport };
