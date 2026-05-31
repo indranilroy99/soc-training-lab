@@ -1,4 +1,5 @@
 'use strict';
+const path = require('path');
 
 // ── Database layer ────────────────────────────────────────────────────────
 // Single source of truth for the DB connection, all migrations, and indexes.
@@ -13,6 +14,25 @@ db.pragma('foreign_keys = ON');     // enforce referential integrity
 db.pragma('synchronous = NORMAL');  // safe + fast (WAL makes full sync unnecessary)
 db.pragma('cache_size = -32000');   // 32MB page cache — reduces disk I/O under load
 db.pragma('temp_store = MEMORY');   // temp tables in RAM
+db.pragma('busy_timeout = 5000');   // wait up to 5s if DB is locked (cluster safety)
+db.pragma('wal_autocheckpoint = 1000'); // checkpoint every 1000 pages (WAL size control)
+
+// ── Hourly DB backup ──────────────────────────────────────────────────────
+// Runs an atomic online backup every hour. Zero impact on active queries.
+const BACKUP_PATH = process.env.DB_BACKUP_PATH || path.join(__dirname, 'database', 'diaas.backup.db');
+setInterval(() => {
+  db.backup(BACKUP_PATH).catch(e => {
+    // Non-fatal — log and continue
+    console.error('[db:backup] Backup failed:', e.message);
+  });
+}, 60 * 60 * 1000).unref(); // .unref() so this never prevents process exit
+
+// ── Periodic WAL checkpoint ───────────────────────────────────────────────
+// Force a WAL truncate every 10 minutes to keep WAL file small.
+setInterval(() => {
+  try { db.pragma('wal_checkpoint(TRUNCATE)'); }
+  catch { /* non-fatal */ }
+}, 10 * 60 * 1000).unref();
 
 // ── Schema migrations (idempotent — safe to run on every startup) ─────────
 function runMigrations() {
@@ -235,7 +255,16 @@ function startSessionCleanup() {
 function healthCheck() {
   try {
     db.prepare(`SELECT 1`).get();
-    return { ok: true };
+    // DB size and WAL stats for monitoring
+    const pageCount = db.pragma('page_count', { simple: true });
+    const pageSize  = db.pragma('page_size',  { simple: true });
+    const walPages  = db.pragma('wal_checkpoint', { simple: true });
+    const dbSizeMB  = ((pageCount * pageSize) / (1024 * 1024)).toFixed(1);
+    const tables    = {};
+    for (const t of ['users','sessions','user_answers','alert_closures','user_progress','streaks']) {
+      try { tables[t] = db.prepare(`SELECT COUNT(*) as c FROM ${t}`).get().c; } catch { tables[t] = -1; }
+    }
+    return { ok: true, db_size_mb: parseFloat(dbSizeMB), page_count: pageCount, tables };
   } catch (e) {
     return { ok: false, error: e.message };
   }

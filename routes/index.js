@@ -51,7 +51,7 @@ async function router(req, res) {
   // Health check
   if (method === 'GET' && url === '/health') {
     const h = healthCheck();
-    return jsonRes(res, h.ok ? 200 : 503, { ok: h.ok, pid: process.pid, ts: new Date().toISOString() });
+    return jsonRes(res, h.ok ? 200 : 503, { ok: h.ok, pid: process.pid, ts: new Date().toISOString(), db_size_mb: h.db_size_mb, tables: h.tables });
   }
 
   // Apply rate limiter to all API routes
