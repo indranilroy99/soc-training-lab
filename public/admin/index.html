@@ -2998,6 +2998,15 @@ const AdminBatch = {
     document.getElementById('batch-modal').style.display = 'none';
   },
 
+  _deleteMode: false,
+
+  updateMode() {
+    const mode = document.querySelector('input[name="batch-mode"]:checked')?.value;
+    this._deleteMode = mode === 'delete';
+    const btn = document.getElementById('batch-confirm-btn');
+    if (btn) btn.textContent = this._deleteMode ? 'Delete All Analysts' : 'Reset All Progress';
+  },
+
   checkConfirm() {
     const v = document.getElementById('batch-confirm-input').value;
     document.getElementById('batch-confirm-btn').disabled = v !== 'RESET';
@@ -3006,17 +3015,24 @@ const AdminBatch = {
   async doReset() {
     const note = document.getElementById('batch-note').value;
     const btn  = document.getElementById('batch-confirm-btn');
-    btn.disabled = true; btn.textContent = 'Resetting...';
+    btn.disabled = true; btn.textContent = 'Processing...';
     try {
-      const res = await API.post('/api/admin/batch/reset', { confirm: 'RESET', note });
-      btn.textContent = 'Reset All Progress';
-      if (!res.ok) { toast(res.data?.error || 'Reset failed', 'error'); btn.disabled = false; return; }
+      const res = await API.post('/api/admin/batch/reset', {
+        confirm: 'RESET', note, delete_users: this._deleteMode,
+      });
+      btn.disabled = false;
+      btn.textContent = this._deleteMode ? 'Delete All Analysts' : 'Reset All Progress';
+      if (!res.ok) { toast(res.data?.error || 'Reset failed', 'error'); return; }
       this.hide();
-      toast('All analyst progress reset. Ready for new cohort.', 'success', 5000);
+      const msg = this._deleteMode
+        ? 'All analyst accounts deleted. Import new users to start the next batch.'
+        : 'All progress reset. Analysts can log in again with forced password change.';
+      toast(msg, 'success', 6000);
       Pages.loadOverview();
       Pages.loadUsers();
     } catch(e) {
-      btn.textContent = 'Reset All Progress'; btn.disabled = false;
+      btn.disabled = false;
+      btn.textContent = this._deleteMode ? 'Delete All Analysts' : 'Reset All Progress';
       toast('Reset failed: ' + e.message, 'error');
     }
   },
@@ -3116,6 +3132,23 @@ document.addEventListener('DOMContentLoaded', App.init);
     <div style="margin-bottom:12px">
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:5px">Note (optional)</div>
       <input type="text" id="batch-note" placeholder="e.g. Batch 2 — June 2025" style="width:100%;height:36px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;padding:0 10px;font-size:13px;color:var(--text);outline:none;font-family:var(--font)">
+    </div>
+    <!-- Reset mode selection -->
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--input-bg)">
+        <input type="radio" name="batch-mode" id="batch-mode-progress" value="progress" checked onchange="AdminBatch.updateMode()" style="margin-top:2px;accent-color:var(--blue)">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">Reset Progress Only</div>
+          <div style="font-size:11.5px;color:var(--dim);margin-top:2px">Keep all analyst accounts. Wipe all scores, lab progress, streaks, and alert history. Analysts must change password on next login.</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid rgba(239,68,68,.4);border-radius:4px;cursor:pointer;background:rgba(239,68,68,.04)">
+        <input type="radio" name="batch-mode" id="batch-mode-delete" value="delete" onchange="AdminBatch.updateMode()" style="margin-top:2px;accent-color:var(--red)">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--red)">Delete All Analyst Accounts</div>
+          <div style="font-size:11.5px;color:var(--dim);margin-top:2px">Remove every analyst account and all their data. Only admin accounts are kept. Import new users after reset.</div>
+        </div>
+      </label>
     </div>
     <div style="margin-bottom:16px">
       <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:5px">Type RESET to confirm</div>

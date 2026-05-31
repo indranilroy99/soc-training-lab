@@ -271,35 +271,55 @@ function getAnalystActivity(req, res, userId) {
 function getProfile(req, res, userId) {
   const admin = requireAdmin(req, res); if (!admin) return;
   const uid   = parseInt(userId, 10);
-  const data  = getAnalystProfile(uid);
-  if (!data) return notFound(res, 'Analyst not found');
-  return ok(res, data);
+  try {
+    const data = getAnalystProfile(uid);
+    if (!data) return notFound(res, 'Analyst not found');
+    return ok(res, data);
+  } catch (err) {
+    console.error('[getProfile] Error for user', uid, ':', err.message);
+    return require('../middleware/response').serverError(res, 'Failed to load profile: ' + err.message);
+  }
 }
 
-// ── POST /api/admin/batch/reset — wipe all analyst progress ─────────────
+// ── POST /api/admin/batch/reset — wipe analyst progress + delete accounts ─
 async function batchReset(req, res) {
   const admin = requireAdmin(req, res); if (!admin) return;
-  const { note, confirm } = await parseBody(req);
+  const { note, confirm, delete_users } = await parseBody(req);
   if (confirm !== 'RESET') return badRequest(res, 'Send { confirm: "RESET" } to confirm.');
 
   const analysts = db.prepare(`SELECT id FROM users WHERE role='analyst'`).all();
-  const tables   = ['user_progress','user_answers','draft_answers','alert_closures',
-                    'user_alert_state','incidents','escalations','user_achievements','streaks',
-                    'lab_notes','bonus_lab_completions'];
+  const analystCount = analysts.length;
+  const relatedTables = ['user_progress','user_answers','draft_answers','alert_closures',
+                         'user_alert_state','incidents','escalations','user_achievements','streaks',
+                         'lab_notes','bonus_lab_completions','sessions'];
 
   db.transaction(() => {
-    for (const tbl of tables) {
-      try { db.prepare(`DELETE FROM ${tbl} WHERE user_id IN (SELECT id FROM users WHERE role='analyst')`).run(); }
-      catch { /* table may not exist */ }
+    // Clear all progress and session data for every analyst
+    for (const tbl of relatedTables) {
+      try {
+        db.prepare(`DELETE FROM ${tbl} WHERE user_id IN (SELECT id FROM users WHERE role='analyst')`).run();
+      } catch { /* table may not exist in all installs */ }
     }
-    // Reset points and force_pw_change for all analysts
-    db.prepare(`UPDATE users SET points=0, extra_labs_bonus=0 WHERE role='analyst'`).run();
-    // Log the reset
+
+    if (delete_users) {
+      // Hard delete: remove all analyst accounts entirely
+      db.prepare(`DELETE FROM users WHERE role='analyst'`).run();
+    } else {
+      // Soft reset: keep accounts, reset scores and force password change on next login
+      db.prepare(`UPDATE users SET points=0, extra_labs_bonus=0, force_pw_change=1 WHERE role='analyst'`).run();
+    }
+
+    // Audit log
     db.prepare(`INSERT INTO batch_resets (reset_by, note, users_affected) VALUES (?,?,?)`)
-      .run(admin.id, sanitize(note || ''), analysts.length);
+      .run(admin.id, sanitize(note || ''), analystCount);
   })();
 
-  return ok(res, { reset: true, analysts_affected: analysts.length, note: note || '' });
+  return ok(res, {
+    reset: true,
+    analysts_affected: analystCount,
+    users_deleted: !!delete_users,
+    note: note || '',
+  });
 }
 
 // ── GET /api/admin/users/export — export all analysts as CSV ─────────────
