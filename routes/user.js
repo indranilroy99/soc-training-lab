@@ -142,4 +142,38 @@ async function changePassword(req, res) {
   return ok(res, { message: 'Password updated successfully.' });
 }
 
-module.exports = { getMe, getMyClosures, updateProfile, changePassword };
+// POST /api/me/draft — save an answer draft for a question
+async function saveDraft(req, res) {
+  const user = requireAuth(req, res); if (!user) return;
+  const { lab_slug, question_id, answer } = await parseBody(req);
+  if (!lab_slug || !question_id) return badRequest(res, 'lab_slug and question_id required');
+
+  const lab = db.prepare(`SELECT id FROM labs WHERE slug=?`).get(lab_slug);
+  if (!lab) return notFound(res, 'Lab not found');
+
+  db.prepare(`
+    INSERT INTO draft_answers (user_id, lab_id, question_id, draft_answer)
+    VALUES (?,?,?,?)
+    ON CONFLICT(user_id, question_id) DO UPDATE SET draft_answer=excluded.draft_answer
+  `).run(user.id, lab.id, question_id, String(answer || ''));
+
+  return ok(res, { saved: true });
+}
+
+// POST /api/me/position — track which question the user is on (for resume)
+async function savePosition(req, res) {
+  const user = requireAuth(req, res); if (!user) return;
+  const { lab_slug, question_id } = await parseBody(req);
+  if (!lab_slug) return ok(res, { ok: true }); // silent no-op if missing
+
+  // Update last_lab_slug in users table (add column if needed)
+  try {
+    db.prepare(`UPDATE users SET last_lab_slug=?, last_active_at=datetime('now') WHERE id=?`)
+      .run(lab_slug, user.id);
+  } catch {
+    // Column may not exist yet - silently ignore
+  }
+  return ok(res, { saved: true });
+}
+
+module.exports = { getMe, getMyClosures, updateProfile, changePassword, saveDraft, savePosition };

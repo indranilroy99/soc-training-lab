@@ -21,6 +21,10 @@ function runMigrations() {
   const lastSeenSQL = `ALTER TABLE sessions ADD COLUMN last_seen_at TEXT DEFAULT (datetime('now'))`;
   try { db.prepare(lastSeenSQL).run(); } catch (e) { /* already exists */ }
 
+  // Resume support columns
+  try { db.prepare('ALTER TABLE users ADD COLUMN last_lab_slug TEXT').run(); } catch {}
+  try { db.prepare('ALTER TABLE users ADD COLUMN last_active_at TEXT').run(); } catch {}
+
   // Extended user profile fields
   const profileCols = [
     `ALTER TABLE users ADD COLUMN display_name    TEXT`,

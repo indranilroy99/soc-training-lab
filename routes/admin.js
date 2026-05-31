@@ -26,23 +26,42 @@ function getStats(req, res) {
 // ── GET /api/admin/users ─────────────────────────────────────────────────
 function listUsers(req, res) {
   const admin = requireAdmin(req, res); if (!admin) return;
-  const users = db.prepare(`
-    SELECT u.id, u.username, u.role, u.is_active, u.created_at,
-      COALESCE(lab.score,0) + COALESCE(cls.score,0) AS score,
-      COALESCE(prog.labs_done,0) AS labs_done,
-      sess.last_seen,
-      sess.expires_at,
-      CASE
-        WHEN sess.last_seen IS NOT NULL AND sess.last_seen > datetime('now','-5 minutes') THEN 1
-        ELSE 0
-      END AS is_online
-    FROM users u
-    LEFT JOIN (SELECT user_id, SUM(CASE WHEN is_correct=1 THEN pts_awarded ELSE 0 END) s FROM user_answers GROUP BY user_id) lab ON lab.user_id = u.id
-    LEFT JOIN (SELECT user_id, SUM(points_awarded) s FROM alert_closures WHERE is_correct=1 GROUP BY user_id) cls ON cls.user_id = u.id
-    LEFT JOIN (SELECT user_id, COUNT(DISTINCT lab_id) AS labs_done FROM user_progress WHERE status='completed' GROUP BY user_id) prog ON prog.user_id = u.id
-    LEFT JOIN (SELECT user_id, MAX(COALESCE(last_seen_at, created_at, expires_at)) AS last_seen, MAX(expires_at) AS expires_at FROM sessions GROUP BY user_id) sess ON sess.user_id = u.id
-    ORDER BY is_online DESC, u.username ASC
-  `).all();
+
+  // Try full query with session tracking columns; fall back if columns don't exist yet
+  let users;
+  try {
+    users = db.prepare(`
+      SELECT u.id, u.username, u.role, u.is_active, u.created_at,
+        u.display_name, u.email, u.force_pw_change,
+        COALESCE(lab.score,0) + COALESCE(cls.score,0) AS score,
+        COALESCE(prog.labs_done,0) AS labs_done,
+        sess.last_seen, sess.expires_at,
+        CASE
+          WHEN sess.last_seen IS NOT NULL AND sess.last_seen > datetime('now','-5 minutes') THEN 1
+          ELSE 0
+        END AS is_online
+      FROM users u
+      LEFT JOIN (SELECT user_id, SUM(CASE WHEN is_correct=1 THEN pts_awarded ELSE 0 END) s FROM user_answers GROUP BY user_id) lab ON lab.user_id=u.id
+      LEFT JOIN (SELECT user_id, SUM(points_awarded) s FROM alert_closures WHERE is_correct=1 GROUP BY user_id) cls ON cls.user_id=u.id
+      LEFT JOIN (SELECT user_id, COUNT(DISTINCT lab_id) AS labs_done FROM user_progress WHERE status='completed' GROUP BY user_id) prog ON prog.user_id=u.id
+      LEFT JOIN (SELECT user_id, MAX(COALESCE(last_seen_at, expires_at)) AS last_seen, MAX(expires_at) AS expires_at FROM sessions GROUP BY user_id) sess ON sess.user_id=u.id
+      ORDER BY is_online DESC, u.username ASC
+    `).all();
+  } catch {
+    // Fallback: session tracking columns missing — run without them
+    users = db.prepare(`
+      SELECT u.id, u.username, u.role, u.is_active, u.created_at,
+        u.display_name, u.email,
+        COALESCE(lab.score,0) + COALESCE(cls.score,0) AS score,
+        COALESCE(prog.labs_done,0) AS labs_done,
+        NULL AS last_seen, NULL AS expires_at, 0 AS is_online
+      FROM users u
+      LEFT JOIN (SELECT user_id, SUM(CASE WHEN is_correct=1 THEN pts_awarded ELSE 0 END) s FROM user_answers GROUP BY user_id) lab ON lab.user_id=u.id
+      LEFT JOIN (SELECT user_id, SUM(points_awarded) s FROM alert_closures WHERE is_correct=1 GROUP BY user_id) cls ON cls.user_id=u.id
+      LEFT JOIN (SELECT user_id, COUNT(DISTINCT lab_id) AS labs_done FROM user_progress WHERE status='completed' GROUP BY user_id) prog ON prog.user_id=u.id
+      ORDER BY u.username ASC
+    `).all();
+  }
   return ok(res, users);
 }
 
@@ -103,6 +122,7 @@ function deleteUser(req, res, userId) {
     db.prepare(`DELETE FROM users WHERE id=?`).run(uid);
   })();
 
+  invalidateLeaderboardCache();  // user removed — refresh cache
   return ok(res, { deleted: target.username });
 }
 
@@ -319,6 +339,7 @@ async function batchReset(req, res) {
       .run(admin.id, sanitize(note || ''), analystCount);
   })();
 
+  invalidateLeaderboardCache();  // clear cached scores after full reset
   return ok(res, {
     reset: true,
     analysts_affected: analystCount,
@@ -342,11 +363,14 @@ function exportUsers(req, res) {
   );
   const csv = [header, ...rows].join('\n');
 
-  require('../middleware/response').jsonRes(res, 200, csv, {
+  // Write raw CSV directly (not JSON-encoded)
+  res.writeHead(200, {
     'Content-Type':        'text/csv; charset=utf-8',
     'Content-Disposition': 'attachment; filename="diaas-users.csv"',
     'Cache-Control':       'no-store',
+    'X-Content-Type-Options': 'nosniff',
   });
+  res.end(csv);
 }
 
 // ── POST /api/admin/users/import — import analysts from CSV ──────────────

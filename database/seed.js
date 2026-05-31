@@ -51,8 +51,10 @@ const users = [
 for (const u of users) {
   const existing = get('SELECT id FROM users WHERE username = ?', [u.username]);
   if (!existing) {
-    run('INSERT INTO users (username, password_hash, role, is_active) VALUES (?,?,?,1)',
-      [u.username, hash(u.password), u.role]);
+    const isAdmin = u.role === 'admin';
+    const forcePw = u.role === 'admin' ? 0 : 1;
+    run('INSERT INTO users (username, password_hash, role, is_active, force_pw_change) VALUES (?,?,?,1,?)',
+      [u.username, hash(u.password), u.role, forcePw]);
   }
 }
 console.log('✓ Users seeded');

@@ -1024,7 +1024,6 @@ input, textarea, select { font-family: var(--font); }
         </div>
       </div>
     </div>
-  </div>
 </div>
 
 <!-- IR Resolve Modal -->
@@ -1383,8 +1382,26 @@ const App = {
     } catch(e) { console.error(e); }
   },
 
+  _navHistory: [],
+
+  navigateBack() {
+    if (this._navHistory.length > 1) {
+      this._navHistory.pop();
+      const prev = this._navHistory.pop();
+      this.navigate(prev);
+    } else {
+      this.navigate('dashboard');
+    }
+  },
+
   navigate(page) {
     if (page === 'lab-view') return; // handled by openLab
+    // Track history and sync URL hash
+    App._navHistory.push(page);
+    if (App._navHistory.length > 50) App._navHistory.shift();
+    if (window.location.hash !== '#' + page) {
+      history.pushState({ page }, '', '#' + page);
+    }
 
     // Save current page state (clear lab state when navigating away from lab)
     localStorage.setItem('diaas_last_page', page);
@@ -1484,8 +1501,10 @@ const Pages = {
       if (notStarted.length > 0) {
         ipEl.innerHTML = `${resumeBanner}<div style="font-size:13px;color:var(--muted);margin-bottom:12px">No labs in progress. Start your first lab!</div>
           ${Pages._miniLabCard(notStarted[0])}`;
+      } else if (labs.length === 0) {
+        ipEl.innerHTML = '<div style="color:var(--dim);font-size:13px;padding:12px 0">Loading labs...</div>';
       } else {
-        ipEl.innerHTML = `${resumeBanner}<div class="empty-state"><div class="empty-title">All labs completed! 🎉</div></div>`;
+        ipEl.innerHTML = `${resumeBanner}<div class="empty-state"><div class="empty-title">All labs completed!</div><div class="empty-sub">Check the leaderboard to see your rank.</div></div>`;
       }
     } else {
       ipEl.innerHTML = resumeBanner + inProgress.slice(0,2).map(Pages._miniLabCard).join('');
@@ -2606,6 +2625,15 @@ window.Pages   = Pages;
 window.SocDash = SocDash;
 window.AchPopup = AchPopup;
 window.Notes   = Notes;
+window.addEventListener('popstate', (e) => {
+  const page = e.state?.page || (location.hash ? location.hash.slice(1) : 'dashboard');
+  if (page && page !== 'lab-view') {
+    App._navHistory.pop();
+    const pages = ['dashboard','soc','labs','leaderboard','profile','achievements'];
+    if (pages.includes(page)) App.navigate(page);
+  }
+});
+
 document.addEventListener('DOMContentLoaded', App.init);
 
 // ── IR WORKFLOW FUNCTIONS ───────────────────────────────
