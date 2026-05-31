@@ -88,7 +88,12 @@ async function createUser(req, res) {
 async function updateUser(req, res, userId) {
   const admin = requireAdmin(req, res); if (!admin) return;
   const uid   = parseInt(userId, 10);
-  if (!db.prepare(`SELECT id FROM users WHERE id=?`).get(uid)) return notFound(res, 'User not found');
+  const target = db.prepare(`SELECT id, role FROM users WHERE id=?`).get(uid);
+  if (!target) return notFound(res, 'User not found');
+  // Security: prevent admins from modifying other admin accounts (privilege abuse)
+  if (target.role === 'admin' && target.id !== admin.id) {
+    return require('../middleware/response').forbidden(res, 'Cannot modify another administrator account');
+  }
   const body = await parseBody(req);
   if (body.active !== undefined) db.prepare(`UPDATE users SET is_active=? WHERE id=?`).run(body.active ? 1 : 0, uid);
   if (body.password) {
@@ -105,7 +110,11 @@ function deleteUser(req, res, userId) {
   const admin = requireAdmin(req, res); if (!admin) return;
   const uid   = parseInt(userId, 10);
   if (uid === admin.id) return badRequest(res, 'Cannot delete your own account');
-  const target = db.prepare(`SELECT id, username FROM users WHERE id=?`).get(uid);
+  const target = db.prepare(`SELECT id, username, role FROM users WHERE id=?`).get(uid);
+  // Security: prevent admins from deleting other admin accounts
+  if (target && target.role === 'admin') {
+    return require('../middleware/response').forbidden(res, 'Cannot delete an administrator account');
+  }
   if (!target) return notFound(res, 'User not found');
 
   // Explicitly delete from all related tables before deleting the user.
@@ -369,12 +378,12 @@ function exportUsers(req, res) {
   const admin = requireAdmin(req, res); if (!admin) return;
   let users;
   try {
+    // Only export analyst accounts — admin accounts excluded for security
     users = db.prepare(
-      `SELECT username, role, is_active, display_name, email, institution, created_at FROM users ORDER BY role, username`
+      `SELECT username, role, is_active, display_name, email, institution, created_at FROM users WHERE role='analyst' ORDER BY username`
     ).all();
   } catch {
-    // Fallback if extended columns don't exist yet
-    users = db.prepare(`SELECT username, role, is_active, created_at FROM users ORDER BY role, username`).all();
+    users = db.prepare(`SELECT username, role, is_active, created_at FROM users WHERE role='analyst' ORDER BY username`).all();
   }
 
   const header = 'username,password,role,display_name,email,institution';

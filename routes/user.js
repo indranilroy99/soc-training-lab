@@ -8,6 +8,7 @@ const { parseBody } = require('../middleware/security');
 const { validateNewPassword, requireString, sanitize } = require('../middleware/validate');
 const { getUserTotalScore, getUserRank } = require('../services/users');
 const { getStreak }                      = require('../services/streaks');
+const { authActionLimiter }              = require('../middleware/rateLimit');
 
 const MAX_IMAGE_BYTES = 500_000; // 500KB base64 limit for profile pictures
 
@@ -103,13 +104,14 @@ async function updateProfile(req, res) {
     }
   }
 
-  // Profile image: base64 data URL
+  // Profile image: allowlist safe types only — SVG excluded (can embed <script> tags)
   if (body.profile_image !== undefined) {
     if (body.profile_image && body.profile_image.length > MAX_IMAGE_BYTES) {
       return badRequest(res, `Profile image too large. Maximum ${Math.round(MAX_IMAGE_BYTES / 1024)}KB.`);
     }
-    if (body.profile_image && !body.profile_image.startsWith('data:image/')) {
-      return badRequest(res, 'Profile image must be a base64 data URL (data:image/...)');
+    const ALLOWED_IMG = ['data:image/jpeg;base64,','data:image/jpg;base64,','data:image/png;base64,','data:image/webp;base64,','data:image/gif;base64,'];
+    if (body.profile_image && !ALLOWED_IMG.some(t => body.profile_image.startsWith(t))) {
+      return badRequest(res, 'Profile image must be JPEG, PNG, WebP, or GIF. SVG is not allowed.');
     }
     setClauses.push('profile_image=?');
     vals.push(body.profile_image || null);
@@ -126,6 +128,10 @@ async function updateProfile(req, res) {
 // POST /api/user/password
 async function changePassword(req, res) {
   const user = requireAuth(req, res); if (!user) return;
+  // Rate limit: prevent brute-forcing current_password on the network
+  let rlDone = false;
+  authActionLimiter(req, res, () => { rlDone = true; });
+  if (!rlDone) return;
   const { current_password, new_password } = await parseBody(req);
 
   // force_pw_change users: skip current password check on FIRST change

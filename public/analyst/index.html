@@ -916,7 +916,8 @@ input, textarea, select { font-family: var(--font); }
                 </div>
                 <div class="form-group">
                   <label class="form-label">New Password</label>
-                  <input type="password" class="form-input" id="pw-new" placeholder="New password (min 8 chars)">
+                  <input type="password" class="form-input" id="pw-new" placeholder="New password">
+                  <div style="font-size:11px;color:var(--dim);margin-top:4px">8+ chars · uppercase · lowercase · digit or special char</div>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Confirm New Password</label>
@@ -1338,6 +1339,9 @@ const App = {
     const pw2 = document.getElementById('fpw-confirm').value;
     const err = document.getElementById('fpw-error');
     if (pw1.length < 8) { err.textContent = 'Password must be at least 8 characters'; err.style.display=''; return; }
+    if (!/[A-Z]/.test(pw1)) { err.textContent = 'Must include at least one uppercase letter (A-Z)'; err.style.display=''; return; }
+    if (!/[a-z]/.test(pw1)) { err.textContent = 'Must include at least one lowercase letter (a-z)'; err.style.display=''; return; }
+    if (!/[0-9!@#$%^&*()\-_=+[\]{};:,.<>?]/.test(pw1)) { err.textContent = 'Must include at least one digit or special character'; err.style.display=''; return; }
     if (pw1 !== pw2)    { err.textContent = 'Passwords do not match'; err.style.display=''; return; }
     err.style.display = 'none';
 
@@ -2306,6 +2310,9 @@ const Pages = {
     if (!cur || !pw1 || !pw2) { showMsg('All fields required.', false); return; }
     if (pw1 !== pw2)          { showMsg('New passwords do not match.', false); return; }
     if (pw1.length < 8)       { showMsg('Password must be at least 8 characters.', false); return; }
+    if (!/[A-Z]/.test(pw1))   { showMsg('Password must include at least one uppercase letter.', false); return; }
+    if (!/[a-z]/.test(pw1))   { showMsg('Password must include at least one lowercase letter.', false); return; }
+    if (!/[0-9!@#$%^&*()\-_=+]/.test(pw1)) { showMsg('Password must include a digit or special character.', false); return; }
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     const res = await API.post('/api/user/password', { current_password: cur, new_password: pw1 });
     if (btn) { btn.disabled = false; btn.textContent = 'Update Password'; }
@@ -2854,7 +2861,8 @@ window.irUpdateStatusBadge = function(newStatus) {
     <div style="display:flex;flex-direction:column;gap:12px">
       <div>
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:5px">New Password</div>
-        <input type="password" id="fpw-new" placeholder="Minimum 8 characters" style="width:100%;height:36px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;padding:0 12px;font-size:13px;color:var(--text);outline:none;font-family:var(--font)">
+        <input type="password" id="fpw-new" placeholder="New password" style="width:100%;height:36px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;padding:0 12px;font-size:13px;color:var(--text);outline:none;font-family:var(--font)">
+        <div style="font-size:11px;color:var(--dim);margin-top:4px">8+ chars · A-Z · a-z · digit or special char (!@#$%...)</div>
       </div>
       <div>
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:5px">Confirm Password</div>

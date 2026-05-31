@@ -44,6 +44,13 @@ function validateNewPassword(password) {
     return `Password must be at least ${cfg.MIN_PASSWORD_LEN} characters`;
   if (password.length > cfg.MAX_PASSWORD_LEN)
     return `Password must be at most ${cfg.MAX_PASSWORD_LEN} characters`;
+  // Complexity: at least one uppercase letter, one lowercase, and one digit or special char
+  if (!/[A-Z]/.test(password))
+    return 'Password must contain at least one uppercase letter (A-Z)';
+  if (!/[a-z]/.test(password))
+    return 'Password must contain at least one lowercase letter (a-z)';
+  if (!/[0-9!@#$%^&*()_+\-=\[\]{};':"\|,.<>\/?]/.test(password))
+    return 'Password must contain at least one digit or special character';
   return null;
 }
 

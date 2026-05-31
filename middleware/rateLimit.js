@@ -14,8 +14,16 @@ const cfg = require('../config');
 const { jsonRes } = require('./response');
 
 function getClientIp(req) {
-  return (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
-    .split(',')[0].trim();
+  // Do NOT trust X-Forwarded-For — it's trivially spoofable without a verified proxy.
+  // In a classroom LAN environment, use the direct socket IP for rate limiting.
+  // If you deploy behind nginx/haproxy, configure it to set X-Real-IP and verify
+  // the TRUSTED_PROXY env var before using forwarded headers.
+  const TRUSTED_PROXY = process.env.TRUSTED_PROXY;
+  if (TRUSTED_PROXY && req.socket?.remoteAddress === TRUSTED_PROXY) {
+    const forwarded = req.headers['x-real-ip'] || req.headers['x-forwarded-for'];
+    if (forwarded) return forwarded.split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || 'unknown';
 }
 
 // ── Generic rate limiter factory ──────────────────────────────────────────
@@ -94,9 +102,17 @@ const submitLimiter = createLimiter({
   message:  'Too many answer submissions. Please wait a moment before continuing.',
 });
 
+// Tight rate limiter for sensitive auth operations (password change, etc.)
+const authActionLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000,  // 15-minute window
+  max:      10,               // max 10 attempts per 15 min per IP
+  message:  'Too many authentication attempts. Please wait 15 minutes.',
+});
+
 module.exports = {
   apiLimiter,
   submitLimiter,
+  authActionLimiter,
   isLoginThrottled,
   recordLoginFailure,
   clearLoginFailures,

@@ -118,10 +118,19 @@ async function submitAnswer(req, res, slug) {
   const isCorrect = question.answer_type === 'choice'
     ? subLower === correctLower
     : (() => {
-        const keywords = correctLower.split(/\s+/).filter(w => w.length > 4);
+        // Text matching: extract significant keywords (>3 chars) from correct answer
+        const keywords = correctLower.split(/\s+/).filter(w => w.length > 3);
         if (!keywords.length) return subLower === correctLower;
-        const matched = keywords.filter(k => subLower.includes(k)).length;
-        return matched >= Math.ceil(keywords.length * 0.35);
+
+        // Require at least 60% of keywords AND the answer must not be trivially short
+        const matched  = keywords.filter(k => subLower.includes(k)).length;
+        const threshold = Math.ceil(keywords.length * 0.60);  // raised from 0.35 to 0.60
+        const hasMinWords = subLower.trim().split(/\s+/).length >= 1;
+
+        // Single-keyword answers (T1027, Kerberoasting etc): require exact keyword match
+        if (keywords.length === 1) return subLower.includes(keywords[0]);
+
+        return matched >= threshold && hasMinWords;
       })();
 
   const nextAttempt = (prior?.attempt_number || 0) + 1;
