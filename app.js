@@ -42,9 +42,9 @@ async function handleRequest(req, res) {
   } catch (err) {
     logError(err, req);
     if (!res.headersSent) {
-      // Never leak internal details in production
-      const msg = cfg.IS_PROD ? 'Internal server error' : err.message;
-      jsonRes(res, err.status || 500, { ok: false, error: msg });
+      // OWASP A05 — never expose internal error details, table names, or stack traces
+      // Log the real error server-side; send only a generic message to the client
+      jsonRes(res, err.status || 500, { ok: false, error: 'Something went wrong. Please try again.' });
     }
   }
 }

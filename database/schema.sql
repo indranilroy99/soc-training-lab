@@ -17,10 +17,12 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id    INTEGER NOT NULL,
-  token      TEXT UNIQUE NOT NULL,
-  expires_at TEXT NOT NULL,
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL,
+  token         TEXT UNIQUE NOT NULL,
+  expires_at    TEXT NOT NULL,
+  created_at    TEXT DEFAULT (datetime('now')),
+  last_seen_at  TEXT DEFAULT (datetime('now')),
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

@@ -61,13 +61,14 @@ function requestLogger(req, res, next) {
 // ── Error logger ──────────────────────────────────────────────────────────
 function logError(err, req = null) {
   logger.error('unhandled_error', {
-    id:      req?.id,
-    path:    req?.url,
-    message: err.message,
-    code:    err.code,
-    status:  err.status,
-    // Only include stack in development — never in production logs served to users
-    stack:   cfg.IS_PROD ? undefined : err.stack,
+    id:     req?.id,
+    path:   req?.url,
+    code:   err.code,
+    status: err.status,
+    // Never log the full stack trace — it exposes internal paths and library versions
+    // Log only the error type and a sanitised message
+    type:   err.constructor?.name || 'Error',
+    msg:    err.code || 'internal_error',  // use error code, not human message
   });
 }
 

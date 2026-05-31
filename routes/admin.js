@@ -33,14 +33,14 @@ function listUsers(req, res) {
       sess.last_seen,
       sess.expires_at,
       CASE
-        WHEN sess.last_seen > datetime('now','-5 minutes') THEN 1
+        WHEN sess.last_seen IS NOT NULL AND sess.last_seen > datetime('now','-5 minutes') THEN 1
         ELSE 0
       END AS is_online
     FROM users u
     LEFT JOIN (SELECT user_id, SUM(CASE WHEN is_correct=1 THEN pts_awarded ELSE 0 END) s FROM user_answers GROUP BY user_id) lab ON lab.user_id = u.id
     LEFT JOIN (SELECT user_id, SUM(points_awarded) s FROM alert_closures WHERE is_correct=1 GROUP BY user_id) cls ON cls.user_id = u.id
     LEFT JOIN (SELECT user_id, COUNT(DISTINCT lab_id) AS labs_done FROM user_progress WHERE status='completed' GROUP BY user_id) prog ON prog.user_id = u.id
-    LEFT JOIN (SELECT user_id, MAX(last_seen_at) AS last_seen, MAX(expires_at) AS expires_at FROM sessions GROUP BY user_id) sess ON sess.user_id = u.id
+    LEFT JOIN (SELECT user_id, MAX(COALESCE(last_seen_at, created_at, expires_at)) AS last_seen, MAX(expires_at) AS expires_at FROM sessions GROUP BY user_id) sess ON sess.user_id = u.id
     ORDER BY is_online DESC, u.username ASC
   `).all();
   return ok(res, users);
@@ -282,7 +282,7 @@ function getProfile(req, res, userId) {
     return ok(res, data);
   } catch (err) {
     console.error('[getProfile] Error for user', uid, ':', err.message);
-    return require('../middleware/response').serverError(res, 'Failed to load profile: ' + err.message);
+    return require('../middleware/response').serverError(res, 'Unable to load profile. Please try again.');
   }
 }
 

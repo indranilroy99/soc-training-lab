@@ -38,7 +38,12 @@ function requireAuth(req, res) {
   // Always extend session + update last_seen_at for online/offline tracking
   const nowTs = new Date().toISOString();
   const nextExpiry = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-  db.prepare(`UPDATE sessions SET expires_at=?, last_seen_at=? WHERE token=?`).run(nextExpiry, nowTs, token);
+  try {
+    db.prepare(`UPDATE sessions SET expires_at=?, last_seen_at=? WHERE token=?`).run(nextExpiry, nowTs, token);
+  } catch {
+    // Fallback: last_seen_at column may not exist in older installs
+    try { db.prepare(`UPDATE sessions SET expires_at=? WHERE token=?`).run(nextExpiry, token); } catch {}
+  }
 
   // Attach user ID to request for logging
   req._userId = row.id;
