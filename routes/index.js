@@ -67,6 +67,7 @@ async function router(req, res) {
 
   // ── User ──────────────────────────────────────────────────────────────
   if (method === 'GET'  && url === '/api/me')            return userRoutes.getMe(req, res);
+  if (method === 'GET'  && url === '/api/me/report')    return userRoutes.getMyReport(req, res);
   if (method === 'GET'  && url === '/api/me/closures')   return userRoutes.getMyClosures(req, res);
   if (method === 'POST' && url === '/api/user/password') return userRoutes.changePassword(req, res);
   if (method === 'PUT'  && url === '/api/me/profile')       return userRoutes.updateProfile(req, res);

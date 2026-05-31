@@ -192,4 +192,19 @@ async function savePosition(req, res) {
   return ok(res, { saved: true });
 }
 
-module.exports = { getMe, getMyClosures, updateProfile, changePassword, saveDraft, savePosition };
+// GET /api/me/report — analyst's own full report card data
+async function getMyReport(req, res) {
+  const user = requireAuth(req, res); if (!user) return;
+  const { getStudentPerformance } = require('../services/scoring_weighted');
+  const { getAnalystProfile }     = require('../services/analyst_profile');
+  const { generateGraduationReport } = require('../services/graduation');
+  const perf    = getStudentPerformance(user.id);
+  const profile = getAnalystProfile(user.id);
+  let grad = null;
+  try { grad = generateGraduationReport(user.id); } catch {}
+  const streak  = db.prepare(`SELECT current_streak, longest_streak FROM streaks WHERE user_id=?`).get(user.id);
+  const me      = db.prepare(`SELECT id, username, display_name, email, institution FROM users WHERE id=?`).get(user.id);
+  return ok(res, { user: me, perf, labs: profile.lab_activity||[], category_breakdown: profile.category_breakdown||[], alert_history: profile.alert_history||[], grad, streak: streak||{current_streak:0,longest_streak:0}, generated_at: new Date().toISOString() });
+}
+
+module.exports = { getMe, getMyClosures, updateProfile, changePassword, saveDraft, savePosition, getMyReport };

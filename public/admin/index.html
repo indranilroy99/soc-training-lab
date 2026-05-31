@@ -2787,87 +2787,329 @@ window.LabBuilder = LabBuilder;
 
 // ── REPORT CARD ─────────────────────────────────────────────────────────
 const ReportCard = {
-  _currentUserId: null,
-  _currentUsername: null,
-
-  async view(userId, username) {
-    this._currentUserId = userId;
-    this._currentUsername = username;
-    document.getElementById('rc-modal').style.display = '';
-    document.getElementById('rc-body').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
-    document.getElementById('rc-dps').textContent = '–';
-    document.getElementById('rc-name').textContent = username;
-
+  async generate(userId, username) {
+    const win = window.open('', '_blank', 'width=900,height=1100');
+    if (!win) { toast('Allow pop-ups to open the report', 'error'); return; }
+    win.document.write('<html><head><title>Loading report…</title></head><body style="font-family:Arial,sans-serif;padding:40px;color:#333"><p>Loading report for ' + escapeHtml(username || '') + '…</p></body></html>');
+    win.document.close();
     try {
-      const d = await API.get('/api/admin/graduation/report/' + userId);
-      this._render(d);
+      const d = await API.get('/api/admin/report/' + userId);
+      const html = buildReportHTML(d);
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
     } catch(e) {
-      document.getElementById('rc-body').innerHTML = '<div style="color:var(--red);padding:20px">Failed to load report. Student may not have enough activity yet.</div>';
+      win.document.open();
+      win.document.write('<html><body style="font-family:Arial;padding:40px;color:#c00"><h2>Failed to load report</h2><p>' + escapeHtml(String(e.message||'Unknown error')) + '</p></body></html>');
+      win.document.close();
     }
   },
 
-  _render(d) {
-    if (!d) return;
-    const verdictEl = document.getElementById('rc-verdict-badge');
-    const verdictColors = { Distinction:'Distinction', Merit:'Merit', Pass:'Pass', Refer:'Refer' };
-    verdictEl.className = 'rc-verdict ' + (verdictColors[d.verdict] || '');
-    verdictEl.textContent = d.verdict || 'Incomplete';
-    document.getElementById('rc-dps').textContent  = d.dps || 0;
-    document.getElementById('rc-name').textContent = (d.user?.username || '');
-
-    const gradeColors = { 'A+':'var(--green)', A:'var(--green)', B:'var(--blue)', C:'var(--yellow)', D:'var(--orange)', F:'var(--red)' };
-    const gradeColor  = gradeColors[d.grade] || 'var(--dim)';
-
-    const pillarRows = d.performance_pillars ? Object.values(d.performance_pillars).map(b => `
-      <div class="rc-pillar">
-        <div class="rc-pillar-label">
-          <span style="color:var(--text)">${b.label}</span>
-          <span style="font-family:var(--mono);font-weight:600;color:${b.score>=70?'var(--green)':b.score>=50?'var(--blue)':'var(--red)'}">${b.score}% × ${b.weight}%</span>
-        </div>
-        <div class="rc-pillar-bar"><div class="rc-pillar-fill" style="width:${b.score}%;background:${b.score>=70?'var(--green)':b.score>=50?'var(--blue)':'var(--red)'}"></div></div>
-      </div>`).join('') : '';
-
-    const catRows = (d.category_breakdown || []).map(c => `
-      <div class="rc-row"><span class="rc-label">${c.category}</span><span class="rc-value">${c.labs_done} labs · ${c.score} pts</span></div>`).join('');
-
-    document.getElementById('rc-body').innerHTML = `
-      <div style="text-align:center;padding-bottom:16px;border-bottom:1px solid var(--border);margin-bottom:16px">
-        <div style="font-size:11px;color:var(--dim)">Performance Score / 100</div>
-        <div style="font-size:13px;font-weight:700;color:${gradeColor}">Grade ${d.grade || '–'}</div>
-        <div style="font-size:11px;color:var(--dim);margin-top:4px">Generated ${d.generated_at ? new Date(d.generated_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : ''}</div>
-      </div>
-      <div class="rc-section">Score Summary</div>
-      <div class="rc-row"><span class="rc-label">Total Score</span><span class="rc-value">${d.score_summary?.total_score || 0} pts</span></div>
-      <div class="rc-row"><span class="rc-label">Lab Score</span><span class="rc-value">${d.score_summary?.lab_score || 0} pts</span></div>
-      <div class="rc-row"><span class="rc-label">Alert Score</span><span class="rc-value">${d.score_summary?.alert_score || 0} pts</span></div>
-      <div class="rc-section">Lab Performance</div>
-      <div class="rc-row"><span class="rc-label">Completed</span><span class="rc-value">${d.labs?.completed || 0} / ${d.labs?.total || 0} (${d.labs?.completion_pct || 0}%)</span></div>
-      <div class="rc-row"><span class="rc-label">Question Accuracy</span><span class="rc-value">${d.questions?.accuracy || 0}%</span></div>
-      <div class="rc-row"><span class="rc-label">Answer Efficiency</span><span class="rc-value">${d.questions?.efficiency || 0}% (no hints/retries)</span></div>
-      <div class="rc-section">Alert Triage</div>
-      <div class="rc-row"><span class="rc-label">Triaged</span><span class="rc-value">${d.alerts?.total || 0} alerts</span></div>
-      <div class="rc-row"><span class="rc-label">Classification Accuracy</span><span class="rc-value">${d.alerts?.triage_accuracy || 0}%</span></div>
-      <div class="rc-row"><span class="rc-label">Avg IR Report Score</span><span class="rc-value">${d.alerts?.avg_ir_score || 0}%</span></div>
-      <div class="rc-section">Performance Pillars</div>
-      ${pillarRows}
-      ${catRows ? `<div class="rc-section">Category Breakdown</div>${catRows}` : ''}
-      <div class="rc-section">Attendance</div>
-      <div class="rc-row"><span class="rc-label">Day Streak</span><span class="rc-value">${d.streak?.current || 0} days (best: ${d.streak?.longest || 0})</span></div>`;
-  },
-
-  async print(userId, username) {
-    await this.view(userId, username);
-    setTimeout(() => this.printCurrent(), 600);
-  },
-
-  printCurrent() {
-    window.print();
-  },
-
-  close() {
-    document.getElementById('rc-modal').style.display = 'none';
-  },
+  // Legacy modal kept for quick inline view from Performance tab
+  async view(userId, username) { return this.generate(userId, username); },
+  async print(userId, username) { return this.generate(userId, username); },
+  printCurrent() { window.print(); },
+  close() { document.getElementById('rc-modal').style.display = 'none'; },
 };
+
+// ── Report card HTML builder ────────────────────────────────────────────────
+function buildReportHTML(d) {
+  const u    = d.user || {};
+  const perf = d.perf || {};
+  const raw  = perf.raw || {};
+  const bd   = perf.breakdown || {};
+  const grad = d.grad || {};
+  const str  = d.streak || {};
+  const cats = d.category_breakdown || [];
+  const genDate = d.generated_at ? new Date(d.generated_at).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : '';
+  const reportId = 'DIAAS-RPT-' + new Date().getFullYear() + '-' + (u.username||'X').toUpperCase().slice(0,4) + String(perf.dps||0).padStart(3,'0');
+
+  // Group labs by session_tag
+  const labsByStack = {};
+  (d.labs || []).forEach(lab => {
+    const tag = lab.session_tag || 'Other';
+    if (!labsByStack[tag]) labsByStack[tag] = [];
+    labsByStack[tag].push(lab);
+  });
+
+  const stackOrder = ['Stack 1','Stack 2','Stack 3','Advanced','Graduation','Final Assessment','Other'];
+  const stackKeys = [...new Set([...stackOrder, ...Object.keys(labsByStack)])].filter(k => labsByStack[k]);
+
+  function statusIcon(s) {
+    if (s === 'completed') return '&#10003;';
+    if (s === 'in_progress') return '&#9654;';
+    return '&#8212;';
+  }
+  function statusColor(s) {
+    if (s === 'completed') return '#15803D';
+    if (s === 'in_progress') return '#1D4ED8';
+    return '#9CA3AF';
+  }
+  function pct(a, b) { return b > 0 ? Math.round(a/b*100) : 0; }
+  function bar(val, color) {
+    return '<div style="background:#E5E7EB;border-radius:3px;height:7px;width:100%;margin-top:4px"><div style="height:7px;border-radius:3px;background:'+color+';width:'+Math.min(100,val)+'%"></div></div>';
+  }
+
+  // Build stack tables
+  let labTables = '';
+  stackKeys.forEach(tag => {
+    const labs = labsByStack[tag] || [];
+    if (!labs.length) return;
+    const done = labs.filter(l=>l.status==='completed').length;
+    const stackPts = labs.reduce((s,l)=>s+(l.max_score||0),0);
+    const stackEarned = labs.reduce((s,l)=>s+(l.score_earned||0),0);
+    const stackPct = pct(done, labs.length);
+
+    labTables += `
+    <div class="section-block" style="margin-bottom:24px">
+      <div class="section-hdr">
+        <span>${escapeHtml(tag)}</span>
+        <span style="font-size:11px;font-weight:400;color:#6B7280">${done}/${labs.length} labs completed &nbsp;|&nbsp; ${stackEarned}/${stackPts} pts</span>
+      </div>
+      <table class="data-table">
+        <thead><tr>
+          <th style="width:40px">No.</th>
+          <th>Lab Name</th>
+          <th style="width:70px;text-align:center">Max Pts</th>
+          <th style="width:70px;text-align:center">Earned</th>
+          <th style="width:55px;text-align:center">Score</th>
+          <th style="width:55px;text-align:center">Q Acc</th>
+          <th style="width:100px;text-align:center">Status</th>
+          <th style="width:100px;text-align:right">Completed</th>
+        </tr></thead>
+        <tbody>`;
+
+    labs.forEach((lab, i) => {
+      const sc   = lab.score_earned || 0;
+      const mx   = lab.max_score || 0;
+      const sp   = pct(sc, mx);
+      const qacc = pct(lab.questions_correct||0, lab.questions_total||1);
+      const date = lab.completed_at ? new Date(lab.completed_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '';
+      const ic   = statusIcon(lab.status);
+      const cl   = statusColor(lab.status);
+      const diff = (lab.difficulty||'').toLowerCase();
+      const diffColor = diff==='advanced'?'#7C3AED':diff==='intermediate'?'#1D4ED8':'#15803D';
+
+      labTables += `
+          <tr class="${i%2===0?'tr-even':'tr-odd'}">
+            <td style="text-align:center;color:#9CA3AF;font-size:11px">${i+1}</td>
+            <td>
+              <span style="font-weight:500;color:#111">${escapeHtml(lab.title||lab.slug)}</span>
+              ${diff?`<span style="font-size:9.5px;font-weight:700;color:${diffColor};background:${diffColor}18;padding:1px 6px;border-radius:3px;margin-left:6px;letter-spacing:.5px;text-transform:uppercase">${diff}</span>`:''}
+            </td>
+            <td style="text-align:center;font-family:monospace;font-size:12px">${mx}</td>
+            <td style="text-align:center;font-family:monospace;font-size:12px;font-weight:600;color:${lab.status==='completed'?'#15803D':'#374151'}">${lab.status==='completed'?sc:'—'}</td>
+            <td style="text-align:center;font-size:12px;color:${sp>=80?'#15803D':sp>=50?'#1D4ED8':'#DC2626'}">${lab.status==='completed'?sp+'%':'—'}</td>
+            <td style="text-align:center;font-size:12px;color:#374151">${lab.status!=='not_started'?(qacc+'%'):'—'}</td>
+            <td style="text-align:center">
+              <span style="color:${cl};font-weight:700;font-size:12px">${ic}</span>
+              <span style="font-size:11px;color:${cl};margin-left:4px">${lab.status==='completed'?'Done':lab.status==='in_progress'?'In Progress':'Not Started'}</span>
+            </td>
+            <td style="text-align:right;font-size:11px;color:#6B7280">${date||'—'}</td>
+          </tr>`;
+    });
+
+    labTables += `
+        </tbody>
+        <tfoot><tr style="background:#F9FAFB;font-weight:700">
+          <td colspan="2" style="padding:6px 10px;font-size:11.5px;color:#374151">Stack Total</td>
+          <td style="text-align:center;font-size:12px">${stackPts}</td>
+          <td style="text-align:center;font-size:12px;color:#15803D">${stackEarned}</td>
+          <td style="text-align:center;font-size:12px">${pct(stackEarned,stackPts)}%</td>
+          <td colspan="3" style="text-align:right;font-size:11px;color:#6B7280;padding-right:10px">${done}/${labs.length} labs &nbsp;(${stackPct}%)</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+  });
+
+  // Category table
+  let catRows = '';
+  cats.forEach(cat => {
+    const acc = pct(cat.score, cat.max_possible||1);
+    catRows += `<tr>
+      <td>${escapeHtml(cat.category)}</td>
+      <td style="text-align:center">${cat.labs_done}/${cat.lab_count}</td>
+      <td style="text-align:center">${cat.score}</td>
+      <td style="text-align:center">${acc}%</td>
+    </tr>`;
+  });
+
+  // Alert history summary
+  const alertHistory = d.alert_history || [];
+  const alertDone    = alertHistory.length;
+  const alertCorrect = alertHistory.filter(a=>a.is_correct).length;
+  const alertAcc     = pct(alertCorrect, alertDone);
+  const avgIR = alertDone > 0 ? Math.round(alertHistory.reduce((s,a)=>s+(a.investigation_score||0),0)/alertDone) : 0;
+
+  // Verdict badge style
+  const vc = {'Distinction':'#7C3AED','Merit':'#15803D','Pass':'#1D4ED8','Refer':'#DC2626'}[grad.verdict]||'#1D4ED8';
+  const vb = {'Distinction':'#FAF5FF','Merit':'#F0FDF4','Pass':'#EFF6FF','Refer':'#FEF2F2'}[grad.verdict]||'#EFF6FF';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DIAAS-SEC Report — ${escapeHtml(u.display_name||u.username)}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,'Helvetica Neue',sans-serif;font-size:12.5px;color:#111;background:#fff;padding:0}
+.page{width:210mm;min-height:297mm;margin:0 auto;padding:18mm 16mm 16mm;background:#fff}
+.doc-header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:2px solid #E35205;margin-bottom:18px}
+.doc-title-block h1{font-size:17px;font-weight:700;color:#0D1B3E;letter-spacing:0.3px}
+.doc-title-block p{font-size:11px;color:#6B7280;margin-top:2px;letter-spacing:0.5px}
+.doc-logo{text-align:right}
+.doc-logo img{height:38px;object-fit:contain}
+.doc-logo-text{font-size:20px;font-weight:700;color:#0D1B3E;letter-spacing:1px}
+.doc-logo-text span{color:#E35205}
+.doc-logo-sub{font-size:10px;color:#9C8A72;margin-top:2px;letter-spacing:0.5px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #E5E7EB;border-radius:4px;overflow:hidden;margin-bottom:18px}
+.info-cell{padding:7px 12px;border-bottom:0.5px solid #E5E7EB;border-right:0.5px solid #E5E7EB}
+.info-cell:nth-child(2n){border-right:none}
+.info-cell:last-child,.info-cell:nth-last-child(2){border-bottom:none}
+.info-label{font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#9CA3AF;font-weight:700;margin-bottom:1px}
+.info-val{font-size:12.5px;color:#111;font-weight:500}
+.perf-box{border:1px solid #E5E7EB;border-radius:4px;padding:12px 14px;margin-bottom:18px;background:#FAFAF9}
+.perf-top{display:flex;align-items:center;gap:28px;margin-bottom:12px;padding-bottom:12px;border-bottom:0.5px solid #E5E7EB}
+.perf-dps{text-align:center}
+.perf-dps .big{font-size:36px;font-weight:700;color:#0D1B3E;line-height:1}
+.perf-dps .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#9CA3AF;margin-top:2px}
+.perf-grade{font-size:22px;font-weight:700;padding:6px 16px;border-radius:4px;background:#EFF6FF;color:#1D4ED8;margin-left:8px}
+.perf-stats{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:6px 20px}
+.perf-stat .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:0.8px;color:#9CA3AF;font-weight:700}
+.perf-stat .val{font-size:14px;font-weight:600;color:#111;margin-top:1px}
+.pillars{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}
+.pillar-row .pillar-top{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}
+.pillar-row .pillar-name{color:#374151;font-weight:600}
+.pillar-row .pillar-val{font-family:monospace;font-weight:700}
+.section-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#0D1B3E;padding:6px 10px;background:#F3F4F6;border-left:3px solid #E35205;margin-bottom:0;display:flex;justify-content:space-between;align-items:center}
+.data-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.data-table th{padding:5px 8px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:0.8px;color:#6B7280;background:#F9FAFB;border-bottom:1px solid #E5E7EB;font-weight:700}
+.data-table td{padding:5px 8px;border-bottom:0.5px solid #F3F4F6;color:#374151}
+.tr-even{background:#fff}
+.tr-odd{background:#FAFAF9}
+.data-table tbody tr:hover{background:#EFF6FF}
+.summary-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:18px}
+.sum-card{border:1px solid #E5E7EB;border-radius:4px;padding:10px 12px;text-align:center;background:#FAFAF9}
+.sum-card .big{font-size:22px;font-weight:700;color:#0D1B3E}
+.sum-card .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:0.8px;color:#9CA3AF;margin-top:2px}
+.grad-box{border:1.5px solid ${vc};border-radius:4px;padding:12px 14px;background:${vb};margin-bottom:18px}
+.grad-verdict{display:inline-block;padding:3px 14px;border-radius:20px;font-size:12px;font-weight:700;background:${vc};color:white;letter-spacing:0.5px;margin-bottom:8px}
+.footer-bar{margin-top:24px;padding-top:10px;border-top:1px solid #E5E7EB;display:flex;justify-content:space-between;font-size:9.5px;color:#9CA3AF}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  body{background:#fff}
+  .page{padding:10mm 12mm;width:100%}
+  .no-print{display:none!important}
+}
+</style>
+</head>
+<body>
+<div class="no-print" style="background:#0D1B3E;color:white;padding:10px 20px;display:flex;gap:12px;align-items:center;font-family:Arial,sans-serif;font-size:13px">
+  <span style="flex:1;font-weight:600">DIAAS-SEC — Analyst Performance Report Card</span>
+  <button onclick="window.print()" style="background:#E35205;color:white;border:none;padding:7px 20px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600">&#128424; Print / Save PDF</button>
+  <button onclick="window.close()" style="background:transparent;color:#9CA3AF;border:1px solid #374151;padding:7px 16px;border-radius:4px;cursor:pointer;font-size:13px">Close</button>
+</div>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="doc-header">
+    <div class="doc-title-block">
+      <h1>Analyst Performance Report Card</h1>
+      <p>DIAAS-SEC SOC Analyst Training Programme &nbsp;·&nbsp; Diaas Learning &amp; Development</p>
+    </div>
+    <div class="doc-logo">
+      <img src="https://diaas.in/assets/images/Diaas_Logo.png" alt="Diaas"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <div class="doc-logo-text" style="display:none">DI<span>AA</span>S</div>
+      <div class="doc-logo-sub">diaas.in</div>
+    </div>
+  </div>
+
+  <!-- Candidate info -->
+  <div class="info-grid">
+    <div class="info-cell"><div class="info-label">Full Name</div><div class="info-val">${escapeHtml(u.display_name||u.username)}</div></div>
+    <div class="info-cell"><div class="info-label">Username</div><div class="info-val">${escapeHtml(u.username)}</div></div>
+    <div class="info-cell"><div class="info-label">Institution</div><div class="info-val">${escapeHtml(u.institution||'—')}</div></div>
+    <div class="info-cell"><div class="info-label">Report Generated</div><div class="info-val">${genDate}</div></div>
+    <div class="info-cell"><div class="info-label">Email</div><div class="info-val">${escapeHtml(u.email||'—')}</div></div>
+    <div class="info-cell"><div class="info-label">Programme</div><div class="info-val">DIAAS-SEC SOC Analyst</div></div>
+  </div>
+
+  <!-- Performance Summary -->
+  <div class="perf-box">
+    <div class="perf-top">
+      <div class="perf-dps">
+        <div class="big">${perf.dps||0}</div>
+        <div class="lbl">DPS Score / 100</div>
+      </div>
+      <div class="perf-grade" style="background:${{'A+':'#F0FDF4','A':'#F0FDF4','B':'#EFF6FF','C':'#FFFBEB','D':'#FFF7ED','F':'#FEF2F2'}[perf.grade||'F']||'#EFF6FF'};color:${{'A+':'#15803D','A':'#15803D','B':'#1D4ED8','C':'#B45309','D':'#C2410C','F':'#DC2626'}[perf.grade||'F']||'#1D4ED8'}">${perf.grade||'—'}</div>
+      <div class="perf-stats" style="margin-left:16px">
+        <div class="perf-stat"><div class="lbl">Labs Completed</div><div class="val">${raw.labs_completed||0} / ${raw.total_labs||0}</div></div>
+        <div class="perf-stat"><div class="lbl">Questions Correct</div><div class="val">${raw.questions_correct||0} / ${raw.questions_attempted||0}</div></div>
+        <div class="perf-stat"><div class="lbl">Total Points</div><div class="val">${raw.pts_earned||0} pts</div></div>
+        <div class="perf-stat"><div class="lbl">Attendance Streak</div><div class="val">${str.current_streak||0} days (best: ${str.longest_streak||0})</div></div>
+      </div>
+    </div>
+    <div class="pillars">
+      ${Object.values(bd).map(b => {
+        const col = b.score>=70?'#15803D':b.score>=50?'#1D4ED8':'#DC2626';
+        return `<div class="pillar-row">
+          <div class="pillar-top"><span class="pillar-name">${b.label}</span><span class="pillar-val" style="color:${col}">${b.score}% <span style="color:#9CA3AF;font-size:10px;font-weight:400">× ${b.weight}%</span></span></div>
+          ${bar(b.score, col)}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+
+  <!-- Lab Performance Breakdown -->
+  <div class="section-hdr" style="margin-bottom:12px">Lab Completion Record
+    <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">${raw.labs_completed||0} of ${raw.total_labs||0} labs completed</span>
+  </div>
+  ${labTables}
+
+  <!-- Category Performance -->
+  ${catRows ? `<div class="section-hdr" style="margin-bottom:8px">Category Performance</div>
+  <table class="data-table" style="margin-bottom:18px">
+    <thead><tr><th>Category</th><th style="text-align:center">Labs Done</th><th style="text-align:center">Score (pts)</th><th style="text-align:center">Avg Score</th></tr></thead>
+    <tbody>${catRows}</tbody>
+  </table>` : ''}
+
+  <!-- Alert Triage -->
+  <div class="section-hdr" style="margin-bottom:10px">SOC Alert Triage Performance</div>
+  <div class="summary-grid" style="margin-bottom:18px">
+    <div class="sum-card"><div class="big">${alertDone}</div><div class="lbl">Alerts Triaged</div></div>
+    <div class="sum-card"><div class="big" style="color:#15803D">${alertCorrect}</div><div class="lbl">Correct</div></div>
+    <div class="sum-card"><div class="big" style="color:${alertAcc>=70?'#15803D':alertAcc>=50?'#1D4ED8':'#DC2626'}">${alertAcc}%</div><div class="lbl">Accuracy</div></div>
+    <div class="sum-card"><div class="big">${avgIR}%</div><div class="lbl">Avg IR Score</div></div>
+  </div>
+
+  <!-- Graduation -->
+  <div class="section-hdr" style="margin-bottom:10px">Final Assessment — Graduation Status</div>
+  ${grad && grad.verdict ? `
+  <div class="grad-box">
+    <div class="grad-verdict">${escapeHtml(grad.verdict||'')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:12px">
+      <div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#6B7280;margin-bottom:2px">Overall Score</div><div style="font-weight:700;font-size:18px;color:${vc}">${grad.overall_score||0}%</div></div>
+      <div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#6B7280;margin-bottom:2px">Prerequisites</div><div style="font-weight:600;color:#15803D">All completed &#10003;</div></div>
+      <div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#6B7280;margin-bottom:2px">Assessment Date</div><div style="font-weight:500">${grad.completed_at ? new Date(grad.completed_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div></div>
+    </div>
+  </div>` : `
+  <div style="border:1px solid #E5E7EB;border-radius:4px;padding:12px 14px;background:#FAFAF9;margin-bottom:18px;font-size:12px;color:#6B7280">
+    Final assessment not yet attempted. Student must complete all Stack 2 and Stack 3 labs to unlock the graduation capstone.
+  </div>`}
+
+  <!-- Footer -->
+  <div class="footer-bar">
+    <span>Issued by Diaas Learning &amp; Development &nbsp;·&nbsp; diaas.in</span>
+    <span>Report ID: ${reportId}</span>
+    <span>Confidential — For internal assessment use only</span>
+  </div>
+
+</div>
+</body>
+</html>`;
+}
 
 // ── CSV IMPORT / EXPORT ─────────────────────────────────────────────────
 const AdminCSV = {

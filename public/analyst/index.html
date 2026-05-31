@@ -912,6 +912,14 @@ input, textarea, select { font-family: var(--font); }
           <div style="font-size:12px;color:var(--dim);margin-bottom:10px">You've completed the DIAAS-SEC SOC Analyst programme.</div>
           <button class="btn btn-primary btn-sm" onclick="Pages.printCertificate()" style="font-size:12px">🖨 Download Certificate</button>
         </div>
+        <!-- Report Card button — always visible -->
+        <div style="margin-bottom:12px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">Performance Report Card</div>
+            <div style="font-size:11.5px;color:var(--dim);margin-top:2px">Full lab-by-lab breakdown, scores, and assessment</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="Pages.openMyReport()" style="flex-shrink:0">View Report</button>
+        </div>
         <div style="margin-top:16px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:4px" id="prof-dps-wrap" style="display:none">
                   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                     <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Performance Score</span>
@@ -2172,6 +2180,20 @@ const Pages = {
     } catch(e) { wrap.innerHTML = '<div class="empty-state"><div class="empty-title">Failed to load</div></div>'; }
   },
 
+  async openMyReport() {
+    const me = App.meData;
+    if (!me) return;
+    const win = window.open('', '_blank', 'width=900,height=1100');
+    if (!win) { toast('Allow pop-ups to open the report', 'error'); return; }
+    win.document.write('<html><head><title>Loading…</title></head><body style="font-family:Arial;padding:40px;color:#333"><p>Loading your report…</p></body></html>');
+    win.document.close();
+    try {
+      const d = await API.get('/api/me/report');
+      const html = buildAnalystReportHTML(d);
+      win.document.open(); win.document.write(html); win.document.close();
+    } catch(e) { win.close(); toast('Failed to load report: ' + (e.message||''), 'error'); }
+  },
+
   async printCertificate() {
     const me = App.meData;
     if (!me) return;
@@ -2974,6 +2996,104 @@ html,body{width:100%;height:100%;background:#E8E0D0;display:flex;align-items:cen
 </div>
 </body>
 </html>`;
+}
+
+// ─── Analyst report card HTML builder ─────────────────────────────────────
+function buildAnalystReportHTML(d) {
+  // Reuse the same function structure as admin version
+  const escHtml = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const u    = d.user || {};
+  const perf = d.perf || {};
+  const raw  = perf.raw || {};
+  const bd   = perf.breakdown || {};
+  const grad = d.grad || {};
+  const str  = d.streak || {};
+  const cats = d.category_breakdown || [];
+  const genDate = d.generated_at ? new Date(d.generated_at).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : '';
+  const reportId = 'DIAAS-RPT-' + new Date().getFullYear() + '-' + (u.username||'X').toUpperCase().slice(0,4) + String(perf.dps||0).padStart(3,'0');
+
+  const labsByStack = {};
+  (d.labs || []).forEach(lab => {
+    const tag = lab.session_tag || 'Other';
+    if (!labsByStack[tag]) labsByStack[tag] = [];
+    labsByStack[tag].push(lab);
+  });
+  const stackOrder = ['Stack 1','Stack 2','Stack 3','Advanced','Graduation','Final Assessment','Other'];
+  const stackKeys = [...new Set([...stackOrder,...Object.keys(labsByStack)])].filter(k => labsByStack[k]);
+
+  const pct = (a,b) => b>0?Math.round(a/b*100):0;
+  const bar = (val,color) => '<div style="background:#E5E7EB;border-radius:3px;height:7px;width:100%;margin-top:4px"><div style="height:7px;border-radius:3px;background:'+color+';width:'+Math.min(100,val)+'%"></div></div>';
+
+  let labTables = '';
+  stackKeys.forEach(tag => {
+    const labs = labsByStack[tag]||[];
+    if(!labs.length) return;
+    const done = labs.filter(l=>l.status==='completed').length;
+    const stackPts = labs.reduce((s,l)=>s+(l.max_score||0),0);
+    const stackEarned = labs.reduce((s,l)=>s+(l.score_earned||0),0);
+    labTables += '<div style="margin-bottom:22px"><div class="sh">'+escHtml(tag)+'<span style="font-size:11px;font-weight:400;color:#6B7280">'+done+'/'+labs.length+' completed &nbsp;|&nbsp; '+stackEarned+'/'+stackPts+' pts</span></div>';
+    labTables += '<table class="dt"><thead><tr><th>#</th><th>Lab Name</th><th style="text-align:center">Max</th><th style="text-align:center">Score</th><th style="text-align:center">Pct</th><th style="text-align:center">Q Acc</th><th style="text-align:center">Status</th><th style="text-align:right">Date</th></tr></thead><tbody>';
+    labs.forEach((lab,i) => {
+      const sc=lab.score_earned||0,mx=lab.max_score||0,sp=pct(sc,mx),qacc=pct(lab.questions_correct||0,lab.questions_total||1);
+      const date=lab.completed_at?new Date(lab.completed_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+      const cl=lab.status==='completed'?'#15803D':lab.status==='in_progress'?'#1D4ED8':'#9CA3AF';
+      const diff=(lab.difficulty||'').toLowerCase();
+      const dc=diff==='advanced'?'#7C3AED':diff==='intermediate'?'#1D4ED8':'#15803D';
+      labTables += '<tr style="background:'+(i%2===0?'#fff':'#FAFAF9')+'"><td style="text-align:center;color:#9CA3AF;font-size:11px">'+(i+1)+'</td>';
+      labTables += '<td><span style="font-weight:500">'+(escHtml(lab.title||lab.slug))+'</span>'+(diff?'<span style="font-size:9px;color:'+dc+';background:'+dc+'18;padding:1px 5px;border-radius:3px;margin-left:5px;text-transform:uppercase">'+diff+'</span>':'')+'</td>';
+      labTables += '<td style="text-align:center;font-family:monospace;font-size:12px">'+mx+'</td>';
+      labTables += '<td style="text-align:center;font-size:12px;font-weight:600;color:'+(lab.status==='completed'?'#15803D':'#374151')+'">'+(lab.status==='completed'?sc:'—')+'</td>';
+      labTables += '<td style="text-align:center;font-size:12px;color:'+(sp>=80?'#15803D':sp>=50?'#1D4ED8':'#DC2626')+'">'+(lab.status==='completed'?sp+'%':'—')+'</td>';
+      labTables += '<td style="text-align:center;font-size:12px">'+(lab.status!=='not_started'?qacc+'%':'—')+'</td>';
+      labTables += '<td style="text-align:center;font-size:11px;color:'+cl+';font-weight:700">'+(lab.status==='completed'?'&#10003; Done':lab.status==='in_progress'?'&#9654; In Progress':'— Not Started')+'</td>';
+      labTables += '<td style="text-align:right;font-size:11px;color:#6B7280">'+(date||'—')+'</td></tr>';
+    });
+    labTables += '</tbody><tfoot><tr style="background:#F9FAFB;font-weight:700"><td colspan="2" style="padding:6px 8px;font-size:11px">Stack Total</td><td style="text-align:center;font-size:11px">'+stackPts+'</td><td style="text-align:center;font-size:11px;color:#15803D">'+stackEarned+'</td><td style="text-align:center;font-size:11px">'+pct(stackEarned,stackPts)+'%</td><td colspan="3" style="text-align:right;font-size:11px;color:#6B7280;padding-right:8px">'+done+'/'+labs.length+' ('+pct(done,labs.length)+'%)</td></tr></tfoot></table></div>';
+  });
+
+  const ah = d.alert_history||[];
+  const aCorr = ah.filter(a=>a.is_correct).length;
+  const aAcc = pct(aCorr,ah.length);
+  const avgIR = ah.length>0?Math.round(ah.reduce((s,a)=>s+(a.investigation_score||0),0)/ah.length):0;
+  const vc = {'Distinction':'#7C3AED','Merit':'#15803D','Pass':'#1D4ED8','Refer':'#DC2626'}[grad.verdict]||'#1D4ED8';
+  const vb = {'Distinction':'#FAF5FF','Merit':'#F0FDF4','Pass':'#EFF6FF','Refer':'#FEF2F2'}[grad.verdict]||'#EFF6FF';
+
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>My Report — '+escHtml(u.display_name||u.username)+'</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12.5px;color:#111;background:#fff}.page{width:210mm;min-height:297mm;margin:0 auto;padding:16mm 14mm;background:#fff}.dh{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:2.5px solid #E35205;margin-bottom:16px}.dh h1{font-size:17px;font-weight:700;color:#0D1B3E}.dh p{font-size:11px;color:#6B7280;margin-top:2px;letter-spacing:.3px}.ig{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #E5E7EB;border-radius:4px;overflow:hidden;margin-bottom:16px}.ic{padding:7px 12px;border-bottom:.5px solid #E5E7EB;border-right:.5px solid #E5E7EB}.ic:nth-child(2n){border-right:none}.ic:last-child,.ic:nth-last-child(2){border-bottom:none}.il{font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#9CA3AF;font-weight:700;margin-bottom:1px}.iv{font-size:12.5px;color:#111;font-weight:500}.pb{border:1px solid #E5E7EB;border-radius:4px;padding:12px 14px;margin-bottom:16px;background:#FAFAF9}.pt{display:flex;align-items:center;gap:24px;margin-bottom:10px;padding-bottom:10px;border-bottom:.5px solid #E5E7EB}.sh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#0D1B3E;padding:6px 10px;background:#F3F4F6;border-left:3px solid #E35205;margin-bottom:0;display:flex;justify-content:space-between;align-items:center}.dt{width:100%;border-collapse:collapse;font-size:11.5px}.dt th{padding:5px 8px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#6B7280;background:#F9FAFB;border-bottom:1px solid #E5E7EB;font-weight:700}.dt td{padding:5px 8px;border-bottom:.5px solid #F3F4F6;color:#374151}.sg{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px}.sc{border:1px solid #E5E7EB;border-radius:4px;padding:10px 12px;text-align:center;background:#FAFAF9}.pl{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}.pr .pt2{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}.ft{margin-top:20px;padding-top:10px;border-top:1px solid #E5E7EB;display:flex;justify-content:space-between;font-size:9.5px;color:#9CA3AF}@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.page{padding:8mm 10mm;width:100%}.np{display:none!important}}</style></head><body>'
+    +'<div class="np" style="background:#0D1B3E;color:white;padding:10px 20px;display:flex;gap:12px;align-items:center;font-family:Arial,sans-serif;font-size:13px">'
+    +'<span style="flex:1;font-weight:600">DIAAS-SEC — My Performance Report</span>'
+    +'<button onclick="window.print()" style="background:#E35205;color:white;border:none;padding:7px 20px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600">Print / Save PDF</button>'
+    +'<button onclick="window.close()" style="background:transparent;color:#9CA3AF;border:1px solid #374151;padding:7px 16px;border-radius:4px;cursor:pointer;font-size:13px">Close</button></div>'
+    +'<div class="page">'
+    +'<div class="dh"><div><h1>Analyst Performance Report Card</h1><p>DIAAS-SEC SOC Analyst Training Programme · Diaas Learning &amp; Development</p></div>'
+    +'<div style="text-align:right"><div style="font-size:20px;font-weight:700;color:#0D1B3E;letter-spacing:1px">DI<span style="color:#E35205">AA</span>S</div><div style="font-size:10px;color:#9C8A72;margin-top:2px">diaas.in</div></div></div>'
+    +'<div class="ig"><div class="ic"><div class="il">Full Name</div><div class="iv">'+escHtml(u.display_name||u.username)+'</div></div>'
+    +'<div class="ic"><div class="il">Username</div><div class="iv">'+escHtml(u.username)+'</div></div>'
+    +'<div class="ic"><div class="il">Institution</div><div class="iv">'+escHtml(u.institution||'—')+'</div></div>'
+    +'<div class="ic"><div class="il">Report Generated</div><div class="iv">'+genDate+'</div></div></div>'
+    +'<div class="pb"><div class="pt">'
+    +'<div style="text-align:center"><div style="font-size:36px;font-weight:700;color:#0D1B3E;line-height:1">'+( perf.dps||0)+'</div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#9CA3AF;margin-top:2px">DPS / 100</div></div>'
+    +'<div style="font-size:22px;font-weight:700;padding:6px 16px;border-radius:4px;background:#EFF6FF;color:#1D4ED8;margin-left:8px">'+( perf.grade||'—')+'</div>'
+    +'<div style="flex:1;margin-left:16px;display:grid;grid-template-columns:1fr 1fr;gap:6px 20px">'
+    +'<div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#9CA3AF;font-weight:700">Labs Completed</div><div style="font-size:14px;font-weight:600;color:#111;margin-top:1px">'+(raw.labs_completed||0)+' / '+(raw.total_labs||0)+'</div></div>'
+    +'<div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#9CA3AF;font-weight:700">Total Points</div><div style="font-size:14px;font-weight:600;color:#111;margin-top:1px">'+(raw.pts_earned||0)+' pts</div></div>'
+    +'<div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#9CA3AF;font-weight:700">Questions Correct</div><div style="font-size:14px;font-weight:600;color:#111;margin-top:1px">'+(raw.questions_correct||0)+' / '+(raw.questions_attempted||0)+'</div></div>'
+    +'<div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#9CA3AF;font-weight:700">Day Streak</div><div style="font-size:14px;font-weight:600;color:#111;margin-top:1px">'+(str.current_streak||0)+' days</div></div>'
+    +'</div></div>'
+    +'<div class="pl">'+Object.values(bd).map(b=>{const col=b.score>=70?'#15803D':b.score>=50?'#1D4ED8':'#DC2626';return '<div class="pr"><div class="pt2"><span style="font-weight:600;font-size:11px">'+b.label+'</span><span style="font-family:monospace;font-weight:700;font-size:11px;color:'+col+'">'+b.score+'% <span style="color:#9CA3AF;font-size:10px;font-weight:400">× '+b.weight+'%</span></span></div>'+bar(b.score,col)+'</div>';}).join('')+'</div></div>'
+    +'<div class="sh" style="margin-bottom:12px">Lab Completion Record <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">'+(raw.labs_completed||0)+' of '+(raw.total_labs||0)+' labs</span></div>'
+    +labTables
+    +'<div class="sh" style="margin-bottom:10px">SOC Alert Triage</div>'
+    +'<div class="sg" style="margin-bottom:16px"><div class="sc"><div style="font-size:22px;font-weight:700;color:#0D1B3E">'+ah.length+'</div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#9CA3AF;margin-top:2px">Triaged</div></div>'
+    +'<div class="sc"><div style="font-size:22px;font-weight:700;color:#15803D">'+aCorr+'</div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#9CA3AF;margin-top:2px">Correct</div></div>'
+    +'<div class="sc"><div style="font-size:22px;font-weight:700;color:'+(aAcc>=70?'#15803D':aAcc>=50?'#1D4ED8':'#DC2626')+'">'+aAcc+'%</div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#9CA3AF;margin-top:2px">Accuracy</div></div>'
+    +'<div class="sc"><div style="font-size:22px;font-weight:700;color:#0D1B3E">'+avgIR+'%</div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:#9CA3AF;margin-top:2px">Avg IR</div></div></div>'
+    +'<div class="sh" style="margin-bottom:10px">Final Assessment</div>'
+    +(grad&&grad.verdict?
+      '<div style="border:1.5px solid '+vc+';border-radius:4px;padding:12px 14px;background:'+vb+';margin-bottom:16px"><div style="display:inline-block;padding:3px 14px;border-radius:20px;font-size:12px;font-weight:700;background:'+vc+';color:white;letter-spacing:.5px;margin-bottom:8px">'+escHtml(grad.verdict)+'</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:12px"><div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#6B7280;margin-bottom:2px">Score</div><div style="font-weight:700;font-size:18px;color:'+vc+'">'+(grad.overall_score||0)+'%</div></div><div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#6B7280;margin-bottom:2px">Prerequisites</div><div style="font-weight:600;color:#15803D">All completed &#10003;</div></div><div><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:#6B7280;margin-bottom:2px">Date</div><div style="font-weight:500">'+(grad.completed_at?new Date(grad.completed_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—')+'</div></div></div></div>'
+      :'<div style="border:1px solid #E5E7EB;border-radius:4px;padding:12px 14px;background:#FAFAF9;margin-bottom:16px;font-size:12px;color:#6B7280">Not yet attempted. Complete all Stack 2 and Stack 3 labs to unlock the final assessment.</div>'
+    )
+    +'<div class="ft"><span>Issued by Diaas Learning &amp; Development · diaas.in</span><span>Report ID: '+reportId+'</span><span>For internal assessment use only</span></div>'
+    +'</div></body></html>';
 }
 
 window.addEventListener('popstate', (e) => {

@@ -475,9 +475,46 @@ function batchHistory(req, res) {
   return ok(res, rows);
 }
 
+
+// GET /api/admin/report/:userId — full report card data bundle
+async function getReportCard(req, res, userId) {
+  const admin = requireAdmin(req, res); if (!admin) return;
+  const uid = parseInt(userId, 10);
+
+  const user = db.prepare(`SELECT id, username, display_name, email, institution, created_at FROM users WHERE id=?`).get(uid);
+  if (!user) return notFound(res, 'User not found');
+
+  // Performance pillars
+  const { getStudentPerformance } = require('../services/scoring_weighted');
+  const perf = getStudentPerformance(uid);
+
+  // All labs with per-question progress
+  const { getAnalystProfile } = require('../services/analyst_profile');
+  const profile = getAnalystProfile(uid);
+
+  // Graduation data
+  const { generateGraduationReport } = require('../services/graduation');
+  let grad = null;
+  try { grad = generateGraduationReport(uid); } catch {}
+
+  // Streak
+  const streak = db.prepare(`SELECT current_streak, longest_streak FROM streaks WHERE user_id=?`).get(uid);
+
+  return ok(res, {
+    user,
+    perf,
+    labs: profile.lab_activity || [],
+    category_breakdown: profile.category_breakdown || [],
+    alert_history: profile.alert_history || [],
+    grad,
+    streak: streak || { current_streak: 0, longest_streak: 0 },
+    generated_at: new Date().toISOString(),
+  });
+}
+
 module.exports = {
   getStats, listUsers, createUser, updateUser, deleteUser, getProfile,
-  batchReset, exportUsers, importUsers, batchHistory,
+  batchReset, exportUsers, importUsers, batchHistory, getReportCard,
   getProgress, listAdminLabs, createLab, updateLab, deleteLab,
   getLabQuestions, addQuestion, updateQuestion, deleteQuestion,
   getAnalystActivity,
