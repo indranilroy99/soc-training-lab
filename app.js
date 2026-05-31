@@ -96,8 +96,14 @@ function startServer(port = cfg.PORT, host = cfg.HOST) {
     server.once('listening', () => {
       server.off('error', reject);
       cleanupTimer = startSessionCleanup();
-      seedAchievements();
-      seedLearningPaths();
+      // Seed reference data only in primary/standalone mode — workers skip this
+      // to avoid concurrent INSERTs on startup (INSERT OR IGNORE handles conflicts
+      // but unnecessary DB contention at startup is avoided)
+      const cl = require('cluster');
+      if (!cl.isWorker) {
+        seedAchievements();
+        seedLearningPaths();
+      }
       resolve(server);
     });
     server.listen(port, host);

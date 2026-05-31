@@ -111,7 +111,7 @@ async function submitAnswer(req, res, slug) {
     });
   }
 
-  const submitted    = String(answer).trim();
+  const submitted    = String(answer || '').trim().slice(0, 2000);  // max 2000 chars — prevents DB bloat
   const subLower     = submitted.toLowerCase();
   const correctLower = String(question.correct_answer || '').trim().toLowerCase();
 
@@ -150,7 +150,9 @@ async function submitAnswer(req, res, slug) {
        VALUES (?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(user_id, question_id) DO UPDATE SET
          submitted_answer=excluded.submitted_answer,
-         is_correct=excluded.is_correct, pts_awarded=excluded.pts_awarded,
+         -- Never downgrade a correct answer to wrong (race condition safety)
+         is_correct  = CASE WHEN user_answers.is_correct=1 THEN 1 ELSE excluded.is_correct END,
+         pts_awarded = CASE WHEN user_answers.is_correct=1 THEN user_answers.pts_awarded ELSE excluded.pts_awarded END,
          hints_used=excluded.hints_used, attempt_number=excluded.attempt_number,
          wrong_count=excluded.wrong_count, submitted_at=excluded.submitted_at`
     ).run(user.id, lab.id, question.id, submitted, isCorrect ? 1 : 0,

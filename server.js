@@ -22,7 +22,11 @@ if (cluster.isPrimary) {
   for (let i = 0; i < numWorkers; i++) cluster.fork();
 
   cluster.on('exit', (worker, code, signal) => {
-    if (code !== 0 && !worker.exitedAfterDisconnect) {
+    if (code === 2) {
+      // Exit code 2 = EADDRINUSE — do NOT restart, it will just loop forever
+      console.error(`[cluster] Worker exited with EADDRINUSE — not restarting. Fix the port conflict first.`);
+      if (Object.keys(cluster.workers).length === 0) process.exit(2);  // exit primary too
+    } else if (code !== 0 && !worker.exitedAfterDisconnect) {
       console.error(`[cluster] Worker ${worker.process.pid} died (code=${code}, signal=${signal}) — restarting`);
       cluster.fork();
     }
@@ -35,7 +39,16 @@ if (cluster.isPrimary) {
   startServer(cfg.PORT, cfg.HOST).then(() => {
     console.log(`[worker:${process.pid}] Listening on ${cfg.HOST}:${cfg.PORT}`);
   }).catch(err => {
-    console.error(`[worker:${process.pid}] Failed to start:`, err.message);
-    process.exit(1);
+    if (err.code === 'EADDRINUSE') {
+      // Port already in use — do NOT let cluster auto-restart (causes infinite loop)
+      // This happens if a previous server instance wasn't killed before starting a new one
+      console.error(`[worker:${process.pid}] FATAL: Port ${cfg.PORT} is already in use.`);
+      console.error(`[worker:${process.pid}] Run: kill $(lsof -ti:${cfg.PORT}) to free the port.`);
+      process.exitCode = 2;  // exitCode=2 signals cluster to NOT restart this worker
+    } else {
+      console.error(`[worker:${process.pid}] Failed to start:`, err.message);
+      process.exitCode = 1;
+    }
+    process.exit(process.exitCode);
   });
 }

@@ -270,7 +270,15 @@ function healthCheck() {
   }
 }
 
-runMigrations();
-ensureIndexes();
+// Run migrations and index creation only once — in the primary process (or single-process mode)
+// If we let every worker run migrations simultaneously they race on ALTER TABLE statements
+const cluster = require('cluster');
+if (!cluster.isWorker) {
+  runMigrations();
+  ensureIndexes();
+} else {
+  // Workers: just ensure indexes (safe to run concurrently — CREATE INDEX IF NOT EXISTS is idempotent)
+  ensureIndexes();
+}
 
 module.exports = { db, startSessionCleanup, healthCheck };

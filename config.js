@@ -32,7 +32,7 @@ module.exports = {
   SUBMIT_RATE_MAX:    30,                   // 30 submits/min per IP
 
   // ── Leaderboard cache ─────────────────────────────────────────────────────
-  LB_CACHE_TTL_MS: 10 * 1000,              // 10 seconds
+  LB_CACHE_TTL_MS:  2 * 1000,              // 2 seconds — short enough that cross-worker stale data is imperceptible
 
   // ── Cluster ───────────────────────────────────────────────────────────────
   CLUSTER_MIN_WORKERS: 2,

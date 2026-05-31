@@ -95,7 +95,12 @@ async function updateUser(req, res, userId) {
     return require('../middleware/response').forbidden(res, 'Cannot modify another administrator account');
   }
   const body = await parseBody(req);
-  if (body.active !== undefined) db.prepare(`UPDATE users SET is_active=? WHERE id=?`).run(body.active ? 1 : 0, uid);
+  if (body.active !== undefined) {
+    const newActive = body.active ? 1 : 0;
+    db.prepare(`UPDATE users SET is_active=? WHERE id=?`).run(newActive, uid);
+    // Deactivating a user: kill all their sessions immediately so they can't keep using the platform
+    if (!newActive) db.prepare(`DELETE FROM sessions WHERE user_id=?`).run(uid);
+  }
   if (body.password) {
     const err = validateNewPassword(body.password);
     if (err) return badRequest(res, err);
@@ -352,9 +357,9 @@ async function batchReset(req, res) {
       // Soft reset: keep accounts, reset scores and force password change
       // Wrap in try/catch — extra_labs_bonus column may not exist on older installs
       try {
-        db.prepare(`UPDATE users SET points=0, extra_labs_bonus=0, force_pw_change=1 WHERE role='analyst'`).run();
+        db.prepare(`UPDATE users SET points=0, extra_labs_bonus=0, force_pw_change=1, last_lab_slug=NULL, last_active_at=NULL WHERE role='analyst'`).run();
       } catch {
-        db.prepare(`UPDATE users SET points=0, force_pw_change=1 WHERE role='analyst'`).run();
+        db.prepare(`UPDATE users SET points=0, force_pw_change=1, last_lab_slug=NULL, last_active_at=NULL WHERE role='analyst'`).run();
       }
     }
     // Also clear the leaderboard snapshot table if it exists
@@ -416,9 +421,8 @@ async function importUsers(req, res) {
 
   const created = []; const errors = [];
 
-  // Pre-validate + pre-hash all passwords OUTSIDE the DB transaction
-  // bcrypt is expensive (~100ms each) — hashing inside a transaction blocks the DB
-  const validated = [];
+  // Pre-validate all rows first (fast — no hashing yet)
+  const toHash = [];
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     if (!r.username || !r.password) { errors.push({ row: i+1, error: 'username and password required' }); continue; }
@@ -426,9 +430,16 @@ async function importUsers(req, res) {
     if (uname.length < 3) { errors.push({ row: i+1, error: 'username too short' }); continue; }
     if (r.password.length < 8) { errors.push({ row: i+1, error: 'password must be 8+ characters' }); continue; }
     const role = r.role === 'admin' ? 'admin' : 'analyst';
-    const hash = bcrypt.hashSync(r.password, 10); // hashed outside transaction
-    validated.push({ row: i+1, uname, hash, role, r });
+    toHash.push({ row: i+1, uname, role, r });
   }
+
+  // Hash passwords async (non-blocking) — allows other requests to be served during this
+  const validated = await Promise.all(toHash.map(async ({ row, uname, role, r }) => {
+    const hash = await new Promise((res, rej) =>
+      require('bcryptjs').hash(r.password, 10, (err, h) => err ? rej(err) : res(h))
+    );
+    return { row, uname, hash, role, r };
+  }));
 
   // Now insert all valid rows inside a single fast transaction (no hashing inside)
   db.transaction(() => {
