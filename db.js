@@ -18,6 +18,8 @@ db.pragma('temp_store = MEMORY');   // temp tables in RAM
 function runMigrations() {
   const sessionSQL = `ALTER TABLE sessions ADD COLUMN created_at TEXT DEFAULT (datetime('now'))`;
   try { db.prepare(sessionSQL).run(); } catch (e) { /* already exists */ }
+  const lastSeenSQL = `ALTER TABLE sessions ADD COLUMN last_seen_at TEXT DEFAULT (datetime('now'))`;
+  try { db.prepare(lastSeenSQL).run(); } catch (e) { /* already exists */ }
 
   // Extended user profile fields
   const profileCols = [

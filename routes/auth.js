@@ -43,7 +43,11 @@ async function login(req, res) {
 
   const token   = crypto.randomBytes(cfg.SESSION_BYTES).toString('hex');
   const expires = new Date(Date.now() + cfg.SESSION_TTL_HOURS * 3_600_000).toISOString();
-  db.prepare(`INSERT INTO sessions (user_id, token, expires_at) VALUES (?,?,?)`).run(user.id, token, expires);
+  // Single-session enforcement: invalidate all previous sessions for this user
+  // This prevents students from sharing credentials or using multiple devices
+  db.prepare(`DELETE FROM sessions WHERE user_id=?`).run(user.id);
+  db.prepare(`INSERT INTO sessions (user_id, token, expires_at, created_at, last_seen_at) VALUES (?,?,?,?,?)`)
+    .run(user.id, token, expires, new Date().toISOString(), new Date().toISOString());
 
   logger.info('login_success', { userId: user.id, username: user.username, ip, reqId: req.id });
   // Award first-login achievement (ignored if already earned)

@@ -668,7 +668,7 @@ input, textarea, select { font-family: var(--font); }
       </div>
     </nav>
     <!-- Streak Widget -->
-    <div id="streak-widget" style="display:none;padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <div id="streak-widget" style="display:none;padding:10px 14px;border-top:1px solid var(--border);align-items:center;gap:10px;flex-shrink:0">
       <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--dim)">STREAK</span>
       <div>
         <div style="font-size:16px;font-weight:700;color:#F97316;font-family:var(--mono);line-height:1" id="streak-count">0</div>
@@ -1354,6 +1354,9 @@ const App = {
 
     document.getElementById('force-pw-modal').style.display = 'none';
     toast('Password updated. Welcome!', 'success');
+    // Now load the platform
+    await App.loadLabs();
+    App.navigate('dashboard');
   },
 
   async loadLabs() {
@@ -2469,12 +2472,12 @@ const SocDash = {
           <span style="font-size:11.5px;color:var(--dim)">Alert ID: ${escapeHtml(a.id)}</span>
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('alert-detail-overlay').remove()">Close</button>
-            <button class="btn btn-warn btn-sm" onclick="SocDash.openEscalate(${JSON.stringify(String(a.id || ''))})">
+            <button class="btn btn-warn btn-sm" onclick="SocDash.openEscalate('${a.id}')" >
               <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='18 15 12 9 6 15'/></svg>
               Escalate
             </button>
-            <button class="btn btn-fp btn-sm" onclick="window.irOpenFP(${JSON.stringify(String(a.id || ''))})">False Positive</button>
-            <button class="btn btn-resolve btn-sm" onclick="window.irOpenResolve(${JSON.stringify(String(a.id || ''))})">Mark as Resolved</button>
+            <button class="btn btn-fp btn-sm" onclick="window.irOpenFP('${a.id}')" >False Positive</button>
+            <button class="btn btn-resolve btn-sm" onclick="window.irOpenResolve('${a.id}')" >Mark as Resolved</button>
           </div>
         </div>
       </div>`;
@@ -2798,7 +2801,7 @@ window.irUpdateStatusBadge = function(newStatus) {
 </script>
 
 <!-- FORCE PASSWORD CHANGE MODAL -->
-<div id="force-pw-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99999;display:flex;align-items:center;justify-content:center" id="force-pw-modal">
+<div id="force-pw-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99999;align-items:center;justify-content:center">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:28px;width:100%;max-width:400px">
     <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">Set Your Password</div>
     <div style="font-size:13px;color:var(--dim);margin-bottom:20px">Your account requires a password change before you can continue.</div>

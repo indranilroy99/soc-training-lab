@@ -1203,16 +1203,22 @@ const Pages = {
         <th>Labs Done</th><th>Last Active</th><th>Actions</th>
       </tr></thead>
       <tbody>${users.map(u => {
-        const lastActive = u.last_session
-          ? new Date(u.last_session).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
+        // Use last_seen (actual last activity) not expires_at (7 days in future)
+        const lastSeen = u.last_seen
+          ? new Date(u.last_seen).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
           : 'Never';
+        const isOnline = u.is_online === 1;
         return `<tr>
-          <td class="td-main"><span style="cursor:pointer;color:var(--blue)" onclick="Pages.showAnalyst(${u.id}, ${JSON.stringify(String(u.username || ''))}, ${JSON.stringify(String(u.role || ''))})">${escapeHtml(u.username)}</span></td>
+          <td class="td-main" style="display:flex;align-items:center;gap:8px">
+            <span style="width:8px;height:8px;border-radius:50%;background:${isOnline?'var(--green)':'var(--border)'};flex-shrink:0" title="${isOnline?'Online now':'Offline'}"></span>
+            <span style="cursor:pointer;color:var(--blue)" onclick="Pages.showAnalyst(${u.id})">${escapeHtml(u.username)}</span>
+            ${u.display_name ? `<span style="font-size:11px;color:var(--dim)">(${escapeHtml(u.display_name)})</span>` : ''}
+          </td>
           <td><span class="chip ${u.role==='admin'?'chip-orange':'chip-blue'}">${escapeHtml(u.role)}</span></td>
           <td><span class="chip ${u.is_active?'chip-blue':'chip-red'}">${u.is_active?'Active':'Disabled'}</span></td>
           <td class="td-mono" style="color:var(--blue)">${u.score}</td>
           <td>${u.labs_done}</td>
-          <td style="color:var(--dim);font-size:11.5px">${lastActive}</td>
+          <td style="color:var(--dim);font-size:11.5px">${lastSeen}</td>
           <td>
             <div style="display:flex;gap:6px;align-items:center">
               <button class="btn btn-outline btn-xs" onclick="Pages.showAnalyst(${u.id}, ${JSON.stringify(String(u.username || ''))}, ${JSON.stringify(String(u.role || ''))})">Profile</button>

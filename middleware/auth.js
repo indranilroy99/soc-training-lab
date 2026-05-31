@@ -35,12 +35,10 @@ function requireAuth(req, res) {
     return null;
   }
 
-  // Slide the session expiry window if it's getting close
-  const expiresTs = Date.parse(row.expires_at || '');
-  if (!isNaN(expiresTs) && (expiresTs - Date.now()) < TOUCH_INTERVAL_MS) {
-    const nextExpiry = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-    db.prepare(`UPDATE sessions SET expires_at=? WHERE token=?`).run(nextExpiry, token);
-  }
+  // Always extend session + update last_seen_at for online/offline tracking
+  const nowTs = new Date().toISOString();
+  const nextExpiry = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+  db.prepare(`UPDATE sessions SET expires_at=?, last_seen_at=? WHERE token=?`).run(nextExpiry, nowTs, token);
 
   // Attach user ID to request for logging
   req._userId = row.id;
