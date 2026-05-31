@@ -79,6 +79,7 @@ function getAnalystProfile(userId) {
   const allLabs = safeGet(() =>
     db.prepare(`
       SELECT l.id, l.slug, l.title, l.category, l.difficulty, l.points,
+             l.session_tag, l.lab_id,
              up.status, up.score, up.started_at, up.completed_at
       FROM labs l
       LEFT JOIN user_progress up ON up.lab_id=l.id AND up.user_id=?
@@ -120,6 +121,7 @@ function getAnalystProfile(userId) {
     return {
       lab_id: lab.id, slug: lab.slug, title: lab.title,
       category: lab.category, difficulty: lab.difficulty, max_score: maxScore,
+      session_tag: lab.session_tag || null, lab_ref: lab.lab_id || null,
       score_earned: scoreEarned, status: lab.status || 'not_started',
       started_at: lab.started_at, completed_at: lab.completed_at,
       time_spent_mins: timeSpentMins,

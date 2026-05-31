@@ -7,6 +7,8 @@ const { parseBody }    = require('../middleware/security');
 const { ok, created, notFound, badRequest } = require('../middleware/response');
 const { requireString, validateNewPassword, sanitize } = require('../middleware/validate');
 const { getAnalystProfile } = require('../services/analyst_profile');
+const { getStudentPerformance }    = require('../services/scoring_weighted');
+const { generateGraduationReport } = require('../services/graduation');
 const { invalidateLeaderboardCache } = require('./leaderboard');
 
 // ── GET /api/admin/stats ─────────────────────────────────────────────────
@@ -88,7 +90,15 @@ async function createUser(req, res) {
   if (existing) return badRequest(res, 'Username already exists');
   const hash = bcrypt.hashSync(password, 10);
   const forcePw = validRole === 'admin' ? 0 : 1;
-  const info = db.prepare(`INSERT INTO users (username, password_hash, role, force_pw_change) VALUES (?,?,?,?)`).run(cleanName, hash, validRole, forcePw);
+  let info;
+  try {
+    info = db.prepare(`INSERT INTO users (username, password_hash, role, force_pw_change) VALUES (?,?,?,?)`).run(cleanName, hash, validRole, forcePw);
+  } catch (e) {
+    if (e.code === 'SQLITE_CONSTRAINT_UNIQUE' || (e.message && e.message.includes('UNIQUE'))) {
+      return badRequest(res, `Username '${cleanName}' already exists.`);
+    }
+    throw e;
+  }
   return created(res, { id: info.lastInsertRowid, username: cleanName, role: validRole });
 }
 
@@ -484,16 +494,8 @@ async function getReportCard(req, res, userId) {
   const user = db.prepare(`SELECT id, username, display_name, email, institution, created_at FROM users WHERE id=?`).get(uid);
   if (!user) return notFound(res, 'User not found');
 
-  // Performance pillars
-  const { getStudentPerformance } = require('../services/scoring_weighted');
-  const perf = getStudentPerformance(uid);
-
-  // All labs with per-question progress
-  const { getAnalystProfile } = require('../services/analyst_profile');
+  const perf    = getStudentPerformance(uid);
   const profile = getAnalystProfile(uid);
-
-  // Graduation data
-  const { generateGraduationReport } = require('../services/graduation');
   let grad = null;
   try { grad = generateGraduationReport(uid); } catch {}
 
@@ -504,7 +506,7 @@ async function getReportCard(req, res, userId) {
     user,
     perf,
     labs: profile.lab_activity || [],
-    category_breakdown: profile.category_breakdown || [],
+    category_breakdown: profile.category_performance || [],
     alert_history: profile.alert_history || [],
     grad,
     streak: streak || { current_streak: 0, longest_streak: 0 },

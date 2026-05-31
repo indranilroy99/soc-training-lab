@@ -1257,6 +1257,12 @@ const App = {
     // Set sidebar user
     document.getElementById('sidebar-username').textContent = user.username;
     document.getElementById('sidebar-avatar').textContent   = user.username.slice(0,2).toUpperCase();
+    // If loadMe has already run, update sidebar with display_name
+    if (App.meData?.display_name) {
+      document.getElementById('sidebar-username').textContent = App.meData.display_name;
+      const initials = App.meData.display_name.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+      document.getElementById('sidebar-avatar').textContent = initials;
+    }
 
     // Nav click handlers
     document.querySelectorAll('.nav-item[data-page]').forEach(el => {
@@ -1321,7 +1327,7 @@ const App = {
       document.getElementById('sidebar-score').textContent  = me.score;
       document.getElementById('topbar-score').textContent   = me.score;
       document.getElementById('topbar-rank').textContent    = me.rank > 0 ? '#' + me.rank : '–';
-      document.getElementById('welcome-title').textContent  = 'Welcome back, ' + me.username;
+      document.getElementById('welcome-title').textContent  = 'Welcome back, ' + (me.display_name ? me.display_name.split(' ')[0] : me.username);
       document.getElementById('ds-score').textContent       = me.score;
       document.getElementById('ds-done').textContent        = me.labs_done;
       document.getElementById('ds-progress').textContent    = me.labs_in_progress;
@@ -1332,6 +1338,12 @@ const App = {
       document.getElementById('prof-acc').textContent   = me.accuracy + '%';
       document.getElementById('profile-username').textContent = me.username;
       document.getElementById('profile-avatar').textContent   = me.username.slice(0,2).toUpperCase();
+      // Update sidebar with display_name if set
+      if (me.display_name) {
+        document.getElementById('sidebar-username').textContent = me.display_name;
+        const initials = me.display_name.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+        document.getElementById('sidebar-avatar').textContent = initials;
+      }
       // XP / Level in sidebar
       const lv = App.getLevelInfo(me.score || 0);
       const xpWrap = document.getElementById('sidebar-xp-wrap');
@@ -1489,9 +1501,10 @@ const App = {
   async openLab(slug, isRestore = false) {
     App.currentLabSlug = slug;
 
-    // Save current state to localStorage
+    // Save current state to localStorage AND server (for resume banner)
     localStorage.setItem('diaas_last_page', 'lab-view');
     localStorage.setItem('diaas_last_lab_slug', slug);
+    API.post('/api/me/position', { lab_slug: slug, question_id: 0 }).catch(() => {});
 
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
