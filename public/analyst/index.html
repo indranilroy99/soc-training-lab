@@ -2177,14 +2177,21 @@ const Pages = {
     if (!me) return;
     try {
       const grad = await API.get('/api/graduation/report');
-      const date = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
-      const verdict = grad.verdict || 'Pass';
-      const score = grad.overall_score || 0;
-      const name = escapeHtml(me.display_name || me.username);
-      const win = window.open('', '_blank', 'width=900,height=700');
-      win.document.write('<html><head><title>SOC Certificate</title><style>body{margin:0;background:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Georgia,serif}.cert{width:800px;padding:60px;border:8px solid #1a1a2e;position:relative;text-align:center}.cert::before{content:"";position:absolute;inset:12px;border:2px solid #c9aa71;pointer-events:none}.t1{font-size:11px;letter-spacing:5px;text-transform:uppercase;color:#666;margin-bottom:8px}.t2{font-size:42px;font-weight:700;color:#1a1a2e;margin:16px 0;letter-spacing:2px}.t3{font-size:13px;color:#888;letter-spacing:3px;text-transform:uppercase;margin-bottom:30px}.name{font-size:32px;color:#c9aa71;font-style:italic;margin:20px 0;border-bottom:2px solid #c9aa71;padding-bottom:10px;display:inline-block;min-width:300px}.body{font-size:14px;color:#444;line-height:1.8;margin:16px 0}.verdict{font-size:22px;font-weight:700;color:#1a1a2e;margin:16px 0}.footer{margin-top:40px;display:flex;justify-content:space-between;padding-top:20px;border-top:1px solid #eee}.sig{text-align:center}.sigline{width:160px;border-top:1px solid #333;margin:0 auto 6px}.siglabel{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#888}@media print{.noprint{display:none}}</style></head><body><div class="cert"><div class="t1">DIAAS-SEC Training Program</div><div class="t2">Certificate of Achievement</div><div class="t3">SOC Analyst Certification</div><div class="body">This certifies that</div><div class="name">' + name + '</div><div class="body">has successfully completed the DIAAS-SEC SOC Analyst Training Program,<br>demonstrating proficiency in threat detection, incident response, and security operations.</div><div class="verdict">Graduation Verdict: ' + verdict + '</div><div class="body" style="color:#666">Score: ' + score + '% &nbsp;·&nbsp; Issued: ' + date + '</div><div class="footer"><div class="sig"><div class="sigline"></div><div class="siglabel">Programme Director</div></div><div style="font-size:48px;opacity:.07;align-self:center">🔒</div><div class="sig"><div class="sigline"></div><div class="siglabel">Date of Issue</div></div></div><button class="noprint" onclick="window.print()" style="margin-top:20px;padding:10px 28px;background:#1a1a2e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px">Print / Save as PDF</button></div></body></html>');
+      if (!grad || !grad.verdict) { toast('Complete the graduation lab first', 'error'); return; }
+
+      const name         = me.display_name || me.username;
+      const verdict      = grad.verdict || 'Pass';
+      const score        = grad.overall_score || 0;
+      const labsDone     = (App.labsData || []).filter(l => l.status === 'completed').length;
+      const date         = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+      const rawHash      = btoa(unescape(encodeURIComponent(name + score + date))).replace(/[^A-Z0-9]/gi,'').toUpperCase();
+      const credId       = 'DIAAS-SOC-' + new Date().getFullYear() + '-' + rawHash.slice(0,8);
+
+      const win = window.open('', '_blank', 'width=1200,height=860');
+      if (!win) { toast('Allow pop-ups to download certificate', 'error'); return; }
+      win.document.write(buildCertHTML(name, verdict, score, labsDone, date, credId));
       win.document.close();
-    } catch { toast('Complete the graduation lab to get a certificate', 'error'); }
+    } catch(e) { console.error(e); toast('Could not generate certificate. Complete the graduation lab first.', 'error'); }
   },
 
   profile() {
@@ -2747,6 +2754,228 @@ window.Pages   = Pages;
 window.SocDash = SocDash;
 window.AchPopup = AchPopup;
 window.Notes   = Notes;
+// ─── Certificate HTML builder (global) ──────────────────────────────────────
+function buildCertHTML(name, verdict, score, labsDone, date, credId) {
+  const verdictColor = {
+    'Distinction': '#6B21A8',
+    'Merit':       '#15803D',
+    'Pass':        '#1D4ED8',
+    'Refer':       '#B91C1C'
+  }[verdict] || '#1D4ED8';
+
+  const verdictBg = {
+    'Distinction': '#FAF5FF',
+    'Merit':       '#F0FDF4',
+    'Pass':        '#EFF6FF',
+    'Refer':       '#FEF2F2'
+  }[verdict] || '#EFF6FF';
+
+  // Build the hex badge SVG (inline)
+  const badgeSVG = `<svg width="130" height="150" viewBox="0 0 130 150" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#E35205"/>
+        <stop offset="100%" stop-color="#C04A06"/>
+      </linearGradient>
+      <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#F97316"/>
+        <stop offset="100%" stop-color="#EA580C"/>
+      </linearGradient>
+    </defs>
+    <!-- Outer hex ring -->
+    <polygon points="65,4 122,36 122,100 65,132 8,100 8,36"
+             fill="none" stroke="#E35205" stroke-width="3" opacity="0.3"/>
+    <!-- Main hex body -->
+    <polygon points="65,12 114,40 114,96 65,124 16,96 16,40"
+             fill="url(#bg)"/>
+    <!-- Inner hex border -->
+    <polygon points="65,18 108,44 108,92 65,118 22,92 22,44"
+             fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+    <!-- Shield icon -->
+    <path d="M65 38 L82 46 L82 64 C82 74 74 82 65 86 C56 82 48 74 48 64 L48 46 Z"
+          fill="rgba(255,255,255,0.15)" stroke="white" stroke-width="1.5"/>
+    <path d="M58 63 L63 68 L73 56" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- CERTIFIED text arc (approx with tspans) -->
+    <text text-anchor="middle" x="65" y="108" font-family="'Arial Narrow',Arial,sans-serif"
+          font-size="8.5" font-weight="700" fill="white" letter-spacing="3.5">CERTIFIED</text>
+    <text text-anchor="middle" x="65" y="119" font-family="'Arial Narrow',Arial,sans-serif"
+          font-size="7" font-weight="600" fill="rgba(255,255,255,0.75)" letter-spacing="2.5">ANALYST</text>
+  </svg>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DIAAS-SEC Certificate — ${name.replace(/</g,'&lt;')}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Crimson+Pro:ital,wght@0,400;1,400;1,600&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#E8E0D0;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.cert-wrap{width:1100px;height:778px;background:#F8F5EE;position:relative;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.25);display:flex;flex-direction:column}
+
+/* Orange top bar */
+.cert-top-bar{height:10px;background:linear-gradient(90deg,#E35205 0%,#F97316 50%,#E35205 100%);flex-shrink:0}
+
+/* Header row */
+.cert-header{padding:22px 48px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E5D8C4;flex-shrink:0}
+.cert-logo{display:flex;align-items:center;gap:14px}
+.cert-logo img{height:42px;object-fit:contain}
+.cert-logo-fallback{font-family:'Playfair Display',Georgia,serif;font-size:26px;font-weight:700;color:#0D1B3E;letter-spacing:1px}
+.cert-logo-fallback span{color:#E35205}
+.cert-hdr-right{text-align:right}
+.cert-hdr-right p{font-family:'Source Sans 3','Trebuchet MS',Arial,sans-serif;font-size:11.5px;color:#7A6A55;letter-spacing:1.5px;text-transform:uppercase;font-weight:600}
+.cert-hdr-right p.big{font-size:14px;color:#0D1B3E;letter-spacing:0.5px;text-transform:none;margin-top:3px}
+
+/* Main certificate body */
+.cert-body{flex:1;padding:24px 72px 0;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative}
+
+/* Watermark background hex pattern */
+.cert-body::before{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg width='60' height='70' viewBox='0 0 60 70' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='30,2 56,17 56,47 30,62 4,47 4,17' fill='none' stroke='%23E35205' stroke-width='0.4' opacity='0.08'/%3E%3C/svg%3E");background-size:60px 70px;opacity:1;pointer-events:none}
+
+.cert-type{font-family:'Source Sans 3','Trebuchet MS',Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:#E35205;margin-bottom:6px}
+.cert-title{font-family:'Playfair Display',Georgia,serif;font-size:36px;font-weight:700;color:#0D1B3E;letter-spacing:0.5px;line-height:1.1;margin-bottom:4px}
+.cert-title-sub{font-family:'Source Sans 3','Trebuchet MS',Arial,sans-serif;font-size:11px;color:#9C8A72;letter-spacing:3px;text-transform:uppercase;font-weight:400;margin-bottom:18px}
+.cert-divider{width:80px;height:1.5px;background:linear-gradient(90deg,transparent,#E35205,transparent);margin:0 auto 16px}
+
+.cert-presented{font-family:'Crimson Pro','Book Antiqua','Palatino Linotype',Georgia,serif;font-size:15px;color:#7A6A55;font-style:italic;margin-bottom:6px}
+.cert-name{font-family:'Playfair Display',Georgia,serif;font-size:44px;font-weight:700;color:#0D1B3E;line-height:1.1;margin-bottom:10px;letter-spacing:0.5px}
+.cert-name::after{content:'';display:block;width:320px;height:1.5px;background:linear-gradient(90deg,transparent,#C9A84C,transparent);margin:8px auto 0}
+
+.cert-description{font-family:'Crimson Pro','Book Antiqua',Georgia,serif;font-size:15.5px;color:#4A3C2A;line-height:1.6;margin-bottom:14px;max-width:620px}
+
+/* Stats row */
+.cert-stats{display:flex;gap:0;border:1.5px solid #D4C5A9;border-radius:8px;overflow:hidden;margin-bottom:0}
+.cert-stat{padding:10px 28px;text-align:center;background:white;border-right:1px solid #D4C5A9;flex:1}
+.cert-stat:last-child{border-right:none}
+.cert-stat-val{font-family:'Playfair Display',Georgia,serif;font-size:22px;font-weight:700;color:#0D1B3E;line-height:1}
+.cert-stat-lbl{font-family:'Source Sans 3','Trebuchet MS',Arial,sans-serif;font-size:10px;color:#9C8A72;text-transform:uppercase;letter-spacing:1.5px;margin-top:3px;font-weight:600}
+.cert-verdict-badge{display:inline-block;padding:3px 14px;border-radius:20px;font-size:13px;font-weight:700;font-family:'Source Sans 3',Arial,sans-serif;letter-spacing:1px;text-transform:uppercase}
+
+/* Footer */
+.cert-footer{padding:14px 56px 0;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0;border-top:1px solid #E5D8C4;margin-top:14px}
+.cert-sig{text-align:center;flex:1}
+.cert-sig-name{font-family:'Crimson Pro','Book Antiqua',Georgia,serif;font-size:17px;font-style:italic;color:#0D1B3E;margin-bottom:2px}
+.cert-sig-line{width:160px;height:1px;background:#0D1B3E;margin:0 auto 5px;opacity:0.4}
+.cert-sig-title{font-family:'Source Sans 3','Trebuchet MS',Arial,sans-serif;font-size:10px;color:#9C8A72;text-transform:uppercase;letter-spacing:1.5px;font-weight:600}
+.cert-sig-org{font-family:'Source Sans 3','Trebuchet MS',Arial,sans-serif;font-size:10px;color:#C9A84C;text-transform:uppercase;letter-spacing:1.5px;margin-top:2px;font-weight:700}
+
+.cert-badge-center{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;padding:0 32px}
+.cert-cred{font-family:'Source Sans 3','Trebuchet MS',Arial,sans-serif;font-size:9px;color:#9C8A72;letter-spacing:1.5px;text-transform:uppercase;text-align:center;line-height:1.6}
+.cert-cred strong{color:#C9A84C;display:block;font-size:10px}
+
+/* Bottom bar */
+.cert-bot-bar{height:8px;background:linear-gradient(90deg,#0D1B3E 0%,#1A2F5E 40%,#E35205 70%,#F97316 100%);flex-shrink:0}
+
+/* Print */
+@media print{
+  html,body{background:#fff;display:block}
+  .cert-wrap{width:100%;height:auto;box-shadow:none;page-break-inside:avoid}
+  @page{size:A4 landscape;margin:0}
+  .no-print{display:none!important}
+}
+</style>
+</head>
+<body>
+<div class="cert-wrap">
+  <div class="cert-top-bar"></div>
+  <div class="cert-header">
+    <div class="cert-logo">
+      <img src="https://diaas.in/assets/images/Diaas_Logo.png" alt="Diaas"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <div class="cert-logo-fallback" style="display:none">DI<span>AA</span>S</div>
+      <div style="width:1px;height:40px;background:#D4C5A9;margin-left:4px"></div>
+      <div style="margin-left:10px">
+        <p style="font-family:'Source Sans 3',Arial,sans-serif;font-size:13px;font-weight:700;color:#0D1B3E;letter-spacing:0.5px">DIAAS-SEC</p>
+        <p style="font-family:'Source Sans 3',Arial,sans-serif;font-size:11px;color:#9C8A72;margin-top:1px">Security Operations Training</p>
+      </div>
+    </div>
+    <div class="cert-hdr-right">
+      <p>Authorised by Diaas Learning &amp; Development</p>
+      <p class="big">diaas.in &nbsp;|&nbsp; info@diaas.in</p>
+    </div>
+  </div>
+
+  <div class="cert-body">
+    <p class="cert-type">Diaas Learning &amp; Development</p>
+    <h1 class="cert-title">Certificate of Achievement</h1>
+    <p class="cert-title-sub">SOC Analyst Certification Programme</p>
+    <div class="cert-divider"></div>
+    <p class="cert-presented">This is to certify that</p>
+    <h2 class="cert-name">${name.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</h2>
+    <p class="cert-description">
+      has successfully completed the <strong>DIAAS-SEC SOC Analyst Certification Programme</strong>,
+      demonstrating professional competency in threat detection, incident response,
+      MITRE ATT&amp;CK framework analysis, and security operations centre procedures.
+    </p>
+    <div class="cert-stats">
+      <div class="cert-stat">
+        <div class="cert-stat-val">${labsDone}</div>
+        <div class="cert-stat-lbl">Labs Completed</div>
+      </div>
+      <div class="cert-stat">
+        <div class="cert-stat-val">${score}%</div>
+        <div class="cert-stat-lbl">Final Score</div>
+      </div>
+      <div class="cert-stat">
+        <div class="cert-stat-val" style="font-size:16px;padding-top:4px">
+          <span class="cert-verdict-badge" style="background:${verdictBg};color:${verdictColor};border:1.5px solid ${verdictColor}">${verdict}</span>
+        </div>
+        <div class="cert-stat-lbl">Graduation Verdict</div>
+      </div>
+      <div class="cert-stat">
+        <div class="cert-stat-val" style="font-size:15px;padding-top:5px">${date}</div>
+        <div class="cert-stat-lbl">Date of Issue</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cert-footer">
+    <div class="cert-sig">
+      <div class="cert-sig-name">Programme Director</div>
+      <div class="cert-sig-line"></div>
+      <div class="cert-sig-title">Programme Director</div>
+      <div class="cert-sig-org">Diaas</div>
+    </div>
+
+    <div class="cert-badge-center">
+      ${badgeSVG}
+      <div class="cert-cred">
+        <strong>${credId}</strong>
+        Credential ID · Verify at diaas.in
+      </div>
+    </div>
+
+    <div class="cert-sig">
+      <div class="cert-sig-name">Head of Learning</div>
+      <div class="cert-sig-line"></div>
+      <div class="cert-sig-title">Head of Learning &amp; Development</div>
+      <div class="cert-sig-org">Diaas</div>
+    </div>
+  </div>
+
+  <div class="cert-bot-bar"></div>
+</div>
+
+<div class="no-print" style="text-align:center;padding:20px">
+  <button onclick="window.print()"
+    style="background:#E35205;color:white;border:none;padding:12px 36px;font-size:15px;font-weight:600;border-radius:6px;cursor:pointer;letter-spacing:0.5px;font-family:Arial,sans-serif;margin-right:12px">
+    🖨 Print / Save as PDF
+  </button>
+  <button onclick="window.close()"
+    style="background:transparent;color:#666;border:1px solid #ccc;padding:12px 24px;font-size:15px;border-radius:6px;cursor:pointer;font-family:Arial,sans-serif">
+    Close
+  </button>
+  <p style="margin-top:12px;font-size:12px;color:#999;font-family:Arial,sans-serif">
+    In print dialog: select A4 Landscape, set margins to None, enable "Background graphics"
+  </p>
+</div>
+</body>
+</html>`;
+}
+
 window.addEventListener('popstate', (e) => {
   const page = e.state?.page || (location.hash ? location.hash.slice(1) : 'dashboard');
   const valid = ['dashboard','soc','labs','leaderboard','profile','achievements'];
