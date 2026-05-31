@@ -143,20 +143,21 @@ function getProgress(req, res) {
   const users = db.prepare(`SELECT id, username FROM users WHERE role='analyst' ORDER BY username`).all();
   const labs  = db.prepare(`SELECT id, slug, title, points FROM labs ORDER BY order_index`).all();
   const allProg = db.prepare(`SELECT user_id, lab_id, status, score, completed_at FROM user_progress`).all();
+  // Batch-load scores to avoid N+1 queries (2 queries vs 2×N)
+  const labScores = db.prepare(
+    `SELECT user_id, COALESCE(SUM(pts_awarded),0) AS s FROM user_answers WHERE is_correct=1 GROUP BY user_id`
+  ).all().reduce((m, r) => { m[r.user_id] = r.s; return m; }, {});
+  const alertScores = db.prepare(
+    `SELECT user_id, COALESCE(SUM(points_awarded),0) AS s FROM alert_closures WHERE is_correct=1 GROUP BY user_id`
+  ).all().reduce((m, r) => { m[r.user_id] = r.s; return m; }, {});
+
   const matrix = users.map(u => {
     const row = { user_id: u.id, username: u.username, labs: {} };
     labs.forEach(l => {
       const p = allProg.find(x => x.user_id === u.id && x.lab_id === l.id);
       row.labs[l.slug] = p ? { status: p.status, score: p.score, completed_at: p.completed_at } : { status: 'not_started', score: 0 };
     });
-    // Sum user_answers pts directly — consistent with leaderboard scoring
-    const scoreRow = db.prepare(
-      `SELECT COALESCE(SUM(pts_awarded),0) AS s FROM user_answers WHERE user_id=? AND is_correct=1`
-    ).get(u.id);
-    const alertRow = db.prepare(
-      `SELECT COALESCE(SUM(points_awarded),0) AS s FROM alert_closures WHERE user_id=? AND is_correct=1`
-    ).get(u.id);
-    row.total_score = (scoreRow?.s || 0) + (alertRow?.s || 0);
+    row.total_score = (labScores[u.id] || 0) + (alertScores[u.id] || 0);
     return row;
   });
   return ok(res, { users: matrix, labs });

@@ -170,7 +170,7 @@ async function saveDraft(req, res) {
   db.prepare(`
     INSERT INTO draft_answers (user_id, lab_id, question_id, draft_answer)
     VALUES (?,?,?,?)
-    ON CONFLICT(user_id, question_id) DO UPDATE SET draft_answer=excluded.draft_answer
+    ON CONFLICT(user_id, lab_id, question_id) DO UPDATE SET draft_answer=excluded.draft_answer, saved_at=datetime('now')
   `).run(user.id, lab.id, question_id, String(answer || ''));
 
   return ok(res, { saved: true });

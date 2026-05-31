@@ -38,7 +38,7 @@ function getLab(req, res, slug) {
     `SELECT id, order_index, question, answer_type, options, points,
             hint, hint_levels, alert_ref
      FROM questions WHERE lab_id=? ORDER BY order_index`
-  ).all(lab.id).map(q => ({ ...q, options: q.options ? JSON.parse(q.options) : null }));
+  ).all(lab.id).map(q => ({ ...q, options: q.options ? (() => { try { return JSON.parse(q.options); } catch { return null; } })() : null }));
 
   const answeredRows = db.prepare(
     `SELECT question_id, is_correct, pts_awarded, attempt_number,
