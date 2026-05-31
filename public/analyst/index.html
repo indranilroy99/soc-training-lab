@@ -748,9 +748,24 @@ input, textarea, select { font-family: var(--font); }
       <div class="page" id="page-labs">
         <div class="page-hdr">
           <h1 class="page-title">My Labs</h1>
-          <p class="page-sub">73 labs across 3 stacks — beginner to expert. Investigate alerts before answering.</p>
+          <p class="page-sub" id="labs-count-sub">Loading labs…</p>
         </div>
-        <div class="filter-tabs" id="lab-filter-tabs">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <div style="position:relative;flex:1;min-width:200px;max-width:320px">
+              <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.45;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input id="lab-search" type="text" placeholder="Search labs…" autocomplete="off"
+                style="width:100%;height:34px;padding:0 12px 0 32px;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text);outline:none;box-sizing:border-box"
+                oninput="Pages.filterLabSearch(this.value)">
+            </div>
+            <select id="lab-diff-filter" onchange="Pages.filterLabSearch(document.getElementById('lab-search').value)"
+              style="height:34px;padding:0 10px;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text);outline:none;cursor:pointer">
+              <option value="">All Levels</option>
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select>
+          </div>
+          <div class="filter-tabs" id="lab-filter-tabs">
           <button class="filter-tab active" data-cat="all">All</button>
           <button class="filter-tab" data-cat="SOC Operations">SOC Ops</button>
           <button class="filter-tab" data-cat="Network Security">Network</button>
@@ -891,7 +906,13 @@ input, textarea, select { font-family: var(--font); }
                   </div>
                 </div>
                 <!-- Performance Score -->
-                <div style="margin-top:16px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:4px" id="prof-dps-wrap" style="display:none">
+                <!-- Certificate button shown after graduation -->
+        <div id="prof-cert-area" style="display:none;margin-bottom:14px;padding:14px;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:8px">
+          <div style="font-size:13px;font-weight:600;color:var(--purple);margin-bottom:4px">🎓 Graduation Complete</div>
+          <div style="font-size:12px;color:var(--dim);margin-bottom:10px">You've completed the DIAAS-SEC SOC Analyst programme.</div>
+          <button class="btn btn-primary btn-sm" onclick="Pages.printCertificate()" style="font-size:12px">🖨 Download Certificate</button>
+        </div>
+        <div style="margin-top:16px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:4px" id="prof-dps-wrap" style="display:none">
                   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
                     <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim)">Performance Score</span>
                     <span style="font-size:10px;color:var(--dim)">Weighted 0–100</span>
@@ -981,6 +1002,7 @@ input, textarea, select { font-family: var(--font); }
     <div id="lab-view">
       <!-- Back bar — fixed at top -->
       <div class="lab-view-topbar">
+        <button class="btn btn-outline btn-sm" style="color:var(--dim);font-size:12px" onclick="Pages.confirmResetLab()" title="Reset all your answers for this lab">↺ Reset</button>
         <button class="btn btn-outline btn-sm" onclick="App.navigate('labs')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
           Back to Labs
@@ -1547,8 +1569,74 @@ const Pages = {
     </div>`;
   },
 
+  // Lab search + difficulty filter
+  async confirmResetLab() {
+    const slug = App.currentLabSlug;
+    if (!slug) return;
+    if (!confirm('Reset all your answers and progress for this lab? This cannot be undone.')) return;
+    try {
+      await API.post('/api/labs/' + slug + '/reset', {});
+      toast('Lab progress reset. Starting fresh!', 'info');
+      // Reload the lab
+      App.currentLabSlug = null;
+      await App.openLab(slug);
+    } catch(e) {
+      toast('Failed to reset lab', 'error');
+    }
+  },
+
+  filterLabSearch(query) {
+    const q = (query || '').toLowerCase().trim();
+    const diff = (document.getElementById('lab-diff-filter')?.value || '').toLowerCase();
+    const cat = Pages._currentCat || 'all';
+    if (!q && !diff) { Pages.renderLabsGrid(cat); return; }
+    const filtered = App.labsData.filter(l => {
+      if (cat !== 'all' && l.category !== cat) return false;
+      if (diff && l.difficulty !== diff) return false;
+      if (q) {
+        const text = ((l.title||'') + ' ' + (l.description||'') + ' ' + (l.category||'') + ' ' + (l.session_tag||'')).toLowerCase();
+        if (!text.includes(q)) return false;
+      }
+      return true;
+    });
+    Pages._renderFilteredLabs(filtered, q || diff ? `${filtered.length} lab${filtered.length!==1?'s':''} matching "${q || diff}"` : null);
+  },
+
+  _renderFilteredLabs(labs, headerMsg) {
+    const el = document.getElementById('lab-list');
+    if (!el) return;
+    // Temporarily override renderLabsGrid data, render, then restore
+    const savedData = App.labsData;
+    App.labsData = labs;
+    const savedCat = Pages._currentCat;
+    Pages._currentCat = 'all';
+    // Render the filtered grid, prepend the header message
+    Pages.renderLabsGrid('all');
+    if (headerMsg) {
+      const header = document.createElement('div');
+      header.style.cssText = 'font-size:12.5px;color:var(--dim);margin-bottom:12px;padding:4px 0';
+      header.textContent = headerMsg;
+      el.insertBefore(header, el.firstChild);
+    }
+    App.labsData = savedData;
+    Pages._currentCat = savedCat;
+  },
+
   renderLabsGrid(cat) {
     Pages._currentCat = cat;
+    // Update dynamic subtitle
+    const subEl = document.getElementById('labs-count-sub');
+    if (subEl) {
+      const total = App.labsData.length;
+      const done = App.labsData.filter(l=>l.status==='completed').length;
+      const inProg = App.labsData.filter(l=>l.status==='in_progress').length;
+      subEl.textContent = `${total} labs · ${done} completed · ${inProg} in progress`;
+    }
+    // Clear search when switching category
+    const searchEl = document.getElementById('lab-search');
+    const diffEl   = document.getElementById('lab-diff-filter');
+    if (searchEl) searchEl.value = '';
+    if (diffEl)   diffEl.value   = '';
     document.querySelectorAll('.filter-tab').forEach(t => {
       t.classList.toggle('active', t.dataset.cat === cat);
     });
@@ -2080,6 +2168,21 @@ const Pages = {
     } catch(e) { wrap.innerHTML = '<div class="empty-state"><div class="empty-title">Failed to load</div></div>'; }
   },
 
+  async printCertificate() {
+    const me = App.meData;
+    if (!me) return;
+    try {
+      const grad = await API.get('/api/graduation/report');
+      const date = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+      const verdict = grad.verdict || 'Pass';
+      const score = grad.overall_score || 0;
+      const name = escapeHtml(me.display_name || me.username);
+      const win = window.open('', '_blank', 'width=900,height=700');
+      win.document.write('<html><head><title>SOC Certificate</title><style>body{margin:0;background:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Georgia,serif}.cert{width:800px;padding:60px;border:8px solid #1a1a2e;position:relative;text-align:center}.cert::before{content:"";position:absolute;inset:12px;border:2px solid #c9aa71;pointer-events:none}.t1{font-size:11px;letter-spacing:5px;text-transform:uppercase;color:#666;margin-bottom:8px}.t2{font-size:42px;font-weight:700;color:#1a1a2e;margin:16px 0;letter-spacing:2px}.t3{font-size:13px;color:#888;letter-spacing:3px;text-transform:uppercase;margin-bottom:30px}.name{font-size:32px;color:#c9aa71;font-style:italic;margin:20px 0;border-bottom:2px solid #c9aa71;padding-bottom:10px;display:inline-block;min-width:300px}.body{font-size:14px;color:#444;line-height:1.8;margin:16px 0}.verdict{font-size:22px;font-weight:700;color:#1a1a2e;margin:16px 0}.footer{margin-top:40px;display:flex;justify-content:space-between;padding-top:20px;border-top:1px solid #eee}.sig{text-align:center}.sigline{width:160px;border-top:1px solid #333;margin:0 auto 6px}.siglabel{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#888}@media print{.noprint{display:none}}</style></head><body><div class="cert"><div class="t1">DIAAS-SEC Training Program</div><div class="t2">Certificate of Achievement</div><div class="t3">SOC Analyst Certification</div><div class="body">This certifies that</div><div class="name">' + name + '</div><div class="body">has successfully completed the DIAAS-SEC SOC Analyst Training Program,<br>demonstrating proficiency in threat detection, incident response, and security operations.</div><div class="verdict">Graduation Verdict: ' + verdict + '</div><div class="body" style="color:#666">Score: ' + score + '% &nbsp;·&nbsp; Issued: ' + date + '</div><div class="footer"><div class="sig"><div class="sigline"></div><div class="siglabel">Programme Director</div></div><div style="font-size:48px;opacity:.07;align-self:center">🔒</div><div class="sig"><div class="sigline"></div><div class="siglabel">Date of Issue</div></div></div><button class="noprint" onclick="window.print()" style="margin-top:20px;padding:10px 28px;background:#1a1a2e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px">Print / Save as PDF</button></div></body></html>');
+      win.document.close();
+    } catch { toast('Complete the graduation lab to get a certificate', 'error'); }
+  },
+
   profile() {
     // Load and populate profile fields from /api/me
     const me = App.meData;
@@ -2102,6 +2205,14 @@ const Pages = {
         if (avatarEl) avatarEl.style.display = 'none';
       }
     }
+    // Load graduation status and show certificate button if graduated
+    API.get('/api/graduation/status').then(grad => {
+      const certArea = document.getElementById('prof-cert-area');
+      if (certArea && grad && grad.unlocked) {
+        certArea.style.display = '';
+      }
+    }).catch(() => {});
+
     // Load performance score
     API.get('/api/me/performance').then(p => {
       if (!p || typeof p.dps === 'undefined') return;
