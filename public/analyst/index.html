@@ -1266,14 +1266,18 @@ const App = {
 
     await App.loadLabs();
 
-    // Restore last page/lab state from localStorage
-    const lastPage = localStorage.getItem('diaas_last_page');
+    // Restore page: prefer URL hash (set by navigate() and persists through refresh),
+    // fall back to localStorage, then dashboard
+    const validPages = ['dashboard','soc','labs','leaderboard','profile','achievements'];
+    const hashPage   = location.hash ? location.hash.slice(1) : null;
+    const lastPage   = localStorage.getItem('diaas_last_page');
     const lastLabSlug = localStorage.getItem('diaas_last_lab_slug');
 
-    if (lastLabSlug && lastPage === 'lab-view') {
-      // Restore lab view
+    if (hashPage && validPages.includes(hashPage)) {
+      App.navigate(hashPage);
+    } else if (lastLabSlug && lastPage === 'lab-view') {
       App.openLab(lastLabSlug, true);
-    } else if (lastPage && lastPage !== 'lab-view') {
+    } else if (lastPage && lastPage !== 'lab-view' && validPages.includes(lastPage)) {
       App.navigate(lastPage);
     } else {
       App.navigate('dashboard');

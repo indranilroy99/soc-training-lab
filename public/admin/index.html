@@ -486,27 +486,30 @@ td.td-mono { font-family: var(--mono); font-size: 12px; }
           <h1 class="page-title">Student Performance</h1>
           <p class="page-sub">Weighted Performance Score (0–100) across all students. Formula: Lab Accuracy 40% · Alert Quality 30% · Efficiency 20% · Coverage 10%.</p>
         </div>
-        <!-- Score formula explanation -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px" id="perf-formula">
-          <div style="background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px">
-            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-bottom:4px">Lab Accuracy</div>
-            <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--blue)">40%</div>
-            <div style="font-size:11px;color:var(--dim);margin-top:3px">pts earned / pts possible</div>
-          </div>
-          <div style="background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px">
-            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-bottom:4px">Alert Quality</div>
-            <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--blue)">30%</div>
-            <div style="font-size:11px;color:var(--dim);margin-top:3px">correct closures + IR depth</div>
-          </div>
-          <div style="background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px">
-            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-bottom:4px">Efficiency</div>
-            <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--blue)">20%</div>
-            <div style="font-size:11px;color:var(--dim);margin-top:3px">no hints, no retries</div>
-          </div>
-          <div style="background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px">
-            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-bottom:4px">Coverage</div>
-            <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--blue)">10%</div>
-            <div style="font-size:11px;color:var(--dim);margin-top:3px">% of platform engaged</div>
+        <!-- DPS Formula reference (not student data — these are weighting constants) -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:20px" id="perf-formula">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:10px">DPS Scoring Formula Weights</div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--blue)">40%</span>
+              <div><div style="font-size:12px;font-weight:600;color:var(--text)">Lab Accuracy</div><div style="font-size:11px;color:var(--dim)">pts earned / pts possible</div></div>
+            </div>
+            <div style="color:var(--border)">+</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--blue)">30%</span>
+              <div><div style="font-size:12px;font-weight:600;color:var(--text)">Alert Quality</div><div style="font-size:11px;color:var(--dim)">correct closures + IR depth</div></div>
+            </div>
+            <div style="color:var(--border)">+</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--blue)">20%</span>
+              <div><div style="font-size:12px;font-weight:600;color:var(--text)">Efficiency</div><div style="font-size:11px;color:var(--dim)">no hints, no retries</div></div>
+            </div>
+            <div style="color:var(--border)">+</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--blue)">10%</span>
+              <div><div style="font-size:12px;font-weight:600;color:var(--text)">Coverage</div><div style="font-size:11px;color:var(--dim)">% of platform engaged</div></div>
+            </div>
+            <div style="margin-left:auto;font-size:11px;color:var(--dim);font-style:italic">Student scores appear in the table below as analysts complete labs and close alerts</div>
           </div>
         </div>
         <!-- Performance table -->
@@ -1097,7 +1100,10 @@ const App = {
     document.querySelectorAll('.nav-item[data-page]').forEach(el => {
       el.addEventListener('click', () => App.navigate(el.dataset.page));
     });
-    App.navigate('overview');
+    // Restore page from URL hash (persists through refresh)
+    const validAdminPages = ['overview','users','progress','performance','leaderboard','labs','analytics','settings'];
+    const startPage = initialPage && validAdminPages.includes(initialPage) ? initialPage : 'overview';
+    App.navigate(startPage);
   },
 
   navigate(page) {

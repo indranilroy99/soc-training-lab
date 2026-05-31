@@ -48,20 +48,28 @@ function listUsers(req, res) {
       LEFT JOIN (SELECT user_id, MAX(COALESCE(last_seen_at, expires_at)) AS last_seen, MAX(expires_at) AS expires_at FROM sessions GROUP BY user_id) sess ON sess.user_id=u.id
       ORDER BY is_online DESC, u.username ASC
     `).all();
-  } catch {
-    // Fallback: use only columns guaranteed to exist in base schema
-    users = db.prepare(`
-      SELECT u.id, u.username, u.role, u.is_active, u.created_at,
-        NULL AS display_name, NULL AS email, NULL AS force_pw_change,
-        COALESCE(lab.score,0) + COALESCE(cls.score,0) AS score,
-        COALESCE(prog.labs_done,0) AS labs_done,
-        NULL AS last_seen, NULL AS expires_at, 0 AS is_online
-      FROM users u
-      LEFT JOIN (SELECT user_id, SUM(CASE WHEN is_correct=1 THEN pts_awarded ELSE 0 END) s FROM user_answers GROUP BY user_id) lab ON lab.user_id=u.id
-      LEFT JOIN (SELECT user_id, SUM(points_awarded) s FROM alert_closures WHERE is_correct=1 GROUP BY user_id) cls ON cls.user_id=u.id
-      LEFT JOIN (SELECT user_id, COUNT(DISTINCT lab_id) AS labs_done FROM user_progress WHERE status='completed' GROUP BY user_id) prog ON prog.user_id=u.id
-      ORDER BY u.username ASC
-    `).all();
+  } catch (e1) {
+    // Fallback level 2: scores-included query failed — try without score JOINs
+    try {
+      users = db.prepare(`
+        SELECT u.id, u.username, u.role, u.is_active, u.created_at,
+          NULL AS display_name, NULL AS email, NULL AS force_pw_change,
+          COALESCE(lab.score,0) AS score, COALESCE(prog.labs_done,0) AS labs_done,
+          NULL AS last_seen, NULL AS expires_at, 0 AS is_online
+        FROM users u
+        LEFT JOIN (SELECT user_id, SUM(CASE WHEN is_correct=1 THEN pts_awarded ELSE 0 END) AS score FROM user_answers GROUP BY user_id) lab ON lab.user_id=u.id
+        LEFT JOIN (SELECT user_id, COUNT(DISTINCT lab_id) AS labs_done FROM user_progress WHERE status='completed' GROUP BY user_id) prog ON prog.user_id=u.id
+        ORDER BY u.username ASC
+      `).all();
+    } catch (e2) {
+      // Nuclear fallback: just return users with no score data
+      try {
+        users = db.prepare(`SELECT id, username, role, is_active, created_at FROM users ORDER BY username ASC`).all()
+          .map(u => ({ ...u, display_name: null, email: null, force_pw_change: 1, score: 0, labs_done: 0, last_seen: null, expires_at: null, is_online: 0 }));
+      } catch (e3) {
+        users = [];
+      }
+    }
   }
   return ok(res, users);
 }
